@@ -46,7 +46,7 @@ pub fn scan_repository(repo: &GithubRepository, tarball_path: &Path) -> anyhow::
     let pinch_audit = File::open(root.join("pinch.yaml"))
         .map(BufReader::new)
         .ok()
-        .and_then(|reader| serde_yaml::from_reader::<_, pinch::schema::PinchManifest>(reader).ok())
+        .and_then(|reader| serde_saphyr::from_reader::<_, pinch::schema::PinchManifest>(reader).ok())
         .map(|manifest| manifest.audit());
 
     let has_dockerfile = root.join("Dockerfile").exists() || root.join("docker-compose.yml").exists();
