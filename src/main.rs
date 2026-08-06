@@ -106,8 +106,6 @@ async fn main() -> Result<()> {
             let data_store = DataStore::new(&cli.data_dir, &cli.organization)?;
             let saved_path = data_store.save_scan(&stats_list)?;
             eprintln!("Saved scan snapshot to {:?}", saved_path);
-
-            println!("{}", serde_json::to_string_pretty(&stats_list)?);
         }
 
         Commands::Inspect { repository } => {

@@ -1,11 +1,11 @@
-pub mod ecosystems;
-
+pub mod pathcollector;
 use crate::github::GithubRepository;
 use crate::sandbox::TarballSandbox;
+use crate::scanners::pathcollector::{PathCollector, Pattern};
 use serde::Serialize;
 use std::fs::File;
 use std::io::BufReader;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Serialize)]
 pub struct DependencyReport {
@@ -25,53 +25,45 @@ pub struct RepoStats {
     pub private: bool,
     pub has_unique_commits: bool,
     pub description: String,
-    pub has_ansible_configuration: bool,
-    pub has_dockerfile: bool,
-    pub has_legopfa: bool,
+    pub pinch_audit: Option<pinch::schema::PinchAudit>,
+    pub ansible_confs: Vec<PathBuf>,
+    pub docker_files: Vec<PathBuf>,
+    pub legopfa_confs: Vec<PathBuf>,
     pub ecosystems_detected: Vec<String>,
     pub dependency_reports: Vec<DependencyReport>,
-    pub pinch_audit: Option<pinch::schema::PinchAudit>,
-}
-
-trait EcosystemScanner: Send + Sync {
-    fn name(&self) -> &'static str;
-    fn is_present(&self, root: &Path) -> bool;
-    fn scan(&self, root: &Path) -> anyhow::Result<DependencyReport>;
 }
 
 pub fn scan_repository(repo: &GithubRepository, tarball_path: &Path) -> anyhow::Result<RepoStats> {
     let sandbox = TarballSandbox::unpack(tarball_path)?;
     let root = sandbox.path();
 
-    let pinch_audit = File::open(root.join("pinch.yaml"))
+    let matches = PathCollector::new()
+        .register("pinch_manifest", Pattern::ExactPath(PathBuf::from("pinch.yaml")))
+        .register("docker_files", Pattern::FileName("Dockerfile".to_string()))
+        .register(
+            "docker_compose_files",
+            Pattern::FileName("docker-compose.yml".to_string()),
+        )
+        .register("ansible_confs", Pattern::FileName("ansible.cfg".to_string()))
+        .register_pattern("legopfa_confs", |name| {
+            name.starts_with("legopfa") && name.ends_with(".json")
+        })
+        .scan(root);
+
+    // Combined path lists ready to be saved in RepoStats if needed
+    let docker_files = matches["docker_files"]
+        .iter()
+        .chain(&matches["docker_compose_files"])
+        .cloned()
+        .collect();
+
+    // 3. Parse pinch audit directly if matched
+    let pinch_audit = matches["pinch_manifest"]
+        .first()
+        .and_then(|rel_path| File::open(root.join(rel_path)).ok())
         .map(BufReader::new)
-        .ok()
         .and_then(|reader| serde_saphyr::from_reader::<_, pinch::schema::PinchManifest>(reader).ok())
         .map(|manifest| manifest.audit());
-
-    let has_dockerfile = root.join("Dockerfile").exists() || root.join("docker-compose.yml").exists();
-    let has_ansible =
-        root.join("ansible.cfg").exists() || root.join("requirements.yml").exists() || root.join("roles").is_dir();
-
-    let has_legopfa = walkdir(root).any(|p| {
-        p.file_name()
-            .and_then(|n| n.to_str())
-            .map_or(false, |name| name.starts_with("legopfa") && name.ends_with(".json"))
-    });
-
-    let scanners: Vec<Box<dyn EcosystemScanner>> = vec![];
-
-    let mut ecosystems_detected = Vec::new();
-    let mut dependency_reports = Vec::new();
-
-    for scanner in scanners {
-        if scanner.is_present(root) {
-            ecosystems_detected.push(scanner.name().to_string());
-            if let Ok(report) = scanner.scan(root) {
-                dependency_reports.push(report);
-            }
-        }
-    }
 
     Ok(RepoStats {
         name: repo.name.clone(),
@@ -83,29 +75,11 @@ pub fn scan_repository(repo: &GithubRepository, tarball_path: &Path) -> anyhow::
         private: repo.private,
         has_unique_commits: !repo.fork,
         description: repo.description.clone().unwrap_or_default(),
-        has_ansible_configuration: has_ansible,
-        has_dockerfile,
-        has_legopfa,
-        ecosystems_detected,
-        dependency_reports,
+        ansible_confs: matches["ansible_confs"].clone(),
+        docker_files: docker_files,
+        legopfa_confs: matches["legopfa_confs"].clone(),
+        ecosystems_detected: vec![],
+        dependency_reports: vec![],
         pinch_audit,
     })
-}
-
-fn walkdir(root: &Path) -> impl Iterator<Item = std::path::PathBuf> {
-    let mut dirs = vec![root.to_path_buf()];
-    let mut files = Vec::new();
-    while let Some(dir) = dirs.pop() {
-        if let Ok(entries) = std::fs::read_dir(dir) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.is_dir() {
-                    dirs.push(path);
-                } else {
-                    files.push(path);
-                }
-            }
-        }
-    }
-    files.into_iter()
 }

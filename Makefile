@@ -29,6 +29,10 @@ check-deps:
 	@cargo update --dry-run
 
 
+serve:
+	(cd data; python3 -m http.server) &
+	sleep 2
+	open http://localhost:8000
 
 
 publish-github: build-release
