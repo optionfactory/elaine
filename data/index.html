@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OptionFactory Audit Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="icon" href="favicon.ico">
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;500;700&amp;display=swap" rel="stylesheet">
+
+    <script type="importmap">
+            {
+                "imports": {
+                    "keycloak": "https://cdn.jsdelivr.net/npm/keycloak-js@26.2.4/lib/keycloak.min.js",
+                    "httpc": "https://cdn.jsdelivr.net/npm/@optionfactory/fml@8.0.0/dist/httpc.min.mjs",
+                    "ftl": "https://cdn.jsdelivr.net/npm/@optionfactory/fml@8.0.0/dist/ftl.min.mjs"
+                },
+                "integrity": {
+                    "https://cdn.jsdelivr.net/npm/keycloak-js@26.2.4/lib/keycloak.min.js": "sha384-3dLZL/6pJWOsiKO0DUwX1GPrD7guTngu8UJ77+42Wc5973GeNTgBno7bY7HCQiR1",
+                    "https://cdn.jsdelivr.net/npm/@optionfactory/fml@8.0.0/dist/httpc.min.mjs": "sha384-9QJP1Q+GlS7keulFI7PAA8amAXjQS6dvYexTmkbKvlJg23ISvRjVUJfDMzJ+9VEL",
+                    "https://cdn.jsdelivr.net/npm/@optionfactory/fml@8.0.0/dist/ftl.min.mjs": "sha384-o8jSbzfN8frPZI1vZ6AnCXymJ9qtGYaJdY8ThO2O137DNlcGX1Ug39nS6QZxsY0p"
+                }
+            }
+        </script>
+    <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/keycloak-js@26.2.4/lib/keycloak.min.js">
+    <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/@optionfactory/fml@8.0.0/dist/httpc.min.mjs">
+    <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/@optionfactory/fml@8.0.0/dist/ftl.min.mjs">
+    <link rel="stylesheet" href="assets/index.css">
+</head>
+</head>
+
+<body>
+
+    <header>
+        <h1>OptionFactory System Dashboard</h1>
+        <p>Audit overview and projects status loaded from <code>optionfactory/latest.json</code></p>
+        <button type="button" class="btn-roulette" data-filter="roulette">
+            <span>Audit Roulette</span>
+        </button>
+    </header>
+
+    <metrics-grid>
+    </metrics-grid>
+
+    <search-bar>
+        <form>
+            <input type="text" name="search" placeholder="Search by repository, commissioner, steward, or domain..." />
+        </form>
+    </search-bar>
+
+    <loading-spinner id="spinner">
+        <div class="spinner"></div>
+    </loading-spinner>
+
+    <projects-grid></projects-grid>
+
+    <template id="metrics-template">
+        <button class="metric-card" data-filter="all">
+            <h2>Total Repositories</h2>
+            {{ repos }}
+        </button>
+        <button class="metric-card compliant" data-filter="audited">
+            <h2>Audited Projects</h2>
+            {{ audited }}
+        </button>
+        <button class="metric-card">
+            <h2>TODO</h2>
+            0
+        </button>
+        <button class="metric-card">
+            <h2>TODO</h2>
+            0
+        </button>
+        <button class="metric-card">
+            <h2>TODO</h2>
+            0
+        </button>
+        <button class="metric-card noncompliant" data-filter="unaudited">
+            <h2>Unaudited Projects</h2>
+            {{ unaudited }}
+        </button>
+        <button class="metric-card">
+            <h2>TODO</h2>
+            0
+        </button>
+        <button class="metric-card">
+            <h2>TODO</h2>
+            0
+        </button>
+
+    </template>
+
+    <template id="projects-template">
+        <error-box data-tpl-if="self.length == 0">No matching repositories found.</error-box>
+        <project-card data-tpl-each="self">
+            <project-header>
+                <div>
+                    <h2>{{ name }}</h2>
+                    <div style="margin-top: 0.3rem;">
+                        <badge data-tpl-if="private" class="private">Private</badge>
+                        <badge data-tpl-if="!private" class="public">Public</badge>
+                        <badge data-tpl-if="fork" class="fork">Fork</badge>
+                        <badge data-tpl-if="disabled" class="disabled">Disabled</badge>
+                        <badge data-tpl-if="archived" class="archived">Archived</badge>
+                        <badge data-tpl-if="!pinch_audit" class="unaudited">No Audit</badge>
+                        <badge data-tpl-if="pinch_audit?.project?.tier" class="tier">{{ pinch_audit.project.tier}}</badge>
+                        <badge data-tpl-if="pinch_audit?.project?.lifecycle" class="lifecycle">{{ pinch_audit.project.lifecycle }}</badge>
+                    </div>
+                </div>
+                <div style="text-align: right; font-size: 0.8rem; color: var(--text-muted);">
+                    Updated: {{ updated_at }}
+                </div>
+            </project-header>
+
+            <info-group data-tpl-if="pinch_audit?.project" data-tpl-with="pinch_audit?.project">
+                <info-item>
+                    <span class="label">Project Name</span>
+                    <span class="value">{{name}}</span>
+                </info-item>
+                <info-item>
+                    <span class="label">Project type</span>
+                    <span class="value">{{ type}}</span>
+                </info-item>
+
+                <info-item>
+                    <span class="label">Commissioner / Channel</span>
+                    <span class="value">{{ commissioner }} / {{ channel}}</span>
+                </info-item>
+                <info-item>
+                    <span class="label">Stewards</span>
+                    <span class="value">{{ stewards?.join(', ')}}</span>
+                </info-item>
+                <info-item>
+                    <span class="label">Authentication</span>
+                    <span class="value">{{authentication?.join(', ')}}</span>
+                </info-item>
+                <info-item>
+                    <span class="label">Sensitivity</span>
+                    <span class="value">{{sensitivity?.join(', ') }}</span>
+                </info-item>
+            </info-group>
+
+            <section>
+                <h3 data-tpl-if="pinch_audit?.project?.compliance">Compliance Frameworks</h3>
+                <tag-list data-tpl-if="pinch_audit?.project?.compliance">
+                    <tag>DORA: {{pinch_audit.project.compliance.dora}}</tag>
+                    <tag>CRA: {{pinch_audit.project.compliance.cra}}</tag>
+                    <tag>NIS2: {{pinch_audit.project.compliance.nis2}}</tag>
+                    <tag>AI Act: {{pinch_audit.project.compliance.ai_act}}</tag>
+                    <tag>GDPR Residency: {{pinch_audit.project.compliance.gdpr.data_residency}}</tag>
+                </tag-list>
+            </section>
+
+
+            <section data-tpl-if="pinch_audit?.project?.environments">
+                <h3>Environments</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Environment</th>
+                            <th>Type</th>
+                            <th>Platform</th>
+                            <th>Ingress</th>
+                            <th>Domains</th>
+                            <th>Certs</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr data-tpl-each="pinch_audit.project.environments" data-tpl-var="env">
+                            <td><strong>{{ env.name }}</strong></td>
+                            <td>{{env.type}}</td>
+                            <td>{{env.platform}}</td>
+                            <td>{{env.ingress}}</td>
+                            <td><code>{{env.domains}}</code></td>
+                            <td>{{env.certificates}}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <section data-tpl-if="pinch_audit?.containers">
+                <h3>Containers</h3>
+                <tag-list>
+                    <tag data-tpl-each="pinch_audit?.containers" class="container">{{ self }}
+                    </tag>
+                </tag-list>
+            </section>
+
+            <section>
+                <h3>Docker files</h3>
+                <tag-list>
+                    <tag data-tpl-each="docker_files" class="dockerfile">{{ self }}</tag>
+                    <tag data-tpl-if="!docker_files.length">No docker files found in this project</tag>
+                </tag-list>
+            </section>
+
+            <section>
+                <h3>Ansible</h3>
+                <tag-list>
+                    <tag data-tpl-each="ansible_confs" class="ansible">{{ self }}</tag>
+                    <tag data-tpl-if="!ansible_confs.length">No ansible configurations found in this
+                        project</tag>
+                </tag-list>
+            </section>
+
+
+            <section>
+                <h3>Legopfa</h3>
+                <tag-list>
+                    <tag data-tpl-each="legopfa_confs" class="legopfa">{{ self }}</tag>
+                    <tag data-tpl-if="!legopfa_confs.length">No legopfa configurations found in this
+                        project</tag>
+                </tag-list>
+            </section>
+
+
+        </project-card>
+
+    </template>
+    <script type="module">
+        import Keycloak from "keycloak";
+        import { Templates } from "ftl";
+        import { HttpClient, HttpClientError } from "httpc";
+
+        const response = await fetch('optionfactory/latest.json');
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+
+
+        const data = await response.json();
+        const projectsTemplate = Templates.fromSelector('#projects-template');
+        const updateProjects = async (data) => {
+            const spinner = document.querySelector('loading-spinner');
+            const grid = document.querySelector('projects-grid');
+            spinner.removeAttribute('hidden');
+            grid.setAttribute('hidden', '');
+            const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+            await sleep(10);
+            try{
+                projectsTemplate.withOverlay(data).renderToSelector('projects-grid');
+            }finally{
+                spinner.setAttribute('hidden', '');
+                grid.removeAttribute('hidden');
+            }
+        }
+
+        const stats = {
+            repos: data.length,
+            audited: data.filter(repo => repo.pinch_audit).length,
+            unaudited: data.filter(repo => !repo.pinch_audit).length,
+            unique_containers: new Set(data.flatMap(repo => repo.pinch_audit?.containers ?? [])).size
+        }
+
+        Templates.fromSelector('#metrics-template').withOverlay(stats).renderToSelector('metrics-grid')
+        updateProjects(data);
+
+        document.querySelector('form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const query = new FormData(e.target).get('search').toLowerCase();
+            const filtered = data.filter(item => JSON.stringify(item).toLowerCase().includes(query));
+            updateProjects(filtered);
+        });
+
+        document.querySelector('body').addEventListener('click', e => {
+            const button = e.target.closest('[data-filter]');
+            if (!button) {
+                return;
+            }
+            switch (button.dataset.filter) {
+                case "all":  {
+                    updateProjects(data);
+                }
+                break;
+                case "audited":{
+                    updateProjects(data.filter(r => r.pinch_audit));
+                }
+                break;
+                case "unaudited":{
+                    updateProjects(data.filter(r => !r.pinch_audit));
+                }
+                break;
+                case "roulette":{
+                    const d = data.filter(r => !r.pinch_audit)
+                    const pick = d[Math.floor(Math.random() * d.length)]
+                    updateProjects([pick]);
+                }
+                break;
+            }
+
+        })
+    </script>
+</body>
+
+</html>
