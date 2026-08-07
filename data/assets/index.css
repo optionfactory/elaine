@@ -107,9 +107,12 @@ metrics-grid {
         font-family: inherit;
         outline: none;
 
-        &.noncompliant { border-top-color: var(--danger, #ef4444); }
+        &.all        { border-top-color: var(--neutral, #64748b); }
+        &.live         { border-top-color: var(--info, #3b82f6); }
+        &.public       { border-top-color: var(--sky, #06b6d4); }
+        &.private      { border-top-color: var(--warning, #f59e0b); }
         &.compliant    { border-top-color: var(--success, #22c55e); }
-        &.warning      { border-top-color: var(--warning, #f59e0b); }
+        &.noncompliant { border-top-color: var(--danger, #ef4444); }
 
         &:focus-visible {
             border-color: var(--primary);
