@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use clap::Parser;
-use indicatif::{ProgressBar, ProgressStyle};
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use repospect::cache::RepositoryCache;
 use repospect::cli::{CacheCommands, Cli, Commands, DataCommands};
 use repospect::data::DataStore;
@@ -22,7 +22,8 @@ async fn main() -> Result<()> {
             let repos = client.fetch_org_repos(&cli.organization).await?;
 
             let total = repos.len() as u64;
-            let progress = make_progress(total, "Downloading repository archives...".to_string());
+            let m = MultiProgress::new();
+            let main_pb = m.add(make_main_progress(total, "Downloading archives...".to_string()));
             let sem = Arc::new(Semaphore::new(2));
 
             let mut tasks = Vec::new();
@@ -31,20 +32,33 @@ async fn main() -> Result<()> {
                 let client = Arc::clone(&client);
                 let cache = Arc::clone(&cache);
                 let sem = Arc::clone(&sem);
-                let pb = Arc::clone(&progress);
                 let org = cli.organization.clone();
+
+                let task_pb = m.add(ProgressBar::new_spinner());
+                task_pb.set_style(
+                    ProgressStyle::default_spinner()
+                        .template("{spinner:.blue} {msg}")
+                        .unwrap(),
+                );
+                task_pb.enable_steady_tick(std::time::Duration::from_millis(100));
+                task_pb.set_message(format!("Syncing {}...", repo.name));
+
+                let main_pb_clone = main_pb.clone();
 
                 tasks.push(tokio::spawn(async move {
                     let _permit = sem.acquire().await.unwrap();
                     let res = cache.sync_repo(&client, &org, &repo, force).await;
+
                     match res {
-                        Ok(_status) => {
-                            pb.inc(1);
+                        Ok(_) => {
+                            task_pb.finish_and_clear();
+                            main_pb_clone.inc(1);
                             Ok(())
                         }
                         Err(e) => {
-                            pb.println(format!("[ERROR] {}: {}", repo.name, e));
-                            pb.inc(1);
+                            task_pb.finish_and_clear();
+                            main_pb_clone.println(format!("❌ [ERROR] {}: {}", repo.name, e));
+                            main_pb_clone.inc(1);
                             Err(e)
                         }
                     }
@@ -55,7 +69,7 @@ async fn main() -> Result<()> {
                 let _ = t.await?;
             }
 
-            progress.finish_with_message("Sync complete!");
+            main_pb.finish_with_message("Sync complete!");
         }
 
         Commands::Scan => {
@@ -67,10 +81,12 @@ async fn main() -> Result<()> {
 
             let worker_count = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4);
             let sem = Arc::new(Semaphore::new(worker_count.max(1)));
-            let progress = make_progress(
+
+            let m = MultiProgress::new();
+            let main_pb = m.add(make_main_progress(
                 total,
-                format!("Scanning repositories using {} workers...", worker_count),
-            );
+                format!("Scanning with {} workers...", worker_count),
+            ));
 
             let mut tasks = Vec::new();
 
@@ -78,37 +94,52 @@ async fn main() -> Result<()> {
                 let cache = Arc::clone(&cache);
                 let data_store = Arc::clone(&data_store);
                 let sem = Arc::clone(&sem);
-                let pb = Arc::clone(&progress);
+                let main_pb_clone = main_pb.clone();
+
+                let task_pb = m.add(ProgressBar::new_spinner());
+                task_pb.set_style(
+                    ProgressStyle::default_spinner()
+                        .template("{spinner:.magenta} {msg}")
+                        .unwrap(),
+                );
 
                 tasks.push(tokio::spawn(async move {
                     let _permit = sem.acquire().await.unwrap();
                     let repo_name = repo.name.clone();
 
-                    if data_store.is_scan_fresh(&repo_name, &repo.updated_at) {
-                        pb.inc(1);
+                    if data_store.is_scan_fresh(&repo_name, &repo.pushed_at) {
+                        main_pb_clone.inc(1);
+                        task_pb.finish_and_clear();
                         return Ok(());
                     }
 
+                    task_pb.enable_steady_tick(std::time::Duration::from_millis(100));
+                    task_pb.set_message(format!("[{}] Starting...", repo_name));
+
                     let tar_path = cache.tarball_path(&repo_name);
                     let result = if tar_path.exists() {
-                        tokio::task::spawn_blocking(move || repospect::scanners::scan_repository(&repo, &tar_path))
-                            .await
-                            .unwrap()
+                        let pb_clone = task_pb.clone();
+                        tokio::task::spawn_blocking(move || {
+                            repospect::scanners::scan_repository(&repo, &tar_path, Some(pb_clone))
+                        })
+                        .await
+                        .unwrap()
                     } else {
-                        Err(anyhow::anyhow!("Tarball missing for repo: {}", repo_name))
+                        Err(anyhow::anyhow!("Tarball missing"))
                     };
 
-                    pb.inc(1);
+                    task_pb.finish_and_clear();
+                    main_pb_clone.inc(1);
 
                     match result {
                         Ok(stat) => {
                             if let Err(e) = data_store.save_project_scan(&stat) {
-                                pb.println(format!("Warning: failed to save scan for {}: {}", repo_name, e));
+                                main_pb_clone.println(format!("⚠️ Failed to save scan for {}: {}", repo_name, e));
                             }
                             Ok(())
                         }
                         Err(e) => {
-                            pb.println(format!("Warning: failed to inspect {}: {}", repo_name, e));
+                            main_pb_clone.println(format!("⚠️ Failed to inspect {}: {}", repo_name, e));
                             Err(e)
                         }
                     }
@@ -119,7 +150,7 @@ async fn main() -> Result<()> {
                 let _ = task.await?;
             }
 
-            progress.finish_and_clear();
+            main_pb.finish_and_clear();
             eprintln!("Scan complete! Run `repospect aggregate` to generate the latest.json dashboard data.");
         }
 
@@ -164,7 +195,7 @@ async fn main() -> Result<()> {
             };
 
             let report =
-                tokio::task::spawn_blocking(move || repospect::scanners::scan_repository(&repo_meta, &tar_path))
+                tokio::task::spawn_blocking(move || repospect::scanners::scan_repository(&repo_meta, &tar_path, None))
                     .await??;
 
             println!("{}", serde_json::to_string_pretty(&report)?);
@@ -209,13 +240,28 @@ async fn main() -> Result<()> {
                 }
             }
         },
+        Commands::Serve { port } => {
+            let data_dir = cli.data_dir.clone();
+
+            if !data_dir.exists() {
+                anyhow::bail!("Data directory {:?} does not exist. Run a scan first.", data_dir);
+            }
+
+            let url = format!("http://localhost:{}", port);
+            eprintln!("Serving dashboard from {:?} at {}", data_dir, url);
+            eprintln!("Press Ctrl+C to stop.");
+
+            // Start the static file server
+            let route = warp::fs::dir(data_dir);
+            warp::serve(route).run(([127, 0, 0, 1], port)).await;
+        }
     }
 
     Ok(())
 }
 
-fn make_progress(total: u64, message: String) -> Arc<ProgressBar> {
-    let pb = Arc::new(ProgressBar::new(total));
+fn make_main_progress(total: u64, message: String) -> ProgressBar {
+    let pb = ProgressBar::new(total);
     pb.set_style(
         ProgressStyle::default_bar()
             .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({eta}) {msg}")

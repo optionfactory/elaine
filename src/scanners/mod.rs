@@ -3,6 +3,7 @@ pub mod pathcollector;
 use crate::github::GithubRepository;
 use crate::sandbox::TarballSandbox;
 use crate::scanners::pathcollector::{PathCollector, Pattern};
+use indicatif::ProgressBar;
 use serde::{Deserialize, Serialize};
 use std::fs::{self, File};
 use std::io::BufReader;
@@ -32,6 +33,7 @@ pub struct RepoStats {
     pub name: String,
     pub created_at: String,
     pub updated_at: String,
+    pub pushed_at: String,
     pub archived: bool,
     pub fork: bool,
     pub disabled: bool,
@@ -47,10 +49,20 @@ pub struct RepoStats {
     pub dependencies: Vec<DependencyUpdate>,
 }
 
-pub fn scan_repository(repo: &GithubRepository, tarball_path: &Path) -> anyhow::Result<RepoStats> {
+pub fn scan_repository(
+    repo: &GithubRepository,
+    tarball_path: &Path,
+    pb: Option<ProgressBar>,
+) -> anyhow::Result<RepoStats> {
+    if let Some(ref p) = pb {
+        p.set_message(format!("[{}] Unpacking archive...", repo.name));
+    }
     let sandbox = TarballSandbox::unpack(tarball_path)?;
     let root = sandbox.path();
 
+    if let Some(ref p) = pb {
+        p.set_message(format!("[{}] Scanning filesystem...", repo.name));
+    }
     let matches = PathCollector::new()
         .register("pinch_manifest", Pattern::ExactPath(PathBuf::from("pinch.yaml")))
         .register("docker_files", Pattern::FileName("Dockerfile".to_string()))
@@ -70,63 +82,71 @@ pub fn scan_repository(repo: &GithubRepository, tarball_path: &Path) -> anyhow::
     let mut dependencies = Vec::new();
 
     if let Some(pom_paths) = matches.get("pom_files") {
-        let mut pom_dirs: Vec<&Path> = pom_paths
-            .iter()
-            .filter_map(|p| p.parent())
-            .collect();
-            
+        let mut pom_dirs: Vec<&Path> = pom_paths.iter().filter_map(|p| p.parent()).collect();
         pom_dirs.sort_by_key(|p| p.components().count());
-        
         let mut selected_dirs: Vec<&Path> = Vec::new();
-        
+
         for dir in pom_dirs {
             let is_submodule = selected_dirs.iter().any(|selected| dir.starts_with(selected));
-            
+
             if !is_submodule {
                 selected_dirs.push(dir);
-                
                 let run_dir = root.join(dir);
-                eprintln!("Found independent root POM in {:?}. Running Maven...", run_dir);
                 
-                let status = Command::new("mvn")
+                if let Some(ref p) = pb {
+                    p.set_message(format!("[{}] Running Maven checks...", repo.name));
+                }
+
+                let output = Command::new("mvn")
                     .current_dir(&run_dir)
                     .args([
-                        "-U", 
-                        "-ntp", 
-                        "net.optionfactory:anarchitect-maven-plugin:LATEST:check-vulns", 
-                        "net.optionfactory:anarchitect-maven-plugin:LATEST:check-updates"
+                        "-B", "-U", "-ntp",
+                        "net.optionfactory:anarchitect-maven-plugin:LATEST:check-vulns",
+                        "net.optionfactory:anarchitect-maven-plugin:LATEST:check-updates",
                     ])
-                    .status();
+                    .output();
 
-                match status {
-                    Ok(s) if s.success() => {
-                        eprintln!("Maven finished successfully for {:?}", run_dir);
-                        
+                match output {
+                    Ok(out) if out.status.success() => {
                         if !ecosystems_detected.contains(&"maven".to_string()) {
                             ecosystems_detected.push("maven".to_string());
                         }
-                        
+
                         let vulns_path = run_dir.join("target").join("anarchitect-vulns.json");
                         if let Ok(payload) = fs::read_to_string(&vulns_path) {
-                            match serde_json::from_str::<Vec<Vulnerability>>(&payload) {
-                                Ok(mut parsed_vulns) => vulnerabilities.append(&mut parsed_vulns),
-                                Err(e) => eprintln!("Failed to parse vulnerabilities JSON at {:?}: {}", vulns_path, e),
+                            if let Ok(mut parsed_vulns) = serde_json::from_str::<Vec<Vulnerability>>(&payload) {
+                                vulnerabilities.append(&mut parsed_vulns);
                             }
                         }
 
                         let updates_path = run_dir.join("target").join("anarchitect-updates.json");
                         if let Ok(payload) = fs::read_to_string(&updates_path) {
-                            match serde_json::from_str::<Vec<DependencyUpdate>>(&payload) {
-                                Ok(mut parsed_updates) => dependencies.append(&mut parsed_updates),
-                                Err(e) => eprintln!("Failed to parse updates JSON at {:?}: {}", updates_path, e),
+                            if let Ok(mut parsed_updates) = serde_json::from_str::<Vec<DependencyUpdate>>(&payload) {
+                                dependencies.append(&mut parsed_updates);
                             }
                         }
-                    },
-                    Ok(s) => eprintln!("Maven failed for {:?} with status: {}", run_dir, s),
-                    Err(e) => eprintln!("Failed to execute Maven for {:?}: {}", run_dir, e),
+                    }
+                    Ok(out) => {
+                        if let Some(ref p) = pb {
+                            p.println(format!(
+                                "⚠️ Maven failed for {}:\n{}",
+                                repo.name,
+                                String::from_utf8_lossy(&out.stderr)
+                            ));
+                        }
+                    }
+                    Err(e) => {
+                        if let Some(ref p) = pb {
+                            p.println(format!("⚠️ Failed to execute Maven for {}: {}", repo.name, e));
+                        }
+                    }
                 }
             }
         }
+    }
+
+    if let Some(ref p) = pb {
+        p.set_message(format!("[{}] Finalizing...", repo.name));
     }
 
     let docker_files = matches["docker_files"]
@@ -134,7 +154,7 @@ pub fn scan_repository(repo: &GithubRepository, tarball_path: &Path) -> anyhow::
         .chain(&matches["docker_compose_files"])
         .cloned()
         .collect();
-        
+
     let pinch_audit = matches["pinch_manifest"]
         .first()
         .and_then(|rel_path| File::open(root.join(rel_path)).ok())
@@ -146,6 +166,7 @@ pub fn scan_repository(repo: &GithubRepository, tarball_path: &Path) -> anyhow::
         name: repo.name.clone(),
         created_at: repo.created_at.clone(),
         updated_at: repo.updated_at.clone(),
+        pushed_at: repo.pushed_at.clone(),
         archived: repo.archived,
         fork: repo.fork,
         disabled: repo.disabled,

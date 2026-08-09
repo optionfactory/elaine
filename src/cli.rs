@@ -54,6 +54,11 @@ pub enum Commands {
     Scan,
     #[command(about = "Aggregate individual project scans into a unified latest.json")]
     Aggregate,
+    #[command(about = "Serve the dashboard and stats data over HTTP")]
+    Serve {
+        #[arg(short, long, default_value_t = 8000, help = "Port to serve the dashboard on")]
+        port: u16,
+    },
     #[command(about = "Inspect a single local filesystem directory or .tar.gz archive directly")]
     Inspect {
         #[arg(short = 'r', long = "repository", help = "Repository name to inspect")]

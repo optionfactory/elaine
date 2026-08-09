@@ -29,11 +29,6 @@ check-deps:
 	@cargo update --dry-run
 
 
-serve:
-	(sleep 2; open http://localhost:8000) &
-	cd data; python3 -m http.server
-
-
 publish-github: build-release
 	$(eval VERSION=v$(shell cargo metadata --format-version=1 --no-deps | jq -r '.packages[0].version'))
 	@cp target/x86_64-unknown-linux-musl/release/$(REPO_NAME) target/$(REPO_NAME)-linux-amd64-musl

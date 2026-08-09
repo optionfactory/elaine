@@ -36,17 +36,21 @@ impl RepositoryCache {
         if expected_pushed_at.is_empty() {
             return false;
         }
+
         let tar_path = self.tarball_path(repo_name);
         if !tar_path.exists() {
             return false;
         }
+
         let meta_path = self.metadata_path(repo_name);
         let Ok(data) = fs::read_to_string(meta_path) else {
             return false;
         };
+
         let Ok(local_meta) = serde_json::from_str::<GithubRepository>(&data) else {
             return false;
         };
+
         local_meta.pushed_at == expected_pushed_at
     }
 
@@ -74,7 +78,6 @@ impl RepositoryCache {
             let chunk = chunk_result.context("Error reading tarball stream from GitHub")?;
             file.write_all(&chunk).await?;
         }
-
         file.flush().await?;
         drop(file);
 
@@ -83,6 +86,7 @@ impl RepositoryCache {
         let target_meta = self.metadata_path(&repo.name);
         let tmp_meta = target_meta.with_extension("json.tmp");
         let pretty_json = serde_json::to_string_pretty(repo)?;
+
         fs::write(&tmp_meta, pretty_json)?;
         fs::rename(&tmp_meta, &target_meta)?;
 
