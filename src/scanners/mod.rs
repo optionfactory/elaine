@@ -2,16 +2,29 @@ pub mod pathcollector;
 use crate::github::GithubRepository;
 use crate::sandbox::TarballSandbox;
 use crate::scanners::pathcollector::{PathCollector, Pattern};
-use serde::Serialize;
-use std::fs::File;
+use serde::{Deserialize, Serialize};
+use std::fs::{self, File};
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
-#[derive(Debug, Serialize)]
-pub struct DependencyReport {
-    pub ecosystem: String,
-    pub format: String,
-    pub payload: String,
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Vulnerability {
+    pub project: String,
+    pub artifact: String,
+    pub version: String,
+    pub vuln_id: String,
+    pub trail: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DependencyUpdate {
+    pub project: String,
+    pub kind: String,
+    pub artifact: String,
+    pub current: String,
+    pub latest: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -30,7 +43,8 @@ pub struct RepoStats {
     pub docker_files: Vec<PathBuf>,
     pub legopfa_confs: Vec<PathBuf>,
     pub ecosystems_detected: Vec<String>,
-    pub dependency_reports: Vec<DependencyReport>,
+    pub vulnerabilities: Vec<Vulnerability>,
+    pub dependencies: Vec<DependencyUpdate>,
 }
 
 pub fn scan_repository(repo: &GithubRepository, tarball_path: &Path) -> anyhow::Result<RepoStats> {
@@ -48,16 +62,81 @@ pub fn scan_repository(repo: &GithubRepository, tarball_path: &Path) -> anyhow::
         .register_pattern("legopfa_confs", |name| {
             name.starts_with("legopfa") && name.ends_with(".json")
         })
+        .register("pom_files", Pattern::FileName("pom.xml".to_string()))
         .scan(root);
 
-    // Combined path lists ready to be saved in RepoStats if needed
+    let mut ecosystems_detected = Vec::new();
+    let mut vulnerabilities = Vec::new();
+    let mut dependencies = Vec::new();
+
+    if let Some(pom_paths) = matches.get("pom_files") {
+        let mut pom_dirs: Vec<&Path> = pom_paths
+            .iter()
+            .filter_map(|p| p.parent())
+            .collect();
+        
+        pom_dirs.sort_by_key(|p| p.components().count());
+        
+        let mut selected_dirs: Vec<&Path> = Vec::new();
+        
+        for dir in pom_dirs {
+            let is_submodule = selected_dirs.iter().any(|selected| dir.starts_with(selected));
+            
+            if !is_submodule {
+                selected_dirs.push(dir);
+                
+                let run_dir = root.join(dir);
+                eprintln!("Found independent root POM in {:?}. Running Maven...", run_dir);
+                
+                let status = Command::new("mvn")
+                    .current_dir(&run_dir)
+                    .args([
+                        "-U", 
+                        "-ntp", 
+                        "net.optionfactory:anarchitect-maven-plugin:LATEST:check-vulns", 
+                        "net.optionfactory:anarchitect-maven-plugin:LATEST:check-updates"
+                    ])
+                    .status();
+
+                match status {
+                    Ok(s) if s.success() => {
+                        eprintln!("Maven finished successfully for {:?}", run_dir);
+                        
+                        if !ecosystems_detected.contains(&"maven".to_string()) {
+                            ecosystems_detected.push("maven".to_string());
+                        }
+                        
+                        // Parse vulnerabilities
+                        let vulns_path = run_dir.join("target").join("anarchitect-vulns.json");
+                        if let Ok(payload) = fs::read_to_string(&vulns_path) {
+                            match serde_json::from_str::<Vec<Vulnerability>>(&payload) {
+                                Ok(mut parsed_vulns) => vulnerabilities.append(&mut parsed_vulns),
+                                Err(e) => eprintln!("Failed to parse vulnerabilities JSON at {:?}: {}", vulns_path, e),
+                            }
+                        }
+
+                        // Parse updates
+                        let updates_path = run_dir.join("target").join("anarchitect-updates.json");
+                        if let Ok(payload) = fs::read_to_string(&updates_path) {
+                            match serde_json::from_str::<Vec<DependencyUpdate>>(&payload) {
+                                Ok(mut parsed_updates) => dependencies.append(&mut parsed_updates),
+                                Err(e) => eprintln!("Failed to parse updates JSON at {:?}: {}", updates_path, e),
+                            }
+                        }
+                    },
+                    Ok(s) => eprintln!("Maven failed for {:?} with status: {}", run_dir, s),
+                    Err(e) => eprintln!("Failed to execute Maven for {:?}: {}", run_dir, e),
+                }
+            }
+        }
+    }
+
     let docker_files = matches["docker_files"]
         .iter()
         .chain(&matches["docker_compose_files"])
         .cloned()
         .collect();
-
-    // 3. Parse pinch audit directly if matched
+        
     let pinch_audit = matches["pinch_manifest"]
         .first()
         .and_then(|rel_path| File::open(root.join(rel_path)).ok())
@@ -76,10 +155,11 @@ pub fn scan_repository(repo: &GithubRepository, tarball_path: &Path) -> anyhow::
         has_unique_commits: !repo.fork,
         description: repo.description.clone().unwrap_or_default(),
         ansible_confs: matches["ansible_confs"].clone(),
-        docker_files: docker_files,
+        docker_files,
         legopfa_confs: matches["legopfa_confs"].clone(),
-        ecosystems_detected: vec![],
-        dependency_reports: vec![],
+        ecosystems_detected,
+        vulnerabilities,
+        dependencies,
         pinch_audit,
     })
 }

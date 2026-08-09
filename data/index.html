@@ -13,21 +13,15 @@
     <script type="importmap">
             {
                 "imports": {
-                    "keycloak": "https://cdn.jsdelivr.net/npm/keycloak-js@26.2.4/lib/keycloak.min.js",
-                    "httpc": "https://cdn.jsdelivr.net/npm/@optionfactory/fml@8.0.0/dist/httpc.min.mjs",
                     "ftl": "https://cdn.jsdelivr.net/npm/@optionfactory/fml@8.0.0/dist/ftl.min.mjs"
                 },
                 "integrity": {
-                    "https://cdn.jsdelivr.net/npm/keycloak-js@26.2.4/lib/keycloak.min.js": "sha384-3dLZL/6pJWOsiKO0DUwX1GPrD7guTngu8UJ77+42Wc5973GeNTgBno7bY7HCQiR1",
-                    "https://cdn.jsdelivr.net/npm/@optionfactory/fml@8.0.0/dist/httpc.min.mjs": "sha384-9QJP1Q+GlS7keulFI7PAA8amAXjQS6dvYexTmkbKvlJg23ISvRjVUJfDMzJ+9VEL",
                     "https://cdn.jsdelivr.net/npm/@optionfactory/fml@8.0.0/dist/ftl.min.mjs": "sha384-o8jSbzfN8frPZI1vZ6AnCXymJ9qtGYaJdY8ThO2O137DNlcGX1Ug39nS6QZxsY0p"
                 }
             }
         </script>
-    <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/keycloak-js@26.2.4/lib/keycloak.min.js">
-    <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/@optionfactory/fml@8.0.0/dist/httpc.min.mjs">
     <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/@optionfactory/fml@8.0.0/dist/ftl.min.mjs">
-    <link rel="stylesheet" href="assets/index.css">
+    <link rel="stylesheet" href="repospect.css">
 </head>
 </head>
 
@@ -55,6 +49,7 @@
     </loading-spinner>
 
     <projects-grid></projects-grid>
+    <scroll-sentinel></scroll-sentinel>
 
     <template id="metrics-template">
         <button class="metric-card all" data-filter="all">
@@ -73,7 +68,7 @@
             <h2>Unaudited Live Repositories</h2>
             {{ live_unaudited }}
         </button>
-        
+
         <button class="metric-card public" data-filter="public">
             <h2>Public Repositories</h2>
             {{ public }}
@@ -111,6 +106,34 @@
             {{ live_private_unaudited }}
         </button>
 
+        <div></div>
+        <button class="metric-card" data-filter="public_vulns">
+            <h2>Public Live with vulns</h2>
+            {{ public_vulns }}
+        </button>
+        <button class="metric-card compliant" data-filter="public_audited_vulns">
+            <h2>Public Audited Live with vulns</h2>
+            {{ public_audited_vulns }}
+        </button>
+        <button class="metric-card noncompliant" data-filter="public_unaudited_vulns">
+            <h2>Public Audited Live with vulns</h2>
+            {{ public_unaudited_vulns }}
+        </button>
+
+        <div></div>
+        <button class="metric-card" data-filter="private_vulns">
+            <h2>Private Live with vulns</h2>
+            {{ private_vulns }}
+        </button>
+        <button class="metric-card compliant" data-filter="private_audited_vulns">
+            <h2>Private Audited Live with vulns</h2>
+            {{ private_audited_vulns }}
+        </button>
+        <button class="metric-card noncompliant" data-filter="private_unaudited_vulns">
+            <h2>Private Unaudited Live with vulns</h2>
+            {{ private_unaudited_vulns }}
+        </button>
+
 
     </template>
 
@@ -118,24 +141,22 @@
         <error-box data-tpl-if="self.length == 0">No matching repositories found.</error-box>
         <project-card data-tpl-each="self">
             <project-header>
-                <div>
-                    <h2>{{ name }}</h2>
-                    <div style="margin-top: 0.3rem;">
-                        <badge data-tpl-if="private" class="private">Private</badge>
-                        <badge data-tpl-if="!private" class="public">Public</badge>
-                        <badge data-tpl-if="fork" class="fork">Fork</badge>
-                        <badge data-tpl-if="disabled" class="disabled">Disabled</badge>
-                        <badge data-tpl-if="archived" class="archived">Archived</badge>
-                        <badge data-tpl-if="!pinch_audit" class="unaudited">No Audit</badge>
-                        <badge data-tpl-if="pinch_audit?.project?.tier" class="tier">{{ pinch_audit.project.tier}}
-                        </badge>
-                        <badge data-tpl-if="pinch_audit?.project?.lifecycle" class="lifecycle">{{
-                            pinch_audit.project.lifecycle }}</badge>
-                    </div>
-                </div>
-                <div style="text-align: right; font-size: 0.8rem; color: var(--text-muted);">
-                    Updated: {{ updated_at }}
-                </div>
+                <h2><a data-tpl-href="`https://github.com/optionfactory/{name}`" target="_blank" rel="noopener noreferrer">{{ name }}</a></h2>
+                <p>{{ description }}</p>
+                <badges>
+                    <badge data-tpl-if="private" class="private">Private</badge>
+                    <badge data-tpl-if="!private" class="public">Public</badge>
+                    <badge data-tpl-if="fork" class="fork">Fork</badge>
+                    <badge data-tpl-if="disabled" class="disabled">Disabled</badge>
+                    <badge data-tpl-if="archived" class="archived">Archived</badge>
+                    <badge data-tpl-if="!pinch_audit" class="unaudited">No Audit</badge>
+                    <badge data-tpl-if="pinch_audit?.project?.tier" class="tier">{{ pinch_audit.project.tier }}</badge>
+                    <badge data-tpl-if="pinch_audit?.project?.lifecycle" class="lifecycle">{{ pinch_audit.project.lifecycle }}</badge>
+                </badges>
+                <time>
+                    <div>Created: {{ created_at }}</div>
+                    <div>Updated: {{ updated_at }}</div>
+                </time>
             </project-header>
 
             <info-group data-tpl-if="pinch_audit?.project" data-tpl-with="pinch_audit?.project">
@@ -180,7 +201,7 @@
 
             <section data-tpl-if="pinch_audit?.project?.environments">
                 <h3>Environments</h3>
-                <table>
+                <table class="environments">
                     <thead>
                         <tr>
                             <th>Environment</th>
@@ -203,6 +224,70 @@
                     </tbody>
                 </table>
             </section>
+
+
+            <section data-tpl-if="dependencies && dependencies.length">
+                <h3>Outdated Dependencies</h3>
+                <table class="dependencies">
+                    <thead>
+                        <tr>
+                            <th>Project</th>
+                            <th>Artifact</th>
+                            <th>Current</th>
+                            <th>Latest</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr data-tpl-each="dependencies" data-tpl-var="dep" data-tpl-when="dep.kind != 'plugin'">
+                            <td><strong>{{ dep.project }}</strong></td>
+                            <td>{{dep.artifact}}</td>
+                            <td>
+                                <tag class="current">{{dep.current}}</tag>
+                            </td>
+                            <td>
+                                <tag class="latest">{{dep.latest}}</tag>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+
+            </section>
+
+            <section data-tpl-if="vulnerabilities && vulnerabilities.length">
+                <h3>Known vulnerabilities</h3>
+                <table class="vulnerabilities">
+                    <thead>
+                        <tr>
+                            <th>Project</th>
+                            <th>Artifact</th>
+                            <th>Version</th>
+                            <th>Vuln ID</th>
+                            <th>Trails</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr data-tpl-each="vulnerabilities" data-tpl-var="vuln">
+                            <td><strong>{{ vuln.project }}</strong></td>
+                            <td>{{vuln.artifact}}</td>
+                            <td>{{vuln.version}}</td>
+                            <td>
+                                <a data-tpl-href="`https://github.com/advisories/{vuln.vuln_id}`" target="_blank" rel="noopener noreferrer">
+                                    {{vuln.vuln_id}}
+                                </a>
+                            </td>
+                            <td>
+                                <tooltip-trigger>
+                                    <tag class="dashed">Depth {{ vuln.trail.length }}</tag>
+                                    <tooltip-content>
+                                        <div data-tpl-each="vuln.trail">{{ self }}</div>
+                                    </tooltip-content>
+                                </tooltip-trigger>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+
 
             <section data-tpl-if="pinch_audit?.containers">
                 <h3>Containers</h3>
@@ -244,53 +329,49 @@
 
     </template>
     <script type="module">
-        import Keycloak from "keycloak";
         import { Templates } from "ftl";
-        import { HttpClient, HttpClientError } from "httpc";
+        import { Spinner, InfiniteScroller } from "/repospect.js";
+
+        const spinner = new Spinner();
 
         const response = await fetch('optionfactory/latest.json');
         if (!response.ok) {
             throw new Error(`HTTP error! Status: ${response.status}`);
         }
 
-
         const data = await response.json();
-        const projectsTemplate = Templates.fromSelector('#projects-template');
-        const updateProjects = async (data) => {
-            const spinner = document.querySelector('loading-spinner');
-            const grid = document.querySelector('projects-grid');
-            spinner.removeAttribute('hidden');
-            grid.setAttribute('hidden', '');
-            const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
-            await sleep(10);
-            try {
-                projectsTemplate.withOverlay(data).renderToSelector('projects-grid');
-            } finally {
-                spinner.setAttribute('hidden', '');
-                grid.removeAttribute('hidden');
-            }
-        }
 
+        spinner.hide();
+
+        const scroller = new InfiniteScroller('projects-grid', 'scroll-sentinel', '#projects-template', spinner);
 
         const filters = {
             all: () => true,
             live: repo => !repo.archived,
             live_audited: repo => !repo.archived && repo.pinch_audit,
             live_unaudited: repo => !repo.archived && !repo.pinch_audit,
+
             public: repo => !repo.private,
             live_public: repo => !repo.archived && !repo.private,
             live_public_audited: repo => !repo.archived && !repo.private && repo.pinch_audit,
             live_public_unaudited: repo => !repo.archived && !repo.private && !repo.pinch_audit,
+
             private: repo => repo.private,
             live_private: repo => !repo.archived && repo.private,
             live_private_audited: repo => !repo.archived && repo.private && repo.pinch_audit,
             live_private_unaudited: repo => !repo.archived && repo.private && !repo.pinch_audit,
 
-        }
+            public_vulns: repo => !repo.archived && !repo.private && repo.vulnerabilities?.length,
+            public_audited_vulns: repo => !repo.archived && !repo.private && repo.pinch_audit && repo.vulnerabilities?.length,
+            public_unaudited_vulns: repo => !repo.archived && !repo.private && !repo.pinch_audit && repo.vulnerabilities?.length,
 
+            private_vulns: repo => !repo.archived && repo.private && repo.vulnerabilities?.length,
+            private_audited_vulns: repo => !repo.archived && repo.private && repo.pinch_audit && repo.vulnerabilities?.length,
+            private_unaudited_vulns: repo => !repo.archived && repo.private && !repo.pinch_audit && repo.vulnerabilities?.length,
+        };
 
         const stats = data.reduce((acc, repo) => {
-            const filterEntries = Object.entries(filters)
+            const filterEntries = Object.entries(filters);
             for (let i = 0; i != filterEntries.length; i++) {
                 const [key, fn] = filterEntries[i];
                 if (fn(repo)) acc[key]++;
@@ -298,35 +379,41 @@
             return acc;
         }, Object.fromEntries(Object.keys(filters).map(key => [key, 0])));
 
+        Templates.fromSelector('#metrics-template').withOverlay(stats).renderToSelector('metrics-grid');
 
-        Templates.fromSelector('#metrics-template').withOverlay(stats).renderToSelector('metrics-grid')
-        updateProjects(data);
+        await scroller.load(data.values());
 
-        document.querySelector('form').addEventListener('submit', (e) => {
+        document.querySelector('form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const query = new FormData(e.target).get('search').toLowerCase();
-            const filtered = data.filter(item => JSON.stringify(item).toLowerCase().includes(query));
-            updateProjects(filtered);
+            const predicate = item => JSON.stringify(item).toLowerCase().includes(query);
+
+            await scroller.load(data.values().filter(predicate));
         });
 
-        document.querySelector('body').addEventListener('click', e => {
+        document.querySelector('body').addEventListener('click', async e => {
             const button = e.target.closest('[data-filter]');
             if (!button) {
                 return;
             }
-            if(button.dataset.filter == 'roulette'){
-                const d = data.filter(filters.live_unaudited);
-                const pick = d[Math.floor(Math.random() * d.length)]
-                updateProjects([pick]);
-                return;
-            }
-            const filter = filters[button.dataset.filter];
-            if(!filter){
-                return;
-            }
-            updateProjects(data.filter(filter));
 
-        })
+            if (button.dataset.filter === 'roulette') {
+                const unaudited = data.values().filter(filters.live_unaudited).toArray();
+                if (unaudited.length > 0) {
+                    const pick = unaudited[Math.floor(Math.random() * unaudited.length)];
+                    await scroller.load([pick].values());
+                } else {
+                    await scroller.load([].values());
+                }
+                return;
+            }
+
+            const filter = filters[button.dataset.filter];
+            if (!filter) {
+                return;
+            }
+            await scroller.load(data.values().filter(filter));
+        });
     </script>
 </body>
 

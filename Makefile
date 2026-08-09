@@ -30,9 +30,8 @@ check-deps:
 
 
 serve:
-	(cd data; python3 -m http.server) &
-	sleep 2
-	open http://localhost:8000
+	(sleep 2; open http://localhost:8000) &
+	cd data; python3 -m http.server
 
 
 publish-github: build-release
