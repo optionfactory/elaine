@@ -17,6 +17,7 @@ pub struct Cli {
         help = "GitHub organization name"
     )]
     pub organization: String,
+
     #[arg(
         short = 'c',
         long = "cache-dir",
@@ -25,6 +26,7 @@ pub struct Cli {
         help = "Directory to store cached repository tarballs and metadata"
     )]
     pub cache_dir: PathBuf,
+
     #[arg(
         short = 'd',
         long = "data-dir",
@@ -48,15 +50,15 @@ pub enum Commands {
         )]
         force: bool,
     },
-
     #[command(about = "Audit cached organization repositories for DevSecOps metadata & SBOMs")]
     Scan,
+    #[command(about = "Aggregate individual project scans into a unified latest.json")]
+    Aggregate,
     #[command(about = "Inspect a single local filesystem directory or .tar.gz archive directly")]
     Inspect {
         #[arg(short = 'r', long = "repository", help = "Repository name to inspect")]
         repository: String,
     },
-
     #[command(about = "Manage the local tarball and metadata cache")]
     Cache {
         #[command(subcommand)]
@@ -67,7 +69,6 @@ pub enum Commands {
         #[command(subcommand)]
         command: DataCommands,
     },
-
 }
 
 #[derive(Subcommand, Debug)]

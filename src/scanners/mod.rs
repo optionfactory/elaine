@@ -1,4 +1,5 @@
 pub mod pathcollector;
+
 use crate::github::GithubRepository;
 use crate::sandbox::TarballSandbox;
 use crate::scanners::pathcollector::{PathCollector, Pattern};
@@ -7,7 +8,6 @@ use std::fs::{self, File};
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Vulnerability {
@@ -27,7 +27,7 @@ pub struct DependencyUpdate {
     pub latest: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct RepoStats {
     pub name: String,
     pub created_at: String,
@@ -74,7 +74,7 @@ pub fn scan_repository(repo: &GithubRepository, tarball_path: &Path) -> anyhow::
             .iter()
             .filter_map(|p| p.parent())
             .collect();
-        
+            
         pom_dirs.sort_by_key(|p| p.components().count());
         
         let mut selected_dirs: Vec<&Path> = Vec::new();
@@ -106,7 +106,6 @@ pub fn scan_repository(repo: &GithubRepository, tarball_path: &Path) -> anyhow::
                             ecosystems_detected.push("maven".to_string());
                         }
                         
-                        // Parse vulnerabilities
                         let vulns_path = run_dir.join("target").join("anarchitect-vulns.json");
                         if let Ok(payload) = fs::read_to_string(&vulns_path) {
                             match serde_json::from_str::<Vec<Vulnerability>>(&payload) {
@@ -115,7 +114,6 @@ pub fn scan_repository(repo: &GithubRepository, tarball_path: &Path) -> anyhow::
                             }
                         }
 
-                        // Parse updates
                         let updates_path = run_dir.join("target").join("anarchitect-updates.json");
                         if let Ok(payload) = fs::read_to_string(&updates_path) {
                             match serde_json::from_str::<Vec<DependencyUpdate>>(&payload) {

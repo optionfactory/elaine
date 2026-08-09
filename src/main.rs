@@ -20,10 +20,11 @@ async fn main() -> Result<()> {
 
             eprintln!("Fetching repository list for organization '{}'...", cli.organization);
             let repos = client.fetch_org_repos(&cli.organization).await?;
-            let total = repos.len() as u64;
 
+            let total = repos.len() as u64;
             let progress = make_progress(total, "Downloading repository archives...".to_string());
             let sem = Arc::new(Semaphore::new(2));
+
             let mut tasks = Vec::new();
 
             for repo in repos {
@@ -36,7 +37,6 @@ async fn main() -> Result<()> {
                 tasks.push(tokio::spawn(async move {
                     let _permit = sem.acquire().await.unwrap();
                     let res = cache.sync_repo(&client, &org, &repo, force).await;
-
                     match res {
                         Ok(_status) => {
                             pb.inc(1);
@@ -60,22 +60,35 @@ async fn main() -> Result<()> {
 
         Commands::Scan => {
             let cache = Arc::new(RepositoryCache::new(&cli.cache_dir, &cli.organization)?);
+            let data_store = Arc::new(DataStore::new(&cli.data_dir, &cli.organization)?);
+
             let repos = cache.load_all_metadata()?;
             let total = repos.len() as u64;
+
             let worker_count = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4);
             let sem = Arc::new(Semaphore::new(worker_count.max(1)));
             let progress = make_progress(
                 total,
                 format!("Scanning repositories using {} workers...", worker_count),
             );
+
             let mut tasks = Vec::new();
+
             for (_name, repo) in repos {
                 let cache = Arc::clone(&cache);
+                let data_store = Arc::clone(&data_store);
                 let sem = Arc::clone(&sem);
                 let pb = Arc::clone(&progress);
+
                 tasks.push(tokio::spawn(async move {
                     let _permit = sem.acquire().await.unwrap();
                     let repo_name = repo.name.clone();
+
+                    if data_store.is_scan_fresh(&repo_name, &repo.updated_at) {
+                        pb.inc(1);
+                        return Ok(());
+                    }
+
                     let tar_path = cache.tarball_path(&repo_name);
                     let result = if tar_path.exists() {
                         tokio::task::spawn_blocking(move || repospect::scanners::scan_repository(&repo, &tar_path))
@@ -84,28 +97,38 @@ async fn main() -> Result<()> {
                     } else {
                         Err(anyhow::anyhow!("Tarball missing for repo: {}", repo_name))
                     };
+
                     pb.inc(1);
+
                     match result {
-                        Ok(stat) => Some(stat),
+                        Ok(stat) => {
+                            if let Err(e) = data_store.save_project_scan(&stat) {
+                                pb.println(format!("Warning: failed to save scan for {}: {}", repo_name, e));
+                            }
+                            Ok(())
+                        }
                         Err(e) => {
                             pb.println(format!("Warning: failed to inspect {}: {}", repo_name, e));
-                            None
+                            Err(e)
                         }
                     }
                 }));
             }
-            let mut stats_list = Vec::with_capacity(total as usize);
-            for task in tasks {
-                if let Ok(Some(stat)) = task.await {
-                    stats_list.push(stat);
-                }
-            }
-            stats_list.sort_by(|a, b| a.name.cmp(&b.name));
-            progress.finish_and_clear();
 
+            for task in tasks {
+                let _ = task.await?;
+            }
+
+            progress.finish_and_clear();
+            eprintln!("Scan complete! Run `repospect aggregate` to generate the latest.json dashboard data.");
+        }
+
+        Commands::Aggregate => {
             let data_store = DataStore::new(&cli.data_dir, &cli.organization)?;
-            let saved_path = data_store.save_scan(&stats_list)?;
-            eprintln!("Saved scan snapshot to {:?}", saved_path);
+            eprintln!("Aggregating project scans for organization '{}'...", cli.organization);
+
+            let latest_path = data_store.aggregate_scans()?;
+            eprintln!("Successfully created aggregated data at {:?}", latest_path);
         }
 
         Commands::Inspect { repository } => {
@@ -143,6 +166,7 @@ async fn main() -> Result<()> {
             let report =
                 tokio::task::spawn_blocking(move || repospect::scanners::scan_repository(&repo_meta, &tar_path))
                     .await??;
+
             println!("{}", serde_json::to_string_pretty(&report)?);
         }
 
