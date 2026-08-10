@@ -1,9 +1,9 @@
 use anyhow::{Context, Result};
 use clap::Parser;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
-use repospect::repositories::RepositoryStore;
 use repospect::cli::{Cli, Commands, RepoCommands, StatsCommands};
 use repospect::github::GithubClient;
+use repospect::repositories::RepositoryStore;
 use repospect::stats::StatsStore;
 use rust_embed::RustEmbed;
 use serde::Deserialize;
@@ -29,7 +29,8 @@ struct FrontendAssets;
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
-
+    let worker_count = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4);
+    let download_worker_count = worker_count.min(8);
     let config_data =
         fs::read_to_string("repospect.json").context("Failed to read 'repospect.json' in the current directory")?;
     let config: Config = serde_json::from_str(&config_data)
@@ -90,15 +91,26 @@ async fn main() -> Result<()> {
 
                 let total = repos.len() as u64;
                 let m = MultiProgress::new();
-                let main_pb = m.add(make_main_progress(total, "Downloading archives...".to_string()));
-                let sem = Arc::new(Semaphore::new(2));
+
+                let main_pb = m.add(ProgressBar::new(total));
+                main_pb.set_style(
+                    ProgressStyle::default_bar()
+                        .template("[{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({eta}) {msg}")
+                        .expect("Invalid progress bar template")
+                        .progress_chars("=>-"),
+                );
+                main_pb.set_message(format!("Downloading archives with {} workers...", download_worker_count));
+
+                let sem = Arc::new(Semaphore::new(download_worker_count));
                 let mut tasks = Vec::new();
+                
                 for repo in repos {
                     let client = Arc::clone(&client);
                     let cache = Arc::clone(&repositories);
                     let sem = Arc::clone(&sem);
                     let m_clone = m.clone();
                     let main_pb_clone = main_pb.clone();
+                    
                     tasks.push(tokio::spawn(async move {
                         let _permit = sem.acquire().await.unwrap();
                         let task_pb = m_clone.add(ProgressBar::new_spinner());
@@ -109,15 +121,16 @@ async fn main() -> Result<()> {
                         );
                         task_pb.enable_steady_tick(std::time::Duration::from_millis(100));
                         task_pb.set_message(format!("Syncing {}...", repo.name));
+                        
                         let res = cache.sync_repo(&client, &repo, force).await;
+                        m_clone.remove(&task_pb);
+
                         match res {
                             Ok(_) => {
-                                task_pb.finish_and_clear();
                                 main_pb_clone.inc(1);
                                 Ok(())
                             }
                             Err(e) => {
-                                task_pb.finish_and_clear();
                                 main_pb_clone.println(format!("  [ERROR] {}: {}", repo.name, e));
                                 main_pb_clone.inc(1);
                                 Err(e)
@@ -125,15 +138,18 @@ async fn main() -> Result<()> {
                         }
                     }));
                 }
+                
                 for t in tasks {
                     let _ = t.await?;
                 }
+                
                 main_pb.finish_with_message("Sync complete!");
             }
             RepoCommands::Inspect { repository } => {
                 let repositories = RepositoryStore::new(&config.data_dir)?;
                 let tar_path = repositories.tarball_path(&repository);
                 let meta_path = repositories.metadata_path(&repository);
+                
                 if !tar_path.exists() {
                     anyhow::bail!(
                         "Cached archive for repository '{}' not found at {:?}",
@@ -141,6 +157,7 @@ async fn main() -> Result<()> {
                         tar_path
                     );
                 }
+                
                 let repo_meta = if meta_path.exists() {
                     let data = fs::read_to_string(&meta_path)?;
                     serde_json::from_str::<repospect::github::GithubRepository>(&data)?
@@ -151,10 +168,12 @@ async fn main() -> Result<()> {
                         meta_path
                     );
                 };
+                
                 let report = tokio::task::spawn_blocking(move || {
                     repospect::scanners::scan_repository(&repo_meta, &tar_path, None)
                 })
                 .await??;
+                
                 println!("{}", serde_json::to_string_pretty(&report)?);
             }
             RepoCommands::Clean => {
@@ -177,27 +196,37 @@ async fn main() -> Result<()> {
                 let stats = Arc::new(StatsStore::new(&config.data_dir)?);
                 let repos = repositories.load_all_metadata()?;
                 let total = repos.len() as u64;
-                let worker_count = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4);
                 let sem = Arc::new(Semaphore::new(worker_count.max(1)));
                 let m = MultiProgress::new();
-                let main_pb = m.add(make_main_progress(
-                    total,
-                    format!("Scanning with {} workers...", worker_count),
-                ));
+                
+                // Add the bar FIRST to prevent double-rendering artifacts
+                let main_pb = m.add(ProgressBar::new(total));
+                main_pb.set_style(
+                    ProgressStyle::default_bar()
+                        .template("[{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({eta}) {msg}")
+                        .expect("Invalid progress bar template")
+                        .progress_chars("=>-"),
+                );
+                main_pb.set_message(format!("Scanning with {} workers...", worker_count));
+                
                 let mut tasks = Vec::new();
+                
                 for (_name, repo) in repos {
                     let cache = Arc::clone(&repositories);
                     let data_store = Arc::clone(&stats);
                     let sem = Arc::clone(&sem);
                     let main_pb_clone = main_pb.clone();
                     let m_clone = m.clone();
+                    
                     tasks.push(tokio::spawn(async move {
                         let _permit = sem.acquire().await.unwrap();
                         let repo_name = repo.name.clone();
+                        
                         if data_store.is_scan_fresh(&repo_name, &repo.pushed_at) {
                             main_pb_clone.inc(1);
                             return Ok(());
                         }
+                        
                         let task_pb = m_clone.add(ProgressBar::new_spinner());
                         task_pb.set_style(
                             ProgressStyle::default_spinner()
@@ -206,7 +235,9 @@ async fn main() -> Result<()> {
                         );
                         task_pb.enable_steady_tick(std::time::Duration::from_millis(100));
                         task_pb.set_message(format!("[{}] Starting...", repo_name));
+                        
                         let tar_path = cache.tarball_path(&repo_name);
+                        
                         let result = if tar_path.exists() {
                             let pb_clone = task_pb.clone();
                             tokio::task::spawn_blocking(move || {
@@ -217,8 +248,11 @@ async fn main() -> Result<()> {
                         } else {
                             Err(anyhow::anyhow!("Tarball missing"))
                         };
-                        task_pb.finish_and_clear();
+                        
+                        // Remove the spinner to prevent ghost lines from shifting the terminal
+                        m_clone.remove(&task_pb);
                         main_pb_clone.inc(1);
+                        
                         match result {
                             Ok(stat) => {
                                 if let Err(e) = data_store.save_project_scan(&stat) {
@@ -233,26 +267,28 @@ async fn main() -> Result<()> {
                         }
                     }));
                 }
+                
                 for task in tasks {
                     let _ = task.await?;
                 }
+                
                 main_pb.finish_and_clear();
                 eprintln!("Scan complete! Run `repospect stats aggregate` to generate the dashboard data.");
             }
             StatsCommands::Aggregate => {
-                let stats = StatsStore::new(&config.data_dir)?;
+                let stats_store = StatsStore::new(&config.data_dir)?;
                 eprintln!("Aggregating project scans...");
-                let latest_path = stats.aggregate_scans()?;
+                let latest_path = stats_store.aggregate_scans()?;
                 eprintln!("Successfully created aggregated data at {:?}", latest_path);
             }
             StatsCommands::Clean => {
-                let stats = StatsStore::new(&config.data_dir)?;
-                stats.clean_all().context("Failed to clean stats directory")?;
+                let stats_store = StatsStore::new(&config.data_dir)?;
+                stats_store.clean_all().context("Failed to clean stats directory")?;
                 eprintln!("Cleaned stats directory.");
             }
             StatsCommands::List => {
-                let stats = StatsStore::new(&config.data_dir)?;
-                let scans = stats.list_scans()?;
+                let data_store = StatsStore::new(&config.data_dir)?;
+                let scans = data_store.list_scans()?;
                 eprintln!("Data files: {}", scans.len());
                 for (name, size) in scans {
                     eprintln!("  - {} ({} bytes)", name, size);
@@ -261,16 +297,4 @@ async fn main() -> Result<()> {
         },
     }
     Ok(())
-}
-
-fn make_main_progress(total: u64, message: String) -> ProgressBar {
-    let pb = ProgressBar::new(total);
-    pb.set_style(
-        ProgressStyle::default_bar()
-            .template("[{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({eta}) {msg}")
-            .expect("Invalid progress bar template")
-            .progress_chars("=>-"),
-    );
-    pb.set_message(message);
-    pb
 }
