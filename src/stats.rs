@@ -4,21 +4,19 @@ use chrono::{DateTime, Utc};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-pub struct DataStore {
+pub struct StatsStore {
     pub base_dir: PathBuf,
     pub org_dir: PathBuf,
-    pub org: String,
 }
 
-impl DataStore {
-    pub fn new<P: AsRef<Path>>(data_base_dir: P, org: &str) -> Result<Self> {
-        let base_dir = data_base_dir.as_ref().to_path_buf();
-        let org_dir = base_dir.join(org);
+impl StatsStore {
+    pub fn new<P: AsRef<Path>>(data_dir: P) -> Result<Self> {
+        let base_dir = data_dir.as_ref().to_path_buf();
+        let org_dir = base_dir.join("stats");
         fs::create_dir_all(&org_dir)?;
         Ok(Self {
             base_dir,
             org_dir,
-            org: org.to_string(),
         })
     }
 
@@ -27,7 +25,7 @@ impl DataStore {
     }
 
     pub fn aggregate_file_path(&self) -> PathBuf {
-        self.base_dir.join(format!("{}.json", self.org))
+        self.base_dir.join("stats.json")
     }
 
     pub fn is_scan_fresh(&self, repo_name: &str, pushed_at: &str) -> bool {

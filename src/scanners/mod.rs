@@ -39,6 +39,7 @@ pub struct DependencyUpdate {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RepoStats {
     pub name: String,
+    pub html_url: String,
     pub created_at: String,
     pub updated_at: String,
     pub pushed_at: String,
@@ -72,6 +73,7 @@ impl RepoStats {
     pub fn new_from_github(repo: &GithubRepository) -> Self {
         Self {
             name: repo.name.clone(),
+            html_url: repo.html_url.clone(),
             created_at: repo.created_at.clone(),
             updated_at: repo.updated_at.clone(),
             pushed_at: repo.pushed_at.clone(),

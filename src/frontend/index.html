@@ -141,8 +141,7 @@
         <error-box data-tpl-if="self.length == 0">No matching repositories found.</error-box>
         <project-card data-tpl-each="self">
             <project-header>
-                <h2><a data-tpl-href="`https://github.com/optionfactory/{name}`" target="_blank"
-                        rel="noopener noreferrer">{{ name }}</a></h2>
+                <h2><a data-tpl-href="html_url" target="_blank" rel="noopener noreferrer">{{ name }}</a></h2>
                 <p>{{ description }}</p>
                 <badges>
                     <badge data-tpl-if="private" class="private">Private</badge>
@@ -228,12 +227,12 @@
 
             <section>
                 <h3>Outdated Dependencies</h3>
-                <tag data-tpl-if="dependencies == null">
-                    No data
-                </tag>
-                <tag data-tpl-if="dependencies?.length == 0">
-                    No outdated dependencies found in this project
-                </tag>
+                <tag-list data-tpl-if="dependencies == null">
+                    <tag>No data</tag>
+                </tag-list>
+                <tag-list data-tpl-if="dependencies?.length == 0">
+                    <tag>No outdated dependencies found in this project</tag>
+                </tag-list>
                 <table class="dependencies" data-tpl-if="dependencies?.length > 0">
                     <thead>
                         <tr>
@@ -261,12 +260,12 @@
 
             <section>
                 <h3>Known vulnerabilities</h3>
-                <tag data-tpl-if="vulnerabilities == null">
-                    No data
-                </tag>
-                <tag data-tpl-if="vulnerabilities?.length == 0">
-                    No known vulnerabilities found in this project
-                </tag>
+                <tag-list data-tpl-if="vulnerabilities == null">
+                    <tag>No data</tag>
+                </tag-list>
+                <tag-list data-tpl-if="vulnerabilities?.length == 0">
+                    <tag>No known vulnerabilities found in this project</tag>
+                </tag-list>
                 <table class="vulnerabilities" data-tpl-if="vulnerabilities?.length > 0">
                     <thead>
                         <tr>
@@ -283,8 +282,7 @@
                             <td>{{vuln.artifact}}</td>
                             <td>{{vuln.version}}</td>
                             <td>
-                                <a data-tpl-href="`https://github.com/advisories/{vuln.vuln_id}`" target="_blank"
-                                    rel="noopener noreferrer">
+                                <a data-tpl-href="`https://github.com/advisories/{vuln.vuln_id}`" target="_blank" rel="noopener noreferrer">
                                     {{vuln.vuln_id}}
                                 </a>
                             </td>
@@ -353,7 +351,7 @@
 
         const spinner = new Spinner();
 
-        const response = await fetch('optionfactory.json');
+        const response = await fetch('stats.json');
         if (!response.ok) {
             throw new Error(`HTTP error! Status: ${response.status}`);
         }

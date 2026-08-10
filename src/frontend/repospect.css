@@ -391,8 +391,8 @@ table {
 
 
 tag-list {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     gap: 0.4rem;
     margin-top: 0.25rem;
 }
@@ -411,7 +411,7 @@ tag {
     }
 
     &.dockerfile {
-        background: #0284c7;
+        background: #03486b;
         color: #f0f9ff;
     }
 

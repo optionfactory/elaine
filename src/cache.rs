@@ -18,8 +18,8 @@ pub struct RepositoryCache {
 }
 
 impl RepositoryCache {
-    pub fn new<P: AsRef<Path>>(cache_base_dir: P, org: &str) -> Result<Self> {
-        let dir = cache_base_dir.as_ref().join(org);
+    pub fn new<P: AsRef<Path>>(data_dir: P) -> Result<Self> {
+        let dir = data_dir.as_ref().join("repos");
         fs::create_dir_all(&dir)?;
         Ok(Self { dir })
     }
@@ -57,7 +57,6 @@ impl RepositoryCache {
     pub async fn sync_repo(
         &self,
         client: &GithubClient,
-        org: &str,
         repo: &GithubRepository,
         force: bool,
     ) -> Result<SyncStatus> {
@@ -65,7 +64,7 @@ impl RepositoryCache {
             return Ok(SyncStatus::Cached);
         }
 
-        let resp = client.download_tarball(org, &repo.name, &repo.default_branch).await?;
+        let resp = client.download_tarball(&repo.name, &repo.default_branch).await?;
         let target_tar = self.tarball_path(&repo.name);
         let tmp_tar = target_tar.with_extension("tar.gz.tmp");
 

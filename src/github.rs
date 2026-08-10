@@ -6,6 +6,7 @@ use std::process::Command;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GithubRepository {
     pub name: String,
+    pub html_url: String,
     pub default_branch: String,
     pub created_at: String,
     pub updated_at: String,
@@ -21,18 +22,22 @@ pub struct GithubRepository {
 #[derive(Clone)]
 pub struct GithubClient {
     client: reqwest::Client,
+    organization: String,
     token: String,
 }
 
 impl GithubClient {
-    pub fn new() -> Result<Self> {
-        let token = Self::get_token()
+    pub fn new(github_token: Option<String>, organization: String) -> Result<Self> {
+        let token = Self::get_token(github_token)
             .context("Could not retrieve GitHub token from env (GITHUB_TOKEN/GH_TOKEN) or `gh auth token`")?;
         let client = reqwest::Client::new();
-        Ok(Self { client, token })
+        Ok(Self { client, organization, token })
     }
 
-    fn get_token() -> Option<String> {
+    fn get_token(auth_token: Option<String>) -> Option<String> {
+        if auth_token.is_some() {
+            return auth_token;
+        }
         if let Ok(t) = std::env::var("GITHUB_TOKEN").or_else(|_| std::env::var("GH_TOKEN")) {
             if !t.trim().is_empty() {
                 return Some(t.trim().to_string());
@@ -49,14 +54,14 @@ impl GithubClient {
         None
     }
 
-    pub async fn fetch_org_repos(&self, org: &str) -> Result<Vec<GithubRepository>> {
+    pub async fn fetch_org_repos(&self) -> Result<Vec<GithubRepository>> {
         let mut all_repos = Vec::new();
         let mut page = 1;
 
         loop {
             let url = format!(
                 "https://api.github.com/orgs/{}/repos?per_page=100&page={}&type=all",
-                org, page
+                self.organization, page
             );
             let resp = self
                 .client
@@ -87,8 +92,8 @@ impl GithubClient {
         Ok(all_repos)
     }
 
-    pub async fn download_tarball(&self, org: &str, repo: &str, branch: &str) -> Result<reqwest::Response> {
-        let url = format!("https://api.github.com/repos/{}/{}/tarball/{}", org, repo, branch);
+    pub async fn download_tarball(&self, repo: &str, branch: &str) -> Result<reqwest::Response> {
+        let url = format!("https://api.github.com/repos/{}/{}/tarball/{}", self.organization, repo, branch);
         let resp = self
             .client
             .get(&url)
