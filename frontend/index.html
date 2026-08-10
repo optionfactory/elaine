@@ -141,7 +141,8 @@
         <error-box data-tpl-if="self.length == 0">No matching repositories found.</error-box>
         <project-card data-tpl-each="self">
             <project-header>
-                <h2><a data-tpl-href="`https://github.com/optionfactory/{name}`" target="_blank" rel="noopener noreferrer">{{ name }}</a></h2>
+                <h2><a data-tpl-href="`https://github.com/optionfactory/{name}`" target="_blank"
+                        rel="noopener noreferrer">{{ name }}</a></h2>
                 <p>{{ description }}</p>
                 <badges>
                     <badge data-tpl-if="private" class="private">Private</badge>
@@ -151,7 +152,8 @@
                     <badge data-tpl-if="archived" class="archived">Archived</badge>
                     <badge data-tpl-if="!pinch_audit" class="unaudited">No Audit</badge>
                     <badge data-tpl-if="pinch_audit?.project?.tier" class="tier">{{ pinch_audit.project.tier }}</badge>
-                    <badge data-tpl-if="pinch_audit?.project?.lifecycle" class="lifecycle">{{ pinch_audit.project.lifecycle }}</badge>
+                    <badge data-tpl-if="pinch_audit?.project?.lifecycle" class="lifecycle">{{
+                        pinch_audit.project.lifecycle }}</badge>
                 </badges>
                 <time>
                     <div>Created: {{ created_at }}</div>
@@ -226,9 +228,15 @@
             </section>
 
 
-            <section data-tpl-if="dependencies && dependencies.length">
+            <section>
                 <h3>Outdated Dependencies</h3>
-                <table class="dependencies">
+                <tag data-tpl-if="dependencies == null">
+                    No data
+                </tag>
+                <tag data-tpl-if="dependencies?.length == 0">
+                    No outdated dependencies found in this project
+                </tag>
+                <table class="dependencies" data-tpl-if="dependencies?.length > 0">
                     <thead>
                         <tr>
                             <th>Project</th>
@@ -253,9 +261,15 @@
 
             </section>
 
-            <section data-tpl-if="vulnerabilities && vulnerabilities.length">
+            <section>
                 <h3>Known vulnerabilities</h3>
-                <table class="vulnerabilities">
+                <tag data-tpl-if="vulnerabilities == null">
+                    No data
+                </tag>
+                <tag data-tpl-if="vulnerabilities?.length == 0">
+                    No known vulnerabilities found in this project
+                </tag>
+                <table class="vulnerabilities" data-tpl-if="vulnerabilities?.length > 0">
                     <thead>
                         <tr>
                             <th>Project</th>
@@ -271,7 +285,8 @@
                             <td>{{vuln.artifact}}</td>
                             <td>{{vuln.version}}</td>
                             <td>
-                                <a data-tpl-href="`https://github.com/advisories/{vuln.vuln_id}`" target="_blank" rel="noopener noreferrer">
+                                <a data-tpl-href="`https://github.com/advisories/{vuln.vuln_id}`" target="_blank"
+                                    rel="noopener noreferrer">
                                     {{vuln.vuln_id}}
                                 </a>
                             </td>
@@ -289,10 +304,17 @@
             </section>
 
 
-            <section data-tpl-if="pinch_audit?.containers">
-                <h3>Containers</h3>
+            <section>
+                <h3>Used containers</h3>
                 <tag-list>
-                    <tag data-tpl-each="pinch_audit?.containers" class="container">{{ self }}
+                    <tag data-tpl-if="!pinch_audit?.containers">
+                        No data
+                    </tag>
+                    <tag data-tpl-if="pinch_audit?.containers?.length == 0">
+                        No containers referenced in this project
+                    </tag>
+                    <tag data-tpl-if="pinch_audit?.containers?.length > 0" data-tpl-each="pinch_audit.containers" class="container">
+                        {{ self }}
                     </tag>
                 </tag-list>
             </section>
@@ -300,17 +322,16 @@
             <section>
                 <h3>Docker files</h3>
                 <tag-list>
-                    <tag data-tpl-each="docker_files" class="dockerfile">{{ self }}</tag>
                     <tag data-tpl-if="!docker_files.length">No docker files found in this project</tag>
+                    <tag data-tpl-each="docker_files" class="dockerfile">{{ self }}</tag>
                 </tag-list>
             </section>
 
             <section>
                 <h3>Ansible</h3>
                 <tag-list>
+                    <tag data-tpl-if="!ansible_confs.length">No ansible configurations found in this project</tag>
                     <tag data-tpl-each="ansible_confs" class="ansible">{{ self }}</tag>
-                    <tag data-tpl-if="!ansible_confs.length">No ansible configurations found in this
-                        project</tag>
                 </tag-list>
             </section>
 
@@ -318,9 +339,8 @@
             <section>
                 <h3>Legopfa</h3>
                 <tag-list>
+                    <tag data-tpl-if="!legopfa_confs.length">No legopfa configurations found in this project</tag>
                     <tag data-tpl-each="legopfa_confs" class="legopfa">{{ self }}</tag>
-                    <tag data-tpl-if="!legopfa_confs.length">No legopfa configurations found in this
-                        project</tag>
                 </tag-list>
             </section>
 
@@ -334,7 +354,7 @@
 
         const spinner = new Spinner();
 
-        const response = await fetch('optionfactory/latest.json');
+        const response = await fetch('optionfactory.json');
         if (!response.ok) {
             throw new Error(`HTTP error! Status: ${response.status}`);
         }

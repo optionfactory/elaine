@@ -1,23 +1,33 @@
+use crate::scanners::RepoStats;
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::scanners::RepoStats;
-
 pub struct DataStore {
-    pub dir: PathBuf,
+    pub base_dir: PathBuf,
+    pub org_dir: PathBuf,
+    pub org: String,
 }
 
 impl DataStore {
     pub fn new<P: AsRef<Path>>(data_base_dir: P, org: &str) -> Result<Self> {
-        let dir = data_base_dir.as_ref().join(org);
-        fs::create_dir_all(&dir)?;
-        Ok(Self { dir })
+        let base_dir = data_base_dir.as_ref().to_path_buf();
+        let org_dir = base_dir.join(org);
+        fs::create_dir_all(&org_dir)?;
+        Ok(Self {
+            base_dir,
+            org_dir,
+            org: org.to_string(),
+        })
     }
 
     pub fn project_file_path(&self, repo_name: &str) -> PathBuf {
-        self.dir.join(format!("{}.json", repo_name))
+        self.org_dir.join(format!("{}.json", repo_name))
+    }
+
+    pub fn aggregate_file_path(&self) -> PathBuf {
+        self.base_dir.join(format!("{}.json", self.org))
     }
 
     pub fn is_scan_fresh(&self, repo_name: &str, pushed_at: &str) -> bool {
@@ -25,7 +35,6 @@ impl DataStore {
         if !file_path.exists() {
             return false;
         }
-
         let Ok(metadata) = fs::metadata(&file_path) else {
             return false;
         };
@@ -33,11 +42,9 @@ impl DataStore {
             return false;
         };
         let modified_dt: DateTime<Utc> = modified.into();
-
         if let Ok(pushed_dt) = DateTime::parse_from_rfc3339(pushed_at) {
             return modified_dt >= pushed_dt.with_timezone(&Utc);
         }
-
         false
     }
 
@@ -45,25 +52,19 @@ impl DataStore {
         let file_path = self.project_file_path(&stat.name);
         let json_data = serde_json::to_string_pretty(stat)?;
         fs::write(&file_path, &json_data).with_context(|| format!("Failed to write scan data to {:?}", file_path))?;
-
         Ok(file_path)
     }
 
     pub fn aggregate_scans(&self) -> Result<PathBuf> {
         let mut stats = Vec::new();
-
-        if !self.dir.exists() {
-            return Ok(self.dir.join("latest.json"));
+        if !self.org_dir.exists() {
+            return Ok(self.aggregate_file_path());
         }
 
-        for entry in fs::read_dir(&self.dir)? {
+        for entry in fs::read_dir(&self.org_dir)? {
             let entry = entry?;
             let path = entry.path();
-
-            if path.is_file()
-                && path.extension().unwrap_or_default() == "json"
-                && path.file_name().unwrap_or_default() != "latest.json"
-            {
+            if path.is_file() && path.extension().unwrap_or_default() == "json" {
                 let data = fs::read_to_string(&path)?;
                 if let Ok(stat) = serde_json::from_str::<RepoStats>(&data) {
                     stats.push(stat);
@@ -74,23 +75,20 @@ impl DataStore {
         }
 
         stats.sort_by(|a, b| a.name.cmp(&b.name));
-
-        let latest_path = self.dir.join("latest.json");
+        let aggregate_path = self.aggregate_file_path();
         let json_data = serde_json::to_string_pretty(&stats)?;
-        fs::write(&latest_path, &json_data)
-            .with_context(|| format!("Failed to update latest scan data at {:?}", latest_path))?;
+        fs::write(&aggregate_path, &json_data)
+            .with_context(|| format!("Failed to update aggregate scan data at {:?}", aggregate_path))?;
 
-        Ok(latest_path)
+        Ok(aggregate_path)
     }
 
     pub fn list_scans(&self) -> Result<Vec<(String, u64)>> {
         let mut scans = Vec::new();
-
-        if !self.dir.exists() {
+        if !self.org_dir.exists() {
             return Ok(scans);
         }
-
-        for entry in fs::read_dir(&self.dir)? {
+        for entry in fs::read_dir(&self.org_dir)? {
             let entry = entry?;
             let path = entry.path();
             if path.is_file() {
@@ -100,7 +98,6 @@ impl DataStore {
                 }
             }
         }
-
         scans.sort_by(|a, b| a.0.cmp(&b.0));
         Ok(scans)
     }

@@ -1,14 +1,22 @@
 pub mod pathcollector;
+mod scanner_ansible;
+mod scanner_docker;
+mod scanner_legopfa;
+mod scanner_maven;
+mod scanner_pinch;
 
 use crate::github::GithubRepository;
 use crate::sandbox::TarballSandbox;
 use crate::scanners::pathcollector::{PathCollector, Pattern};
+use crate::scanners::scanner_ansible::AnsibleScanner;
+use crate::scanners::scanner_docker::DockerScanner;
+use crate::scanners::scanner_legopfa::LegopfaScanner;
+use crate::scanners::scanner_maven::MavenScanner;
+use crate::scanners::scanner_pinch::PinchScanner;
 use indicatif::ProgressBar;
 use serde::{Deserialize, Serialize};
-use std::fs::{self, File};
-use std::io::BufReader;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Vulnerability {
@@ -45,8 +53,100 @@ pub struct RepoStats {
     pub docker_files: Vec<PathBuf>,
     pub legopfa_confs: Vec<PathBuf>,
     pub ecosystems_detected: Vec<String>,
-    pub vulnerabilities: Vec<Vulnerability>,
-    pub dependencies: Vec<DependencyUpdate>,
+    pub vulnerabilities: Option<Vec<Vulnerability>>,
+    pub dependencies: Option<Vec<DependencyUpdate>>,
+}
+
+impl RepoStats {
+    /// Initializes a baseline RepoStats object from GitHub metadata
+    pub fn new_from_github(repo: &GithubRepository) -> Self {
+        Self {
+            name: repo.name.clone(),
+            created_at: repo.created_at.clone(),
+            updated_at: repo.updated_at.clone(),
+            pushed_at: repo.pushed_at.clone(),
+            archived: repo.archived,
+            fork: repo.fork,
+            disabled: repo.disabled,
+            private: repo.private,
+            has_unique_commits: !repo.fork,
+            description: repo.description.clone().unwrap_or_default(),
+            pinch_audit: None,
+            ansible_confs: Vec::new(),
+            docker_files: Vec::new(),
+            legopfa_confs: Vec::new(),
+            ecosystems_detected: Vec::new(),
+            vulnerabilities: None,
+            dependencies: None,
+        }
+    }
+    pub fn add_ecosystem(&mut self, name: &str, success: bool) {
+        let eco_string = if success {
+            name.to_string()
+        } else {
+            format!("{}:failed", name)
+        };
+
+        if !self.ecosystems_detected.contains(&eco_string) {
+            self.ecosystems_detected.push(eco_string);
+        }
+    }
+
+    pub fn checked_for_vulnerabilities(&mut self) {
+        if self.vulnerabilities.is_none() {
+            self.vulnerabilities = Some(Vec::new());
+        }
+    }
+
+    pub fn add_vulnerability(&mut self, vuln: Vulnerability) {
+        self.checked_for_vulnerabilities();
+        if let Some(ref mut vulns) = self.vulnerabilities {
+            vulns.push(vuln);
+        }
+    }
+
+    pub fn add_vulnerabilities(&mut self, mut vulns: Vec<Vulnerability>) {
+        self.checked_for_vulnerabilities();
+        if let Some(ref mut v) = self.vulnerabilities {
+            v.append(&mut vulns);
+        }
+    }
+
+    pub fn checked_for_upgrades(&mut self) {
+        if self.dependencies.is_none() {
+            self.dependencies = Some(Vec::new());
+        }
+    }
+
+    pub fn add_upgrade(&mut self, upgrade: DependencyUpdate) {
+        self.checked_for_upgrades();
+        if let Some(ref mut deps) = self.dependencies {
+            deps.push(upgrade);
+        }
+    }
+
+    pub fn add_upgrades(&mut self, mut upgrades: Vec<DependencyUpdate>) {
+        self.checked_for_upgrades();
+        if let Some(ref mut d) = self.dependencies {
+            d.append(&mut upgrades);
+        }
+    }
+}
+
+pub struct ScanContext<'a> {
+    pub repo: &'a GithubRepository,
+    pub root: &'a Path,
+    pub matches: &'a HashMap<String, Vec<PathBuf>>,
+    pub pb: Option<&'a ProgressBar>,
+}
+
+/// The Trait implemented by all specific ecosystem/tool scanners
+pub trait Scanner {
+    /// Returns the patterns this scanner wants to collect during the filesystem pass
+    fn patterns(&self) -> Vec<(&'static str, Pattern)>;
+
+    /// Executes the scanner logic using the provided context, updating RepoStats
+    fn scan(&self, ctx: &ScanContext, stats: &mut RepoStats) -> anyhow::Result<()>;
 }
 
 pub fn scan_repository(
@@ -63,124 +163,37 @@ pub fn scan_repository(
     if let Some(ref p) = pb {
         p.set_message(format!("[{}] Scanning filesystem...", repo.name));
     }
-    let matches = PathCollector::new()
-        .register("pinch_manifest", Pattern::ExactPath(PathBuf::from("pinch.yaml")))
-        .register("docker_files", Pattern::FileName("Dockerfile".to_string()))
-        .register(
-            "docker_compose_files",
-            Pattern::FileName("docker-compose.yml".to_string()),
-        )
-        .register("ansible_confs", Pattern::FileName("ansible.cfg".to_string()))
-        .register_pattern("legopfa_confs", |name| {
-            name.starts_with("legopfa") && name.ends_with(".json")
-        })
-        .register("pom_files", Pattern::FileName("pom.xml".to_string()))
-        .scan(root);
 
-    let mut ecosystems_detected = Vec::new();
-    let mut vulnerabilities = Vec::new();
-    let mut dependencies = Vec::new();
+    let scanners: Vec<Box<dyn Scanner>> = vec![
+        Box::new(PinchScanner),
+        Box::new(DockerScanner),
+        Box::new(AnsibleScanner),
+        Box::new(LegopfaScanner),
+        Box::new(MavenScanner),
+    ];
 
-    if let Some(pom_paths) = matches.get("pom_files") {
-        let mut pom_dirs: Vec<&Path> = pom_paths.iter().filter_map(|p| p.parent()).collect();
-        pom_dirs.sort_by_key(|p| p.components().count());
-        let mut selected_dirs: Vec<&Path> = Vec::new();
-
-        for dir in pom_dirs {
-            let is_submodule = selected_dirs.iter().any(|selected| dir.starts_with(selected));
-
-            if !is_submodule {
-                selected_dirs.push(dir);
-                let run_dir = root.join(dir);
-
-                if let Some(ref p) = pb {
-                    p.set_message(format!("[{}] Running Maven checks...", repo.name));
-                }
-
-                let output = Command::new("mvn")
-                    .current_dir(&run_dir)
-                    .args([
-                        "-B",
-                        "-U",
-                        "-ntp",
-                        "net.optionfactory:anarchitect-maven-plugin:LATEST:check-vulns",
-                        "net.optionfactory:anarchitect-maven-plugin:LATEST:check-updates",
-                    ])
-                    .output();
-
-                match output {
-                    Ok(out) if out.status.success() => {
-                        if !ecosystems_detected.contains(&"maven".to_string()) {
-                            ecosystems_detected.push("maven".to_string());
-                        }
-
-                        let vulns_path = run_dir.join("target").join("anarchitect-vulns.json");
-                        if let Ok(payload) = fs::read_to_string(&vulns_path) {
-                            if let Ok(mut parsed_vulns) = serde_json::from_str::<Vec<Vulnerability>>(&payload) {
-                                vulnerabilities.append(&mut parsed_vulns);
-                            }
-                        }
-
-                        let updates_path = run_dir.join("target").join("anarchitect-updates.json");
-                        if let Ok(payload) = fs::read_to_string(&updates_path) {
-                            if let Ok(mut parsed_updates) = serde_json::from_str::<Vec<DependencyUpdate>>(&payload) {
-                                dependencies.append(&mut parsed_updates);
-                            }
-                        }
-                    }
-                    Ok(out) => {
-                        if let Some(ref p) = pb {
-                            p.println(format!(
-                                "⚠️ Maven failed for {}:\n{}",
-                                repo.name,
-                                String::from_utf8_lossy(&out.stderr)
-                            ));
-                        }
-                    }
-                    Err(e) => {
-                        if let Some(ref p) = pb {
-                            p.println(format!("⚠️ Failed to execute Maven for {}: {}", repo.name, e));
-                        }
-                    }
-                }
-            }
+    let mut collector = PathCollector::new();
+    for scanner in &scanners {
+        for (key, pattern) in scanner.patterns() {
+            collector = collector.register(key, pattern);
         }
+    }
+
+    let matches = collector.scan(root);
+    let mut stats = RepoStats::new_from_github(repo);
+    let ctx = ScanContext {
+        repo,
+        root,
+        matches: &matches,
+        pb: pb.as_ref(),
+    };
+    for scanner in &scanners {
+        scanner.scan(&ctx, &mut stats)?;
     }
 
     if let Some(ref p) = pb {
         p.set_message(format!("[{}] Finalizing...", repo.name));
     }
 
-    let docker_files = matches["docker_files"]
-        .iter()
-        .chain(&matches["docker_compose_files"])
-        .cloned()
-        .collect();
-
-    let pinch_audit = matches["pinch_manifest"]
-        .first()
-        .and_then(|rel_path| File::open(root.join(rel_path)).ok())
-        .map(BufReader::new)
-        .and_then(|reader| serde_saphyr::from_reader::<_, pinch::schema::PinchManifest>(reader).ok())
-        .map(|manifest| manifest.audit());
-
-    Ok(RepoStats {
-        name: repo.name.clone(),
-        created_at: repo.created_at.clone(),
-        updated_at: repo.updated_at.clone(),
-        pushed_at: repo.pushed_at.clone(),
-        archived: repo.archived,
-        fork: repo.fork,
-        disabled: repo.disabled,
-        private: repo.private,
-        has_unique_commits: !repo.fork,
-        description: repo.description.clone().unwrap_or_default(),
-        ansible_confs: matches["ansible_confs"].clone(),
-        docker_files,
-        legopfa_confs: matches["legopfa_confs"].clone(),
-        ecosystems_detected,
-        vulnerabilities,
-        dependencies,
-        pinch_audit,
-    })
+    Ok(stats)
 }
