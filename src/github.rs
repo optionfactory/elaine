@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use indicatif::ProgressBar;
 use reqwest::header::{ACCEPT, AUTHORIZATION, USER_AGENT};
 use serde::{Deserialize, Serialize};
 use std::process::Command;
@@ -54,10 +55,10 @@ impl GithubClient {
         None
     }
 
-    pub async fn fetch_org_repos(&self) -> Result<Vec<GithubRepository>> {
+    pub async fn fetch_org_repos(&self, pb: &ProgressBar) -> Result<Vec<GithubRepository>> {
         let mut all_repos = Vec::new();
         let mut page = 1;
-
+        
         loop {
             let url = format!(
                 "https://api.github.com/orgs/{}/repos?per_page=100&page={}&type=all",
@@ -77,11 +78,12 @@ impl GithubClient {
             let count = repos.len();
             all_repos.extend(repos);
 
-            eprintln!(
+
+            pb.set_message(format!(
                 "Fetched page {} ({} repositories found so far)...",
                 page,
                 all_repos.len()
-            );
+            ));
 
             if count < 100 {
                 break;
