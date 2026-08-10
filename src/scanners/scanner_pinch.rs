@@ -11,7 +11,7 @@ impl Scanner for PinchScanner {
     }
 
     fn scan(&self, ctx: &ScanContext, stats: &mut RepoStats) -> anyhow::Result<()> {
-        stats.pinch_audit = ctx
+        let pinch_audit = ctx
             .matches
             .get("pinch_manifest")
             .and_then(|paths| paths.first())
@@ -19,6 +19,17 @@ impl Scanner for PinchScanner {
             .map(BufReader::new)
             .and_then(|reader| serde_saphyr::from_reader::<_, pinch::schema::PinchManifest>(reader).ok())
             .map(|manifest| manifest.audit());
+
+        match pinch_audit {
+            Some(audit) => {
+                stats.audit = Some(audit.project);
+                stats.add_containers(audit.containers);
+            },
+            None => {
+                stats.audit = None;
+                stats.checked_for_containers();
+            },
+        }
         Ok(())
     }
 }

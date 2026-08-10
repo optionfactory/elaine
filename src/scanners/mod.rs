@@ -48,13 +48,23 @@ pub struct RepoStats {
     pub private: bool,
     pub has_unique_commits: bool,
     pub description: String,
-    pub pinch_audit: Option<pinch::schema::PinchAudit>,
+    //
+    pub audit: Option<pinch::schema::ProjectManifest>,
+    //
+    pub stack: HashMap<String, StackInspectionStatus>,
+    pub containers: Option<Vec<String>>,
     pub ansible_confs: Vec<PathBuf>,
     pub docker_files: Vec<PathBuf>,
     pub legopfa_confs: Vec<PathBuf>,
-    pub ecosystems_detected: Vec<String>,
+    //
     pub vulnerabilities: Option<Vec<Vulnerability>>,
     pub dependencies: Option<Vec<DependencyUpdate>>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum StackInspectionStatus {
+    Success, Failure
 }
 
 impl RepoStats {
@@ -71,25 +81,18 @@ impl RepoStats {
             private: repo.private,
             has_unique_commits: !repo.fork,
             description: repo.description.clone().unwrap_or_default(),
-            pinch_audit: None,
+            audit: None,
+            stack: HashMap::new(),
+            containers: None,
             ansible_confs: Vec::new(),
             docker_files: Vec::new(),
             legopfa_confs: Vec::new(),
-            ecosystems_detected: Vec::new(),
             vulnerabilities: None,
             dependencies: None,
         }
     }
-    pub fn add_ecosystem(&mut self, name: &str, success: bool) {
-        let eco_string = if success {
-            name.to_string()
-        } else {
-            format!("{}:failed", name)
-        };
-
-        if !self.ecosystems_detected.contains(&eco_string) {
-            self.ecosystems_detected.push(eco_string);
-        }
+    pub fn put_stack(&mut self, name: &str, status: StackInspectionStatus) {
+        self.stack.insert(name.to_string(), status);
     }
 
     pub fn checked_for_vulnerabilities(&mut self) {
@@ -131,6 +134,27 @@ impl RepoStats {
             d.append(&mut upgrades);
         }
     }
+
+    pub fn checked_for_containers(&mut self) {
+        if self.containers.is_none() {
+            self.containers = Some(Vec::new());
+        }
+    }    
+
+    pub fn add_container(&mut self, container: String) {
+        self.checked_for_containers();
+        if let Some(ref mut deps) = self.containers {
+            deps.push(container);
+        }
+    }
+
+    pub fn add_containers(&mut self, mut upgrades: Vec<String>) {
+        self.checked_for_containers();
+        if let Some(ref mut d) = self.containers {
+            d.append(&mut upgrades);
+        }
+    }    
+
 }
 
 pub struct ScanContext<'a> {
@@ -167,9 +191,9 @@ pub fn scan_repository(
     let scanners: Vec<Box<dyn Scanner>> = vec![
         Box::new(PinchScanner),
         Box::new(DockerScanner),
+        Box::new(MavenScanner),
         Box::new(AnsibleScanner),
         Box::new(LegopfaScanner),
-        Box::new(MavenScanner),
     ];
 
     let mut collector = PathCollector::new();

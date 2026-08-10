@@ -116,7 +116,7 @@
             {{ public_audited_vulns }}
         </button>
         <button class="metric-card noncompliant" data-filter="public_unaudited_vulns">
-            <h2>Public Audited Live with vulns</h2>
+            <h2>Public Unaudited Live with vulns</h2>
             {{ public_unaudited_vulns }}
         </button>
 
@@ -150,10 +150,9 @@
                     <badge data-tpl-if="fork" class="fork">Fork</badge>
                     <badge data-tpl-if="disabled" class="disabled">Disabled</badge>
                     <badge data-tpl-if="archived" class="archived">Archived</badge>
-                    <badge data-tpl-if="!pinch_audit" class="unaudited">No Audit</badge>
-                    <badge data-tpl-if="pinch_audit?.project?.tier" class="tier">{{ pinch_audit.project.tier }}</badge>
-                    <badge data-tpl-if="pinch_audit?.project?.lifecycle" class="lifecycle">{{
-                        pinch_audit.project.lifecycle }}</badge>
+                    <badge data-tpl-if="!audit" class="unaudited">No Audit</badge>
+                    <badge data-tpl-if="audit?.tier" class="tier">{{ audit.tier }}</badge>
+                    <badge data-tpl-if="audit?.lifecycle" class="lifecycle">{{ audit.lifecycle }}</badge>
                 </badges>
                 <time>
                     <div>Created: {{ created_at }}</div>
@@ -161,11 +160,7 @@
                 </time>
             </project-header>
 
-            <info-group data-tpl-if="pinch_audit?.project" data-tpl-with="pinch_audit?.project">
-                <info-item>
-                    <span class="label">Project Name</span>
-                    <span class="value">{{name}}</span>
-                </info-item>
+            <info-group data-tpl-if="audit" data-tpl-with="audit">
                 <info-item>
                     <span class="label">Project type</span>
                     <span class="value">{{ type}}</span>
@@ -173,35 +168,38 @@
 
                 <info-item>
                     <span class="label">Commissioner / Channel</span>
-                    <span class="value">{{ commissioner }} / {{ channel}}</span>
+                    <span class="value">{{ commissioner ?? 'unspecified' }} / {{ channel ?? 'unspecified' }}</span>
                 </info-item>
                 <info-item>
                     <span class="label">Stewards</span>
-                    <span class="value">{{ stewards?.join(', ')}}</span>
+                    <span class="value">{{ stewards?.join(', ') ?? 'unspecified' }}</span>
                 </info-item>
                 <info-item>
                     <span class="label">Authentication</span>
-                    <span class="value">{{authentication?.join(', ')}}</span>
+                    <span class="value">{{authentication?.join(', ') ?? 'unspecified' }}</span>
                 </info-item>
                 <info-item>
                     <span class="label">Sensitivity</span>
-                    <span class="value">{{sensitivity?.join(', ') }}</span>
+                    <span class="value">{{sensitivity?.join(', ') ?? 'unspecified' }}</span>
                 </info-item>
             </info-group>
 
             <section>
-                <h3 data-tpl-if="pinch_audit?.project?.compliance">Compliance Frameworks</h3>
-                <tag-list data-tpl-if="pinch_audit?.project?.compliance">
-                    <tag>DORA: {{pinch_audit.project.compliance.dora}}</tag>
-                    <tag>CRA: {{pinch_audit.project.compliance.cra}}</tag>
-                    <tag>NIS2: {{pinch_audit.project.compliance.nis2}}</tag>
-                    <tag>AI Act: {{pinch_audit.project.compliance.ai_act}}</tag>
-                    <tag>GDPR Residency: {{pinch_audit.project.compliance.gdpr.data_residency}}</tag>
+                <h3 >Compliance Frameworks</h3>
+                <tag data-tpl-if="!audit?.compliance">No data</tag>
+                <tag-list data-tpl-if="audit?.compliance">
+                    <tag>DORA: {{ audit.compliance.dora }}</tag>
+                    <tag>CRA: {{audit.compliance.cra }}</tag>
+                    <tag>NIS2: {{audit.compliance.nis2}}</tag>
+                    <tag>AI Act: {{audit.compliance.ai_act}}</tag>
+                    <tag>GDPR: {{ audit.compliance.gdpr }}</tag>
+                    <tag>Data Residency: {{audit.compliance.data_residency}}</tag>
+                    <tag>Ads: {{audit.compliance.ads}}</tag>
                 </tag-list>
             </section>
 
 
-            <section data-tpl-if="pinch_audit?.project?.environments">
+            <section data-tpl-if="audit?.environments">
                 <h3>Environments</h3>
                 <table class="environments">
                     <thead>
@@ -215,7 +213,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr data-tpl-each="pinch_audit.project.environments" data-tpl-var="env">
+                        <tr data-tpl-each="audit.environments" data-tpl-var="env">
                             <td><strong>{{ env.name }}</strong></td>
                             <td>{{env.type}}</td>
                             <td>{{env.platform}}</td>
@@ -246,7 +244,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr data-tpl-each="dependencies" data-tpl-var="dep" data-tpl-when="dep.kind != 'plugin'">
+                        <tr data-tpl-each="dependencies" data-tpl-var="dep">
                             <td><strong>{{ dep.project }}</strong></td>
                             <td>{{dep.artifact}}</td>
                             <td>
@@ -307,13 +305,14 @@
             <section>
                 <h3>Used containers</h3>
                 <tag-list>
-                    <tag data-tpl-if="!pinch_audit?.containers">
+                    <tag data-tpl-if="!containers">
                         No data
                     </tag>
-                    <tag data-tpl-if="pinch_audit?.containers?.length == 0">
+                    <tag data-tpl-if="containers?.length == 0">
                         No containers referenced in this project
                     </tag>
-                    <tag data-tpl-if="pinch_audit?.containers?.length > 0" data-tpl-each="pinch_audit.containers" class="container">
+                    <tag data-tpl-if="containers?.length > 0" data-tpl-each="containers"
+                        class="container">
                         {{ self }}
                     </tag>
                 </tag-list>
@@ -368,26 +367,26 @@
         const filters = {
             all: () => true,
             live: repo => !repo.archived,
-            live_audited: repo => !repo.archived && repo.pinch_audit,
-            live_unaudited: repo => !repo.archived && !repo.pinch_audit,
+            live_audited: repo => !repo.archived && repo.audit,
+            live_unaudited: repo => !repo.archived && !repo.audit,
 
             public: repo => !repo.private,
             live_public: repo => !repo.archived && !repo.private,
-            live_public_audited: repo => !repo.archived && !repo.private && repo.pinch_audit,
-            live_public_unaudited: repo => !repo.archived && !repo.private && !repo.pinch_audit,
+            live_public_audited: repo => !repo.archived && !repo.private && repo.audit,
+            live_public_unaudited: repo => !repo.archived && !repo.private && !repo.audit,
 
             private: repo => repo.private,
             live_private: repo => !repo.archived && repo.private,
-            live_private_audited: repo => !repo.archived && repo.private && repo.pinch_audit,
-            live_private_unaudited: repo => !repo.archived && repo.private && !repo.pinch_audit,
+            live_private_audited: repo => !repo.archived && repo.private && repo.audit,
+            live_private_unaudited: repo => !repo.archived && repo.private && !repo.audit,
 
             public_vulns: repo => !repo.archived && !repo.private && repo.vulnerabilities?.length,
-            public_audited_vulns: repo => !repo.archived && !repo.private && repo.pinch_audit && repo.vulnerabilities?.length,
-            public_unaudited_vulns: repo => !repo.archived && !repo.private && !repo.pinch_audit && repo.vulnerabilities?.length,
+            public_audited_vulns: repo => !repo.archived && !repo.private && repo.audit && repo.vulnerabilities?.length,
+            public_unaudited_vulns: repo => !repo.archived && !repo.private && !repo.audit && repo.vulnerabilities?.length,
 
             private_vulns: repo => !repo.archived && repo.private && repo.vulnerabilities?.length,
-            private_audited_vulns: repo => !repo.archived && repo.private && repo.pinch_audit && repo.vulnerabilities?.length,
-            private_unaudited_vulns: repo => !repo.archived && repo.private && !repo.pinch_audit && repo.vulnerabilities?.length,
+            private_audited_vulns: repo => !repo.archived && repo.private && repo.audit && repo.vulnerabilities?.length,
+            private_unaudited_vulns: repo => !repo.archived && repo.private && !repo.audit && repo.vulnerabilities?.length,
         };
 
         const stats = data.reduce((acc, repo) => {

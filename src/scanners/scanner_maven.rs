@@ -1,5 +1,5 @@
 use crate::scanners::pathcollector::Pattern;
-use crate::scanners::{DependencyUpdate, RepoStats, ScanContext, Scanner, Vulnerability};
+use crate::scanners::{DependencyUpdate, RepoStats, ScanContext, Scanner, StackInspectionStatus, Vulnerability};
 use std::fs;
 use std::path::Path;
 use std::process::Command;
@@ -46,7 +46,7 @@ impl Scanner for MavenScanner {
 
             match output {
                 Ok(out) if out.status.success() => {
-                    stats.add_ecosystem("maven", true);
+                    stats.put_stack("maven", StackInspectionStatus::Success);
                     stats.checked_for_vulnerabilities();
                     stats.checked_for_upgrades();
 
@@ -57,7 +57,7 @@ impl Scanner for MavenScanner {
                         }
                     }
 
-                    let updates_path = run_dir.join("target").join("anarchitect-updates.json");
+                    let updates_path = run_dir.join("target").join("anarchitect-dependency-upgrades.json");
                     if let Ok(payload) = fs::read_to_string(&updates_path) {
                         if let Ok(parsed_updates) = serde_json::from_str::<Vec<DependencyUpdate>>(&payload) {
                             stats.add_upgrades(parsed_updates);
@@ -65,7 +65,7 @@ impl Scanner for MavenScanner {
                     }
                 }
                 Ok(out) => {
-                    stats.add_ecosystem("maven", false);
+                    stats.put_stack("maven", StackInspectionStatus::Failure);
                     if let Some(p) = ctx.pb {
                         p.println(format!(
                             "⚠️ Maven failed for {}:\n{}",
@@ -75,7 +75,7 @@ impl Scanner for MavenScanner {
                     }
                 }
                 Err(e) => {
-                    stats.add_ecosystem("maven", false);
+                    stats.put_stack("maven", StackInspectionStatus::Failure);
                     if let Some(p) = ctx.pb {
                         p.println(format!("⚠️ Failed to execute Maven for {}: {}", ctx.repo.name, e));
                     }
