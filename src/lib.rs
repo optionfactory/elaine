@@ -1,4 +1,4 @@
-pub mod cache;
+pub mod repositories;
 pub mod cli;
 pub mod stats;
 pub mod github;

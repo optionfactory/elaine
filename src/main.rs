@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use clap::Parser;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
-use repospect::cache::RepositoryCache;
+use repospect::repositories::RepositoryStore;
 use repospect::cli::{Cli, Commands, RepoCommands, StatsCommands};
 use repospect::github::GithubClient;
 use repospect::stats::StatsStore;
@@ -78,32 +78,16 @@ async fn main() -> Result<()> {
         }
         Commands::Repositories { command } => match command {
             RepoCommands::Sync { force } => {
-                let cache = Arc::new(RepositoryCache::new(&config.data_dir)?);
+                let repositories = Arc::new(RepositoryStore::new(&config.data_dir)?);
                 let client = Arc::new(GithubClient::new(config.github_token, config.organization)?);
+                
                 eprintln!("Fetching repository list...");
                 let repos = client.fetch_org_repos().await?;
+                
                 eprintln!("Checking for deleted repositories to remove from cache...");
                 let current_repo_names: HashSet<&str> = repos.iter().map(|r| r.name.as_str()).collect();
-                if let Ok(entries) = fs::read_dir(&cache.dir) {
-                    for entry in entries.filter_map(|e| e.ok()) {
-                        let path = entry.path();
-                        if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
-                            let repo_name = if file_name.ends_with(".json") {
-                                file_name.strip_suffix(".json")
-                            } else if file_name.ends_with(".tar.gz") {
-                                file_name.strip_suffix(".tar.gz")
-                            } else {
-                                None
-                            };
-                            if let Some(name) = repo_name {
-                                if !current_repo_names.contains(name) {
-                                    eprintln!("  🗑️ Removing orphaned cache file: {}", file_name);
-                                    let _ = fs::remove_file(&path);
-                                }
-                            }
-                        }
-                    }
-                }
+                repositories.clean_orphans(&current_repo_names)?;
+
                 let total = repos.len() as u64;
                 let m = MultiProgress::new();
                 let main_pb = m.add(make_main_progress(total, "Downloading archives...".to_string()));
@@ -111,7 +95,7 @@ async fn main() -> Result<()> {
                 let mut tasks = Vec::new();
                 for repo in repos {
                     let client = Arc::clone(&client);
-                    let cache = Arc::clone(&cache);
+                    let cache = Arc::clone(&repositories);
                     let sem = Arc::clone(&sem);
                     let m_clone = m.clone();
                     let main_pb_clone = main_pb.clone();
@@ -147,9 +131,9 @@ async fn main() -> Result<()> {
                 main_pb.finish_with_message("Sync complete!");
             }
             RepoCommands::Inspect { repository } => {
-                let cache = RepositoryCache::new(&config.data_dir)?;
-                let tar_path = cache.tarball_path(&repository);
-                let meta_path = cache.metadata_path(&repository);
+                let repositories = RepositoryStore::new(&config.data_dir)?;
+                let tar_path = repositories.tarball_path(&repository);
+                let meta_path = repositories.metadata_path(&repository);
                 if !tar_path.exists() {
                     anyhow::bail!(
                         "Cached archive for repository '{}' not found at {:?}",
@@ -174,17 +158,13 @@ async fn main() -> Result<()> {
                 println!("{}", serde_json::to_string_pretty(&report)?);
             }
             RepoCommands::Clean => {
-                let target_dir = config.data_dir.join("repos");
-                if target_dir.exists() {
-                    fs::remove_dir_all(&target_dir).with_context(|| format!("Failed to remove {:?}", target_dir))?;
-                    eprintln!("Cleaned cache directory: {:?}", target_dir);
-                } else {
-                    eprintln!("Cache directory {:?} is already clean.", target_dir);
-                }
+                let repositories = RepositoryStore::new(&config.data_dir)?;
+                repositories.clean_all().context("Failed to clean cache directory")?;
+                eprintln!("Cleaned cache directory.");
             }
             RepoCommands::List => {
-                let cache = RepositoryCache::new(&config.data_dir)?;
-                let repos = cache.load_all_metadata()?;
+                let repositories = RepositoryStore::new(&config.data_dir)?;
+                let repos = repositories.load_all_metadata()?;
                 eprintln!("Cached repositories: {}", repos.len());
                 for (name, _) in repos {
                     eprintln!("  - {}", name);
@@ -193,9 +173,9 @@ async fn main() -> Result<()> {
         },
         Commands::Stats { command } => match command {
             StatsCommands::Scan => {
-                let cache = Arc::new(RepositoryCache::new(&config.data_dir)?);
-                let data_store = Arc::new(StatsStore::new(&config.data_dir)?);
-                let repos = cache.load_all_metadata()?;
+                let repositories = Arc::new(RepositoryStore::new(&config.data_dir)?);
+                let stats = Arc::new(StatsStore::new(&config.data_dir)?);
+                let repos = repositories.load_all_metadata()?;
                 let total = repos.len() as u64;
                 let worker_count = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4);
                 let sem = Arc::new(Semaphore::new(worker_count.max(1)));
@@ -206,8 +186,8 @@ async fn main() -> Result<()> {
                 ));
                 let mut tasks = Vec::new();
                 for (_name, repo) in repos {
-                    let cache = Arc::clone(&cache);
-                    let data_store = Arc::clone(&data_store);
+                    let cache = Arc::clone(&repositories);
+                    let data_store = Arc::clone(&stats);
                     let sem = Arc::clone(&sem);
                     let main_pb_clone = main_pb.clone();
                     let m_clone = m.clone();
@@ -257,26 +237,22 @@ async fn main() -> Result<()> {
                     let _ = task.await?;
                 }
                 main_pb.finish_and_clear();
-                eprintln!("Scan complete! Run `repospect scan aggregate` to generate the stats.json dashboard data.");
+                eprintln!("Scan complete! Run `repospect stats aggregate` to generate the dashboard data.");
             }
             StatsCommands::Aggregate => {
-                let data_store = StatsStore::new(&config.data_dir)?;
+                let stats = StatsStore::new(&config.data_dir)?;
                 eprintln!("Aggregating project scans...");
-                let latest_path = data_store.aggregate_scans()?;
+                let latest_path = stats.aggregate_scans()?;
                 eprintln!("Successfully created aggregated data at {:?}", latest_path);
             }
             StatsCommands::Clean => {
-                let target_dir = config.data_dir.join("stats");
-                if target_dir.exists() {
-                    fs::remove_dir_all(&target_dir).with_context(|| format!("Failed to remove {:?}", target_dir))?;
-                    eprintln!("Cleaned data directory: {:?}", target_dir);
-                } else {
-                    eprintln!("Data directory {:?} is already clean.", target_dir);
-                }
+                let stats = StatsStore::new(&config.data_dir)?;
+                stats.clean_all().context("Failed to clean stats directory")?;
+                eprintln!("Cleaned stats directory.");
             }
             StatsCommands::List => {
-                let data_store = StatsStore::new(&config.data_dir)?;
-                let scans = data_store.list_scans()?;
+                let stats = StatsStore::new(&config.data_dir)?;
+                let scans = stats.list_scans()?;
                 eprintln!("Data files: {}", scans.len());
                 for (name, size) in scans {
                     eprintln!("  - {} ({} bytes)", name, size);

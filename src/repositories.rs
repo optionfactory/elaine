@@ -13,11 +13,11 @@ pub enum SyncStatus {
     Downloaded,
 }
 
-pub struct RepositoryCache {
+pub struct RepositoryStore {
     pub dir: PathBuf,
 }
 
-impl RepositoryCache {
+impl RepositoryStore {
     pub fn new<P: AsRef<Path>>(data_dir: P) -> Result<Self> {
         let dir = data_dir.as_ref().join("repos");
         fs::create_dir_all(&dir)?;
@@ -54,12 +54,7 @@ impl RepositoryCache {
         local_meta.pushed_at == expected_pushed_at
     }
 
-    pub async fn sync_repo(
-        &self,
-        client: &GithubClient,
-        repo: &GithubRepository,
-        force: bool,
-    ) -> Result<SyncStatus> {
+    pub async fn sync_repo(&self, client: &GithubClient, repo: &GithubRepository, force: bool) -> Result<SyncStatus> {
         if !force && self.is_cache_valid(&repo.name, &repo.pushed_at) {
             return Ok(SyncStatus::Cached);
         }
@@ -106,5 +101,37 @@ impl RepositoryCache {
             }
         }
         Ok(repos)
+    }
+
+    pub fn clean_orphans(&self, current_repo_names: &std::collections::HashSet<&str>) -> anyhow::Result<()> {
+        if let Ok(entries) = std::fs::read_dir(&self.dir) {
+            for entry in entries.filter_map(|e| e.ok()) {
+                let path = entry.path();
+                if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
+                    let repo_name = if file_name.ends_with(".json") {
+                        file_name.strip_suffix(".json")
+                    } else if file_name.ends_with(".tar.gz") {
+                        file_name.strip_suffix(".tar.gz")
+                    } else {
+                        None
+                    };
+
+                    if let Some(name) = repo_name {
+                        if !current_repo_names.contains(name) {
+                            eprintln!("  Removing orphaned cache file: {}", file_name);
+                            let _ = std::fs::remove_file(&path);
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn clean_all(&self) -> anyhow::Result<()> {
+        if self.dir.exists() {
+            std::fs::remove_dir_all(&self.dir)?;
+        }
+        Ok(())
     }
 }

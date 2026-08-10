@@ -6,22 +6,19 @@ use std::path::{Path, PathBuf};
 
 pub struct StatsStore {
     pub base_dir: PathBuf,
-    pub org_dir: PathBuf,
+    pub stats_dir: PathBuf,
 }
 
 impl StatsStore {
     pub fn new<P: AsRef<Path>>(data_dir: P) -> Result<Self> {
         let base_dir = data_dir.as_ref().to_path_buf();
-        let org_dir = base_dir.join("stats");
-        fs::create_dir_all(&org_dir)?;
-        Ok(Self {
-            base_dir,
-            org_dir,
-        })
+        let stats_dir = base_dir.join("stats");
+        fs::create_dir_all(&stats_dir)?;
+        Ok(Self { base_dir, stats_dir })
     }
 
     pub fn project_file_path(&self, repo_name: &str) -> PathBuf {
-        self.org_dir.join(format!("{}.json", repo_name))
+        self.stats_dir.join(format!("{}.json", repo_name))
     }
 
     pub fn aggregate_file_path(&self) -> PathBuf {
@@ -55,11 +52,11 @@ impl StatsStore {
 
     pub fn aggregate_scans(&self) -> Result<PathBuf> {
         let mut stats = Vec::new();
-        if !self.org_dir.exists() {
+        if !self.stats_dir.exists() {
             return Ok(self.aggregate_file_path());
         }
 
-        for entry in fs::read_dir(&self.org_dir)? {
+        for entry in fs::read_dir(&self.stats_dir)? {
             let entry = entry?;
             let path = entry.path();
             if path.is_file() && path.extension().unwrap_or_default() == "json" {
@@ -83,10 +80,10 @@ impl StatsStore {
 
     pub fn list_scans(&self) -> Result<Vec<(String, u64)>> {
         let mut scans = Vec::new();
-        if !self.org_dir.exists() {
+        if !self.stats_dir.exists() {
             return Ok(scans);
         }
-        for entry in fs::read_dir(&self.org_dir)? {
+        for entry in fs::read_dir(&self.stats_dir)? {
             let entry = entry?;
             let path = entry.path();
             if path.is_file() {
@@ -98,5 +95,12 @@ impl StatsStore {
         }
         scans.sort_by(|a, b| a.0.cmp(&b.0));
         Ok(scans)
+    }
+
+    pub fn clean_all(&self) -> anyhow::Result<()> {
+        if self.stats_dir.exists() {
+            std::fs::remove_dir_all(&self.stats_dir)?;
+        }
+        Ok(())
     }
 }
