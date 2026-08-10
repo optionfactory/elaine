@@ -5,9 +5,15 @@ use repospect::cache::RepositoryCache;
 use repospect::cli::{CacheCommands, Cli, Commands, DataCommands};
 use repospect::data::DataStore;
 use repospect::github::GithubClient;
+use rust_embed::RustEmbed;
 use std::fs;
 use std::sync::Arc;
 use tokio::sync::Semaphore;
+use warp::Reply;
+
+#[derive(RustEmbed)]
+#[folder = "frontend/"]
+struct FrontendAssets;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -240,20 +246,52 @@ async fn main() -> Result<()> {
                 }
             }
         },
-        Commands::Serve { port } => {
+        Commands::Serve { port, dev } => {
             let data_dir = cli.data_dir.clone();
-
             if !data_dir.exists() {
                 anyhow::bail!("Data directory {:?} does not exist. Run a scan first.", data_dir);
             }
-
             let url = format!("http://localhost:{}", port);
             eprintln!("Serving dashboard from {:?} at {}", data_dir, url);
+
+            if dev {
+                eprintln!("Development mode enabled: Serving frontend assets from ./frontend/");
+            } else {
+                eprintln!("Serving embedded frontend assets.");
+            }
             eprintln!("Press Ctrl+C to stop.");
 
-            // Start the static file server
-            let route = warp::fs::dir(data_dir);
-            warp::serve(route).run(([127, 0, 0, 1], port)).await;
+            use warp::Filter;
+
+            let data_route = warp::fs::dir(data_dir);
+
+            if dev {
+                let frontend_route = warp::fs::dir("frontend");
+                let route = frontend_route.or(data_route);
+                warp::serve(route).run(([127, 0, 0, 1], port)).await;
+            } else {
+                let embedded_frontend = warp::path::tail().and_then(|tail: warp::path::Tail| async move {
+                    let path = if tail.as_str().is_empty() {
+                        "index.html"
+                    } else {
+                        tail.as_str()
+                    };
+
+                    match FrontendAssets::get(path) {
+                        Some(content) => {
+                            let mime = mime_guess::from_path(path).first_or_octet_stream();
+                            Ok(
+                                warp::reply::with_header(content.data.into_owned(), "content-type", mime.as_ref())
+                                    .into_response(),
+                            )
+                        }
+                        None => Err(warp::reject::not_found()),
+                    }
+                });
+
+                let route = embedded_frontend.or(data_route);
+                warp::serve(route).run(([127, 0, 0, 1], port)).await;
+            }
         }
     }
 

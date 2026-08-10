@@ -26,8 +26,12 @@ impl DataStore {
             return false;
         }
 
-        let Ok(metadata) = fs::metadata(&file_path) else { return false; };
-        let Ok(modified) = metadata.modified() else { return false; };
+        let Ok(metadata) = fs::metadata(&file_path) else {
+            return false;
+        };
+        let Ok(modified) = metadata.modified() else {
+            return false;
+        };
         let modified_dt: DateTime<Utc> = modified.into();
 
         if let Ok(pushed_dt) = DateTime::parse_from_rfc3339(pushed_at) {
@@ -40,9 +44,8 @@ impl DataStore {
     pub fn save_project_scan(&self, stat: &RepoStats) -> Result<PathBuf> {
         let file_path = self.project_file_path(&stat.name);
         let json_data = serde_json::to_string_pretty(stat)?;
-        fs::write(&file_path, &json_data)
-            .with_context(|| format!("Failed to write scan data to {:?}", file_path))?;
-        
+        fs::write(&file_path, &json_data).with_context(|| format!("Failed to write scan data to {:?}", file_path))?;
+
         Ok(file_path)
     }
 
@@ -56,10 +59,10 @@ impl DataStore {
         for entry in fs::read_dir(&self.dir)? {
             let entry = entry?;
             let path = entry.path();
-            
-            if path.is_file() 
-               && path.extension().unwrap_or_default() == "json" 
-               && path.file_name().unwrap_or_default() != "latest.json" 
+
+            if path.is_file()
+                && path.extension().unwrap_or_default() == "json"
+                && path.file_name().unwrap_or_default() != "latest.json"
             {
                 let data = fs::read_to_string(&path)?;
                 if let Ok(stat) = serde_json::from_str::<RepoStats>(&data) {
@@ -76,7 +79,7 @@ impl DataStore {
         let json_data = serde_json::to_string_pretty(&stats)?;
         fs::write(&latest_path, &json_data)
             .with_context(|| format!("Failed to update latest scan data at {:?}", latest_path))?;
-            
+
         Ok(latest_path)
     }
 

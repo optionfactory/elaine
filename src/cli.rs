@@ -58,6 +58,12 @@ pub enum Commands {
     Serve {
         #[arg(short, long, default_value_t = 8000, help = "Port to serve the dashboard on")]
         port: u16,
+
+        #[arg(
+            long,
+            help = "Serve frontend assets from the local filesystem instead of embedded binary"
+        )]
+        dev: bool,
     },
     #[command(about = "Inspect a single local filesystem directory or .tar.gz archive directly")]
     Inspect {

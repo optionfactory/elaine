@@ -92,7 +92,7 @@ pub fn scan_repository(
             if !is_submodule {
                 selected_dirs.push(dir);
                 let run_dir = root.join(dir);
-                
+
                 if let Some(ref p) = pb {
                     p.set_message(format!("[{}] Running Maven checks...", repo.name));
                 }
@@ -100,7 +100,9 @@ pub fn scan_repository(
                 let output = Command::new("mvn")
                     .current_dir(&run_dir)
                     .args([
-                        "-B", "-U", "-ntp",
+                        "-B",
+                        "-U",
+                        "-ntp",
                         "net.optionfactory:anarchitect-maven-plugin:LATEST:check-vulns",
                         "net.optionfactory:anarchitect-maven-plugin:LATEST:check-updates",
                     ])
