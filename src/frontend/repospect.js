@@ -1,6 +1,5 @@
 import { Templates } from "ftl";
 
-
 class Spinner {
     constructor() {
         this.el = document.querySelector('loading-spinner');
@@ -23,7 +22,8 @@ class InfiniteScroller {
         this.batchSize = batchSize;
         this.spinner = spinner;
         this.iterator = null;
-
+        this.isFetching = false;
+        
         this.observer = new IntersectionObserver((entries) => {
             if (entries[0].isIntersecting && this.iterator && !this.isFetching) {
                 this.renderNextBatch();
@@ -31,8 +31,8 @@ class InfiniteScroller {
         }, { rootMargin: '1000px' });
     }
 
-    async load(iterator) {
-        this.iterator = iterator;
+    async load(asyncIterator) {
+        this.iterator = asyncIterator;
         this.grid.innerHTML = '';
         this.observer.observe(this.sentinel);
         await this.spinner.show();
@@ -44,17 +44,25 @@ class InfiniteScroller {
     }
 
     async renderNextBatch() {
-        const batch = Array.from({ length: this.batchSize }, () => this.iterator.next()).filter(item => !item.done).map(item => item.value);
+        this.isFetching = true;
+        const batch = [];
+        
+        for (let i = 0; i < this.batchSize; i++) {
+            const item = await this.iterator.next();
+            if (item.done) break;
+            batch.push(item.value);
+        }
+
         if (batch.length === 0 && this.grid.children.length === 0) {
             this.grid.innerHTML = '<error-box>No matching repositories found.</error-box>';
             this.observer.unobserve(this.sentinel);
-            return;
-        }
-        if (batch.length === 0) {
+        } else if (batch.length === 0) {
             this.observer.unobserve(this.sentinel);
-            return;
+        } else {
+            this.template.withOverlay(batch).appendTo(this.grid);
         }
-        this.template.withOverlay(batch).appendTo(this.grid);
+        
+        this.isFetching = false;
     }
 }
 
