@@ -345,7 +345,7 @@
             e.preventDefault();
             document.querySelectorAll('.metric-card').forEach(b => b.classList.remove('active'));
             const search = new FormData(e.target).get('search');
-            await scroller.load(projects(null, search));
+            await scroller.load(projects(http, null, search));
         });
 
         document.querySelector('body').addEventListener('click', async e => {
@@ -357,12 +357,12 @@
                 document.querySelectorAll('.metric-card').forEach(b => b.classList.remove('active'));
                 button.classList.add('active');
             }
-            await scroller.load(projects(button.dataset.filter, null));
+            await scroller.load(projects(http, button.dataset.filter, null));
         });
 
         const stats = await http.get('/api/stats').fetchJson();
         Templates.fromSelector('#metrics-template').withOverlay(stats).renderToSelector('metrics-grid');
-        await scroller.load(projects());
+        await scroller.load(projects(http));
 
     </script>
 </body>

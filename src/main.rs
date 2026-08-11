@@ -67,70 +67,59 @@ pub struct DashboardStats {
 impl DashboardStats {
     pub fn calculate(projects: &[repospect::scanners::RepoStats]) -> Self {
         let mut s = Self::default();
+
         for r in projects {
             s.all += 1;
-            let live = !r.archived;
+
+            let (tot, live, aud, unaud, vul, aud_v, unaud_v) = match r.private {
+                true => (
+                    &mut s.private,
+                    &mut s.live_private,
+                    &mut s.live_private_audited,
+                    &mut s.live_private_unaudited,
+                    &mut s.private_vulns,
+                    &mut s.private_audited_vulns,
+                    &mut s.private_unaudited_vulns,
+                ),
+                false => (
+                    &mut s.public,
+                    &mut s.live_public,
+                    &mut s.live_public_audited,
+                    &mut s.live_public_unaudited,
+                    &mut s.public_vulns,
+                    &mut s.public_audited_vulns,
+                    &mut s.public_unaudited_vulns,
+                ),
+            };
+
+            *tot += 1;
+            if r.archived {
+                continue;
+            }
+
+            s.live += 1;
+            *live += 1;
+
             let audited = r.audit.is_some();
-            let private = r.private;
-            let public = !private;
-            let has_vulns = r.vulnerabilities.as_ref().map(|v| !v.is_empty()).unwrap_or(false);
+            let has_vulns = r.vulnerabilities.as_ref().is_some_and(|v| !v.is_empty());
 
-            if live {
-                s.live += 1;
-            }
-            if live && audited {
+            if audited {
                 s.live_audited += 1;
-            }
-            if live && !audited {
+                *aud += 1;
+            } else {
                 s.live_unaudited += 1;
+                *unaud += 1;
             }
-
-            if public {
-                s.public += 1;
-            }
-            if live && public {
-                s.live_public += 1;
-            }
-            if live && public && audited {
-                s.live_public_audited += 1;
-            }
-            if live && public && !audited {
-                s.live_public_unaudited += 1;
-            }
-
-            if private {
-                s.private += 1;
-            }
-            if live && private {
-                s.live_private += 1;
-            }
-            if live && private && audited {
-                s.live_private_audited += 1;
-            }
-            if live && private && !audited {
-                s.live_private_unaudited += 1;
-            }
-
-            if live && public && has_vulns {
-                s.public_vulns += 1;
-            }
-            if live && public && audited && has_vulns {
-                s.public_audited_vulns += 1;
-            }
-            if live && public && !audited && has_vulns {
-                s.public_unaudited_vulns += 1;
-            }
-
-            if live && private && has_vulns {
-                s.private_vulns += 1;
-            }
-            if live && private && audited && has_vulns {
-                s.private_audited_vulns += 1;
-            }
-            if live && private && !audited && has_vulns {
-                s.private_unaudited_vulns += 1;
+            if has_vulns {
+                *vul += 1;
+                if audited {
+                    *aud_v += 1;
+                } else {
+                    *unaud_v += 1;
+                }
             }
         }
+
         s
     }
 }
@@ -225,7 +214,6 @@ where
     }
 }
 
-// --- API Route Handlers ---
 
 async fn api_config_handler(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     Json(serde_json::json!({
@@ -323,7 +311,6 @@ async fn embedded_assets_handler(uri: axum::http::Uri) -> impl IntoResponse {
     }
 }
 
-// --- Main ---
 
 #[tokio::main]
 async fn main() -> Result<()> {

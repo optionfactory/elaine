@@ -88,8 +88,8 @@ const authenticate = async () => {
         window.history.replaceState(null, null, window.location.pathname);
     }
 
+    const storedToken = sessionStorage.getItem('google_token');
     const isTokenExpired = (() => {
-        const storedToken = sessionStorage.getItem('google_token');
         if (!storedToken) {
             return true;
         }
@@ -129,7 +129,7 @@ const authenticate = async () => {
 }
 
 
-async function* projects(filters, search) {
+async function* projects(http, filters, search) {
     let offset = 0;
     const limit = 50;
     while (true) {
