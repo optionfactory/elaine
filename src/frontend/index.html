@@ -37,6 +37,42 @@
 
     <metrics-grid></metrics-grid>
 
+    <filter-controls>
+        <div class="filter-group" data-group="visibility">
+            <span class="group-label">Visibility:</span>
+            <div class="btn-group">
+                <button type="button" class="btn-state active" data-value="all">All</button>
+                <button type="button" class="btn-state" data-value="public">Public</button>
+                <button type="button" class="btn-state" data-value="private">Private</button>
+            </div>
+        </div>
+
+        <div class="filter-group" data-group="status">
+            <span class="group-label">Status:</span>
+            <div class="btn-group">
+                <button type="button" class="btn-state active" data-value="all">All</button>
+                <button type="button" class="btn-state" data-value="live">Live</button>
+            </div>
+        </div>
+
+        <div class="filter-group" data-group="audit">
+            <span class="group-label">Audit:</span>
+            <div class="btn-group">
+                <button type="button" class="btn-state active" data-value="all">All</button>
+                <button type="button" class="btn-state" data-value="audited">Audited</button>
+                <button type="button" class="btn-state" data-value="unaudited">Unaudited</button>
+            </div>
+        </div>
+
+        <div class="filter-group" data-group="vulnerability">
+            <span class="group-label">Vulnerabilities:</span>
+            <div class="btn-group">
+                <button type="button" class="btn-state active" data-value="all">All</button>
+                <button type="button" class="btn-state" data-value="vulns">With Vulns</button>
+            </div>
+        </div>
+    </filter-controls>
+
     <search-bar>
         <form>
             <input type="text" name="search" placeholder="Search by repository, commissioner, steward, or domain..." />
@@ -51,7 +87,7 @@
     <scroll-sentinel></scroll-sentinel>
 
     <template id="metrics-template">
-        <button class="metric-card all" data-filter>
+        <button class="metric-card all active" data-filter>
             <h2>Total Repositories</h2>
             {{ all }}
         </button>
@@ -337,33 +373,88 @@
         import { Spinner, InfiniteScroller, authenticate, projects } from "/repospect.js";
 
         const { config, http } = await authenticate();
-
         const spinner = new Spinner();
         const scroller = new InfiniteScroller('projects-grid', 'scroll-sentinel', '#projects-template', spinner, 5);
 
+        let currentSearch = '';
+
+        function getActiveFiltersFromControls() {
+            const activeTags = [];
+            document.querySelectorAll('filter-controls .filter-group').forEach(group => {
+                const activeBtn = group.querySelector('.btn-state.active');
+                if (activeBtn && activeBtn.dataset.value && activeBtn.dataset.value !== 'all') {
+                    activeTags.push(activeBtn.dataset.value);
+                }
+            });
+            return activeTags.join(',');
+        }
+
+        function setControlsFromFilterString(filterStr) {
+            const activeTags = (filterStr || '').split(',').map(s => s.trim()).filter(Boolean);
+            document.querySelectorAll('filter-controls .filter-group').forEach(group => {
+                const buttons = group.querySelectorAll('.btn-state');
+                let hasMatch = false;
+                buttons.forEach(btn => {
+                    btn.classList.remove('active');
+                    if (activeTags.includes(btn.dataset.value)) {
+                        btn.classList.add('active');
+                        hasMatch = true;
+                    }
+                });
+                if (!hasMatch) {
+                    const defaultBtn = group.querySelector('.btn-state[data-value="all"]');
+                    if (defaultBtn) defaultBtn.classList.add('active');
+                }
+            });
+        }
+
+        function updateActiveMetricCard(filterStr) {
+            document.querySelectorAll('.metric-card').forEach(b => {
+                b.classList.remove('active');
+                const cardFilter = b.dataset.filter || '';
+                if (cardFilter === (filterStr || '')) {
+                    b.classList.add('active');
+                }
+            });
+        }
+
+        document.querySelector('filter-controls').addEventListener('click', async e => {
+            const button = e.target.closest('.btn-state');
+            if (!button) return;
+
+            const group = button.closest('.filter-group');
+            group.querySelectorAll('.btn-state').forEach(b => b.classList.remove('active'));
+            button.classList.add('active');
+
+            const activeFilters = getActiveFiltersFromControls();
+            updateActiveMetricCard(activeFilters);
+            await scroller.load(projects(http, activeFilters, currentSearch));
+        });
+
         document.querySelector('form').addEventListener('submit', async (e) => {
             e.preventDefault();
-            document.querySelectorAll('.metric-card').forEach(b => b.classList.remove('active'));
-            const search = new FormData(e.target).get('search');
-            await scroller.load(projects(http, null, search));
+            currentSearch = new FormData(e.target).get('search');
+            const activeFilters = getActiveFiltersFromControls();
+            await scroller.load(projects(http, activeFilters, currentSearch));
         });
 
         document.querySelector('body').addEventListener('click', async e => {
             const button = e.target.closest('[data-filter]');
-            if (!button) {
-                return;
-            }
+            if (!button || button.closest('filter-controls')) return;
+
+            const filterStr = button.dataset.filter;
             if (button.classList.contains('metric-card')) {
                 document.querySelectorAll('.metric-card').forEach(b => b.classList.remove('active'));
                 button.classList.add('active');
             }
-            await scroller.load(projects(http, button.dataset.filter, null));
+
+            setControlsFromFilterString(filterStr);
+            await scroller.load(projects(http, filterStr, currentSearch));
         });
 
         const stats = await http.get('/api/stats').fetchJson();
         Templates.fromSelector('#metrics-template').withOverlay(stats).renderToSelector('metrics-grid');
         await scroller.load(projects(http));
-
     </script>
 </body>
 
