@@ -23,7 +23,7 @@ pub enum Commands {
     },
     #[command(about = "Fetch repository metadata and cache .tar.gz archives from GitHub")]
     Sync {
-        #[arg(long = "force", help = "Force re-downloading archives even if pushed_at timestamps match")]
+        #[arg(long = "force", help = "Force re-downloading archives even if updated_at timestamps match")]
         force: bool,
     },
     #[command(about = "Audit cached organization repositories for DevSecOps metadata & SBOMs")]

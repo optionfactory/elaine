@@ -9,6 +9,9 @@ impl Scanner for LegopfaScanner {
             Pattern::FileNamePattern(Box::new(|name| name.starts_with("legopfa") && name.ends_with(".json"))),
         )]
     }
+    fn interested_in_archived(&self) -> bool {
+        false
+    }
 
     fn scan(&self, ctx: &ScanContext, stats: &mut RepoStats) -> anyhow::Result<()> {
         if let Some(files) = ctx.matches.get("legopfa_confs") {

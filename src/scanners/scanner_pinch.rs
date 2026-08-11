@@ -10,6 +10,11 @@ impl Scanner for PinchScanner {
         vec![("pinch_manifest", Pattern::ExactPath(PathBuf::from("pinch.yaml")))]
     }
 
+    fn interested_in_archived(&self) -> bool {
+        true
+    }
+
+
     fn scan(&self, ctx: &ScanContext, stats: &mut RepoStats) -> anyhow::Result<()> {
         let pinch_audit = ctx
             .matches

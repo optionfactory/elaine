@@ -32,8 +32,8 @@ impl RepositoryStore {
         self.dir.join(format!("{}.json", repo_name))
     }
 
-    pub fn is_cache_valid(&self, repo_name: &str, expected_pushed_at: &str) -> bool {
-        if expected_pushed_at.is_empty() {
+    pub fn is_cache_valid(&self, repo_name: &str, expected_updated_at: &str) -> bool {
+        if expected_updated_at.is_empty() {
             return false;
         }
 
@@ -51,11 +51,11 @@ impl RepositoryStore {
             return false;
         };
 
-        local_meta.pushed_at == expected_pushed_at
+        local_meta.updated_at == expected_updated_at
     }
 
     pub async fn sync_repo(&self, client: &GithubClient, repo: &GithubRepository, force: bool) -> Result<SyncStatus> {
-        if !force && self.is_cache_valid(&repo.name, &repo.pushed_at) {
+        if !force && self.is_cache_valid(&repo.name, &repo.updated_at) {
             return Ok(SyncStatus::Cached);
         }
 

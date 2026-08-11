@@ -9,7 +9,9 @@ impl Scanner for MavenScanner {
     fn patterns(&self) -> Vec<(&'static str, Pattern)> {
         vec![("pom_files", Pattern::FileName("pom.xml".to_string()))]
     }
-
+    fn interested_in_archived(&self) -> bool {
+        false
+    }
     fn scan(&self, ctx: &ScanContext, stats: &mut RepoStats) -> anyhow::Result<()> {
         let Some(pom_paths) = ctx.matches.get("pom_files") else {
             return Ok(());
@@ -64,20 +66,16 @@ impl Scanner for MavenScanner {
                         stats.add_upgrades(parsed_updates);
                     }
                 }
-                Ok(out) => {
+                Ok(_out) => {
                     stats.put_stack("maven", StackInspectionStatus::Failure);
                     if let Some(p) = ctx.pb {
-                        p.println(format!(
-                            "⚠️ Maven failed for {}:\n{}",
-                            ctx.repo.name,
-                            String::from_utf8_lossy(&out.stderr).trim()
-                        ));
+                        p.println(format!("[{}] 🔥 Maven failed", ctx.repo.name));
                     }
                 }
                 Err(e) => {
                     stats.put_stack("maven", StackInspectionStatus::Failure);
                     if let Some(p) = ctx.pb {
-                        p.println(format!("⚠️ Failed to execute Maven for {}: {}", ctx.repo.name, e));
+                        p.println(format!("[{}] 🔥 Failed to execute Maven: {}", ctx.repo.name, e));
                     }
                 }
             }

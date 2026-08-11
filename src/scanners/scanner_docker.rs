@@ -9,6 +9,9 @@ impl Scanner for DockerScanner {
             ("docker_compose_files", Pattern::FileName("docker-compose.yml".to_string())),
         ]
     }
+    fn interested_in_archived(&self) -> bool {
+        false
+    }
 
     fn scan(&self, ctx: &ScanContext, stats: &mut RepoStats) -> anyhow::Result<()> {
         let mut all_docker = Vec::new();
