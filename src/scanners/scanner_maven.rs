@@ -51,18 +51,16 @@ impl Scanner for MavenScanner {
                     stats.checked_for_upgrades();
 
                     let vulns_path = run_dir.join("target").join("anarchitect-vulns.json");
-                    if let Ok(payload) = fs::read_to_string(&vulns_path) {
-                        if let Ok(parsed_vulns) = serde_json::from_str::<Vec<Vulnerability>>(&payload) {
+                    if let Ok(payload) = fs::read_to_string(&vulns_path)
+                        && let Ok(parsed_vulns) = serde_json::from_str::<Vec<Vulnerability>>(&payload) {
                             stats.add_vulnerabilities(parsed_vulns);
                         }
-                    }
 
                     let updates_path = run_dir.join("target").join("anarchitect-dependency-upgrades.json");
-                    if let Ok(payload) = fs::read_to_string(&updates_path) {
-                        if let Ok(parsed_updates) = serde_json::from_str::<Vec<DependencyUpdate>>(&payload) {
+                    if let Ok(payload) = fs::read_to_string(&updates_path)
+                        && let Ok(parsed_updates) = serde_json::from_str::<Vec<DependencyUpdate>>(&payload) {
                             stats.add_upgrades(parsed_updates);
                         }
-                    }
                 }
                 Ok(out) => {
                     stats.put_stack("maven", StackInspectionStatus::Failure);

@@ -187,11 +187,10 @@ where
         let token_data = jsonwebtoken::decode::<Claims>(token, &decoding_key, &validation)
             .map_err(|e| AuthError(format!("Invalid token: {}", e)))?;
 
-        if let Some(expected_hd) = &google_auth.hosted_domain {
-            if token_data.claims.hd.as_deref() != Some(expected_hd.as_str()) {
+        if let Some(expected_hd) = &google_auth.hosted_domain
+            && token_data.claims.hd.as_deref() != Some(expected_hd.as_str()) {
                 return Err(AuthError(format!("Invalid organization domain. Expected {}", expected_hd)));
             }
-        }
 
         Ok(ValidatedUser)
     }
@@ -226,11 +225,10 @@ async fn api_projects_handler(
     let mut filtered: Vec<&repospect::scanners::RepoStats> = cache.projects
         .iter()
         .filter(|p| {
-            if let Some(t) = &term {
-                if !p.name.to_lowercase().contains(t) && !p.description.to_lowercase().contains(t) {
+            if let Some(t) = &term
+                && !p.name.to_lowercase().contains(t) && !p.description.to_lowercase().contains(t) {
                     return false;
                 }
-            }
             
             if filters.contains(&"all") {
                 return true;
@@ -348,11 +346,11 @@ async fn main() -> Result<()> {
                 
                 loop {
                     interval.tick().await;
-                    if let Ok(meta) = tokio::fs::metadata(&stats_file).await {
-                        if let Ok(mtime) = meta.modified() {
-                            if mtime != last_mtime {
-                                if let Ok(data) = tokio::fs::read_to_string(&stats_file).await {
-                                    if let Ok(parsed) = serde_json::from_str::<Vec<repospect::scanners::RepoStats>>(&data) {
+                    if let Ok(meta) = tokio::fs::metadata(&stats_file).await
+                        && let Ok(mtime) = meta.modified()
+                            && mtime != last_mtime
+                                && let Ok(data) = tokio::fs::read_to_string(&stats_file).await
+                                    && let Ok(parsed) = serde_json::from_str::<Vec<repospect::scanners::RepoStats>>(&data) {
                                         let new_stats = DashboardStats::calculate(&parsed);
                                         let mut w = bg_projects_cache.write().await;
                                         w.projects = parsed;
@@ -360,10 +358,6 @@ async fn main() -> Result<()> {
                                         last_mtime = mtime;
                                         eprintln!("[Background] Detected stats.json change. Recalculated stats and reloaded memory.");
                                     }
-                                }
-                            }
-                        }
-                    }
                 }
             });
 

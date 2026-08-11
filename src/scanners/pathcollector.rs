@@ -72,11 +72,10 @@ impl PathCollector {
             let is_dir = entry.file_type().is_dir();
 
             for (key, pattern) in &self.rules {
-                if pattern.matches(rel_path, &name, is_dir) {
-                    if let Some(matched_paths) = results.get_mut(key) {
+                if pattern.matches(rel_path, &name, is_dir)
+                    && let Some(matched_paths) = results.get_mut(key) {
                         matched_paths.push(rel_path.to_path_buf());
                     }
-                }
             }
         }
 

@@ -43,19 +43,17 @@ impl GithubClient {
         if auth_token.is_some() {
             return auth_token;
         }
-        if let Ok(t) = std::env::var("GITHUB_TOKEN").or_else(|_| std::env::var("GH_TOKEN")) {
-            if !t.trim().is_empty() {
+        if let Ok(t) = std::env::var("GITHUB_TOKEN").or_else(|_| std::env::var("GH_TOKEN"))
+            && !t.trim().is_empty() {
                 return Some(t.trim().to_string());
             }
-        }
-        if let Ok(out) = Command::new("gh").args(["auth", "token"]).output() {
-            if out.status.success() {
+        if let Ok(out) = Command::new("gh").args(["auth", "token"]).output()
+            && out.status.success() {
                 let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
                 if !s.is_empty() {
                     return Some(s);
                 }
             }
-        }
         None
     }
 

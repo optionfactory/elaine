@@ -90,13 +90,11 @@ impl RepositoryStore {
         for entry in fs::read_dir(&self.dir)? {
             let entry = entry?;
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "json") {
-                if let Ok(data) = fs::read_to_string(&path) {
-                    if let Ok(repo) = serde_json::from_str::<GithubRepository>(&data) {
+            if path.extension().is_some_and(|ext| ext == "json")
+                && let Ok(data) = fs::read_to_string(&path)
+                    && let Ok(repo) = serde_json::from_str::<GithubRepository>(&data) {
                         repos.insert(repo.name.clone(), repo);
                     }
-                }
-            }
         }
         Ok(repos)
     }
@@ -114,12 +112,11 @@ impl RepositoryStore {
                         None
                     };
 
-                    if let Some(name) = repo_name {
-                        if !current_repo_names.contains(name) {
+                    if let Some(name) = repo_name
+                        && !current_repo_names.contains(name) {
                             eprintln!("  Removing orphaned cache file: {}", file_name);
                             let _ = std::fs::remove_file(&path);
                         }
-                    }
                 }
             }
         }
