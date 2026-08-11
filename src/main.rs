@@ -1,10 +1,10 @@
 use anyhow::{Context, Result};
 use axum::{
+    Json, Router,
     extract::{FromRef, FromRequestParts, Query, State},
-    http::{request::Parts, StatusCode},
+    http::{StatusCode, request::Parts},
     response::{IntoResponse, Response},
     routing::get,
-    Json, Router,
 };
 use clap::Parser;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
@@ -75,27 +75,61 @@ impl DashboardStats {
             let public = !private;
             let has_vulns = r.vulnerabilities.as_ref().map(|v| !v.is_empty()).unwrap_or(false);
 
-            if live { s.live += 1; }
-            if live && audited { s.live_audited += 1; }
-            if live && !audited { s.live_unaudited += 1; }
-            
-            if public { s.public += 1; }
-            if live && public { s.live_public += 1; }
-            if live && public && audited { s.live_public_audited += 1; }
-            if live && public && !audited { s.live_public_unaudited += 1; }
-            
-            if private { s.private += 1; }
-            if live && private { s.live_private += 1; }
-            if live && private && audited { s.live_private_audited += 1; }
-            if live && private && !audited { s.live_private_unaudited += 1; }
-            
-            if live && public && has_vulns { s.public_vulns += 1; }
-            if live && public && audited && has_vulns { s.public_audited_vulns += 1; }
-            if live && public && !audited && has_vulns { s.public_unaudited_vulns += 1; }
-            
-            if live && private && has_vulns { s.private_vulns += 1; }
-            if live && private && audited && has_vulns { s.private_audited_vulns += 1; }
-            if live && private && !audited && has_vulns { s.private_unaudited_vulns += 1; }
+            if live {
+                s.live += 1;
+            }
+            if live && audited {
+                s.live_audited += 1;
+            }
+            if live && !audited {
+                s.live_unaudited += 1;
+            }
+
+            if public {
+                s.public += 1;
+            }
+            if live && public {
+                s.live_public += 1;
+            }
+            if live && public && audited {
+                s.live_public_audited += 1;
+            }
+            if live && public && !audited {
+                s.live_public_unaudited += 1;
+            }
+
+            if private {
+                s.private += 1;
+            }
+            if live && private {
+                s.live_private += 1;
+            }
+            if live && private && audited {
+                s.live_private_audited += 1;
+            }
+            if live && private && !audited {
+                s.live_private_unaudited += 1;
+            }
+
+            if live && public && has_vulns {
+                s.public_vulns += 1;
+            }
+            if live && public && audited && has_vulns {
+                s.public_audited_vulns += 1;
+            }
+            if live && public && !audited && has_vulns {
+                s.public_unaudited_vulns += 1;
+            }
+
+            if live && private && has_vulns {
+                s.private_vulns += 1;
+            }
+            if live && private && audited && has_vulns {
+                s.private_audited_vulns += 1;
+            }
+            if live && private && !audited && has_vulns {
+                s.private_unaudited_vulns += 1;
+            }
         }
         s
     }
@@ -161,19 +195,13 @@ where
             None => return Err(AuthError("Google JWKS not loaded on server".into())),
         };
 
-        let header = jsonwebtoken::decode_header(token)
-            .map_err(|_| AuthError("Invalid token header".into()))?;
+        let header = jsonwebtoken::decode_header(token).map_err(|_| AuthError("Invalid token header".into()))?;
 
-        let kid = header
-            .kid
-            .ok_or_else(|| AuthError("Missing 'kid' in token header".into()))?;
+        let kid = header.kid.ok_or_else(|| AuthError("Missing 'kid' in token header".into()))?;
 
-        let jwk = jwks
-            .find(&kid)
-            .ok_or_else(|| AuthError("Unknown 'kid'".into()))?;
+        let jwk = jwks.find(&kid).ok_or_else(|| AuthError("Unknown 'kid'".into()))?;
 
-        let decoding_key = jsonwebtoken::DecodingKey::from_jwk(jwk)
-            .map_err(|_| AuthError("Invalid JWK formatting".into()))?;
+        let decoding_key = jsonwebtoken::DecodingKey::from_jwk(jwk).map_err(|_| AuthError("Invalid JWK formatting".into()))?;
 
         let mut validation = jsonwebtoken::Validation::new(header.alg);
         validation.set_audience(&[&google_auth.client_id]);
@@ -184,13 +212,14 @@ where
             hd: Option<String>,
         }
 
-        let token_data = jsonwebtoken::decode::<Claims>(token, &decoding_key, &validation)
-            .map_err(|e| AuthError(format!("Invalid token: {}", e)))?;
+        let token_data =
+            jsonwebtoken::decode::<Claims>(token, &decoding_key, &validation).map_err(|e| AuthError(format!("Invalid token: {}", e)))?;
 
         if let Some(expected_hd) = &google_auth.hosted_domain
-            && token_data.claims.hd.as_deref() != Some(expected_hd.as_str()) {
-                return Err(AuthError(format!("Invalid organization domain. Expected {}", expected_hd)));
-            }
+            && token_data.claims.hd.as_deref() != Some(expected_hd.as_str())
+        {
+            return Err(AuthError(format!("Invalid organization domain. Expected {}", expected_hd)));
+        }
 
         Ok(ValidatedUser)
     }
@@ -204,10 +233,7 @@ async fn api_config_handler(State(state): State<Arc<AppState>>) -> impl IntoResp
     }))
 }
 
-async fn api_stats_handler(
-    State(state): State<Arc<AppState>>,
-    _auth: ValidatedUser, 
-) -> impl IntoResponse {
+async fn api_stats_handler(State(state): State<Arc<AppState>>, _auth: ValidatedUser) -> impl IntoResponse {
     let cache = state.cache.read().await;
     Json(cache.stats.clone()).into_response()
 }
@@ -215,21 +241,24 @@ async fn api_stats_handler(
 async fn api_projects_handler(
     State(state): State<Arc<AppState>>,
     Query(query): Query<ApiQuery>,
-    _auth: ValidatedUser, 
+    _auth: ValidatedUser,
 ) -> impl IntoResponse {
     let cache = state.cache.read().await;
 
     let term = query.search.as_deref().map(|s| s.to_lowercase());
     let filters: Vec<&str> = query.filters.as_deref().unwrap_or("all").split(',').collect();
 
-    let mut filtered: Vec<&repospect::scanners::RepoStats> = cache.projects
+    let mut filtered: Vec<&repospect::scanners::RepoStats> = cache
+        .projects
         .iter()
         .filter(|p| {
             if let Some(t) = &term
-                && !p.name.to_lowercase().contains(t) && !p.description.to_lowercase().contains(t) {
-                    return false;
-                }
-            
+                && !p.name.to_lowercase().contains(t)
+                && !p.description.to_lowercase().contains(t)
+            {
+                return false;
+            }
+
             if filters.contains(&"all") {
                 return true;
             }
@@ -239,13 +268,25 @@ async fn api_projects_handler(
             let public = !p.private;
             let has_vulns = p.vulnerabilities.as_ref().map(|v| !v.is_empty()).unwrap_or(false);
 
-            if filters.contains(&"live") && !live { return false; }
-            if filters.contains(&"audited") && !audited { return false; }
-            if filters.contains(&"unaudited") && audited { return false; }
-            if filters.contains(&"public") && !public { return false; }
-            if filters.contains(&"private") && public { return false; }
-            if filters.contains(&"vulns") && !has_vulns { return false; }
-            
+            if filters.contains(&"live") && !live {
+                return false;
+            }
+            if filters.contains(&"audited") && !audited {
+                return false;
+            }
+            if filters.contains(&"unaudited") && audited {
+                return false;
+            }
+            if filters.contains(&"public") && !public {
+                return false;
+            }
+            if filters.contains(&"private") && public {
+                return false;
+            }
+            if filters.contains(&"vulns") && !has_vulns {
+                return false;
+            }
+
             true
         })
         .collect();
@@ -261,12 +302,8 @@ async fn api_projects_handler(
 
     let offset = query.offset.unwrap_or(0);
     let limit = query.limit.unwrap_or(5);
-    
-    let paginated: Vec<&repospect::scanners::RepoStats> = filtered
-        .into_iter()
-        .skip(offset)
-        .take(limit)
-        .collect();
+
+    let paginated: Vec<&repospect::scanners::RepoStats> = filtered.into_iter().skip(offset).take(limit).collect();
 
     Json(paginated).into_response()
 }
@@ -294,8 +331,7 @@ async fn main() -> Result<()> {
     let worker_count = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4);
     let download_worker_count = worker_count.min(8);
 
-    let config_data = fs::read_to_string("repospect.json")
-        .context("Failed to read 'repospect.json' in the current directory")?;
+    let config_data = fs::read_to_string("repospect.json").context("Failed to read 'repospect.json' in the current directory")?;
     let config: Config = serde_json::from_str(&config_data)
         .context("Failed to parse 'repospect.json'. Ensure it has github_token, organization, and data_dir fields.")?;
 
@@ -324,16 +360,15 @@ async fn main() -> Result<()> {
 
             let stats_file = data_dir.join("stats.json");
             let initial_data = fs::read_to_string(&stats_file).unwrap_or_else(|_| "[]".to_string());
-            let initial_projects: Vec<repospect::scanners::RepoStats> = 
-                serde_json::from_str(&initial_data).unwrap_or_default();
-            
+            let initial_projects: Vec<repospect::scanners::RepoStats> = serde_json::from_str(&initial_data).unwrap_or_default();
+
             let initial_stats = DashboardStats::calculate(&initial_projects);
 
             let projects_cache = Arc::new(RwLock::new(CacheData {
                 projects: initial_projects,
                 stats: initial_stats,
             }));
-            
+
             let bg_projects_cache = Arc::clone(&projects_cache);
 
             tokio::spawn(async move {
@@ -343,21 +378,22 @@ async fn main() -> Result<()> {
                     .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
 
                 let mut interval = tokio::time::interval(std::time::Duration::from_secs(2));
-                
+
                 loop {
                     interval.tick().await;
                     if let Ok(meta) = tokio::fs::metadata(&stats_file).await
                         && let Ok(mtime) = meta.modified()
-                            && mtime != last_mtime
-                                && let Ok(data) = tokio::fs::read_to_string(&stats_file).await
-                                    && let Ok(parsed) = serde_json::from_str::<Vec<repospect::scanners::RepoStats>>(&data) {
-                                        let new_stats = DashboardStats::calculate(&parsed);
-                                        let mut w = bg_projects_cache.write().await;
-                                        w.projects = parsed;
-                                        w.stats = new_stats;
-                                        last_mtime = mtime;
-                                        eprintln!("[Background] Detected stats.json change. Recalculated stats and reloaded memory.");
-                                    }
+                        && mtime != last_mtime
+                        && let Ok(data) = tokio::fs::read_to_string(&stats_file).await
+                        && let Ok(parsed) = serde_json::from_str::<Vec<repospect::scanners::RepoStats>>(&data)
+                    {
+                        let new_stats = DashboardStats::calculate(&parsed);
+                        let mut w = bg_projects_cache.write().await;
+                        w.projects = parsed;
+                        w.stats = new_stats;
+                        last_mtime = mtime;
+                        eprintln!("[Background] Detected stats.json change. Recalculated stats and reloaded memory.");
+                    }
                 }
             });
 

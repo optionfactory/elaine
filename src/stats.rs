@@ -86,10 +86,11 @@ impl StatsStore {
             let entry = entry?;
             let path = entry.path();
             if path.is_file()
-                && let Some(filename) = path.file_name().and_then(|n| n.to_str()) {
-                    let metadata = entry.metadata()?;
-                    scans.push((filename.to_string(), metadata.len()));
-                }
+                && let Some(filename) = path.file_name().and_then(|n| n.to_str())
+            {
+                let metadata = entry.metadata()?;
+                scans.push((filename.to_string(), metadata.len()));
+            }
         }
         scans.sort_by(|a, b| a.0.cmp(&b.0));
         Ok(scans)
