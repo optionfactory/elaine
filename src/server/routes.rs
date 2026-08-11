@@ -20,7 +20,8 @@ pub struct ApiQuery {
 
 pub async fn api_config_handler(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     Json(serde_json::json!({
-        "google_auth": state.config.google_auth
+        "google_auth": state.config.google_auth,
+        "organization": state.config.organization,
     }))
 }
 

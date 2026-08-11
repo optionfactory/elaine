@@ -28,8 +28,8 @@
 
 <body>
     <header>
-        <h1>OptionFactory System Dashboard</h1>
-        <p>Audit overview and projects status loaded from <code>optionfactory/latest.json</code></p>
+        <h1>System Dashboard - <span id="organization"></span></h1>
+        <p>Audit overview and projects status</p>
         <button type="button" class="btn-roulette" data-filter="live,unaudited,roulette">
             <span>Audit Roulette</span>
         </button>
@@ -38,39 +38,39 @@
     <metrics-grid></metrics-grid>
 
     <filter-controls>
-        <div class="filter-group" data-group="visibility">
-            <span class="group-label">Visibility:</span>
-            <div class="btn-group">
-                <button type="button" class="btn-state active" data-value="all">All</button>
-                <button type="button" class="btn-state" data-value="public">Public</button>
-                <button type="button" class="btn-state" data-value="private">Private</button>
-            </div>
-        </div>
+        <filter-group data-group="visibility">
+            <label>Visibility:</label>
+            <state-button>
+                <state active data-value="all">All</state>
+                <state data-value="public">Public</state>
+                <state data-value="private">Private</state>
+            </state-button>
+        </filter-group>
 
-        <div class="filter-group" data-group="status">
-            <span class="group-label">Status:</span>
-            <div class="btn-group">
-                <button type="button" class="btn-state active" data-value="all">All</button>
-                <button type="button" class="btn-state" data-value="live">Live</button>
-            </div>
-        </div>
+        <filter-group data-group="status">
+            <label>Status:</label>
+            <state-button>
+                <state active data-value="all">All</state>
+                <state data-value="live">Live</state>
+            </state-button>
+        </filter-group>
 
-        <div class="filter-group" data-group="audit">
-            <span class="group-label">Audit:</span>
-            <div class="btn-group">
-                <button type="button" class="btn-state active" data-value="all">All</button>
-                <button type="button" class="btn-state" data-value="audited">Audited</button>
-                <button type="button" class="btn-state" data-value="unaudited">Unaudited</button>
-            </div>
-        </div>
+        <filter-group data-group="audit">
+            <label>Audit:</label>
+            <state-button>
+                <state active data-value="all">All</state>
+                <state data-value="audited">Audited</state>
+                <state data-value="unaudited">Unaudited</state>
+            </state-button>
+        </filter-group>
 
-        <div class="filter-group" data-group="vulnerability">
-            <span class="group-label">Vulnerabilities:</span>
-            <div class="btn-group">
-                <button type="button" class="btn-state active" data-value="all">All</button>
-                <button type="button" class="btn-state" data-value="vulns">With Vulns</button>
-            </div>
-        </div>
+        <filter-group data-group="vulnerability">
+            <label>Vulnerabilities:</label>
+            <state-button>
+                <state active data-value="all">All</state>
+                <state data-value="vulns">With Vulns</state>
+            </state-button>
+        </filter-group>
     </filter-controls>
 
     <search-bar>
@@ -376,12 +376,11 @@
         const spinner = new Spinner();
         const scroller = new InfiniteScroller('projects-grid', 'scroll-sentinel', '#projects-template', spinner, 5);
 
-        let currentSearch = '';
-
-        function getActiveFiltersFromControls() {
+        document.querySelector('#organization').innerText = config.organization;
+        function filtersFromControls() {
             const activeTags = [];
-            document.querySelectorAll('filter-controls .filter-group').forEach(group => {
-                const activeBtn = group.querySelector('.btn-state.active');
+            document.querySelectorAll('filter-controls filter-group').forEach(group => {
+                const activeBtn = group.querySelector('state[active]');
                 if (activeBtn && activeBtn.dataset.value && activeBtn.dataset.value !== 'all') {
                     activeTags.push(activeBtn.dataset.value);
                 }
@@ -389,24 +388,26 @@
             return activeTags.join(',');
         }
 
-        function setControlsFromFilterString(filterStr) {
+        function updateFilterControls(filterStr) {
             const activeTags = (filterStr || '').split(',').map(s => s.trim()).filter(Boolean);
-            document.querySelectorAll('filter-controls .filter-group').forEach(group => {
-                const buttons = group.querySelectorAll('.btn-state');
+            document.querySelectorAll('filter-controls filter-group').forEach(group => {
+                const buttons = group.querySelectorAll('state');
                 let hasMatch = false;
                 buttons.forEach(btn => {
-                    btn.classList.remove('active');
                     if (activeTags.includes(btn.dataset.value)) {
-                        btn.classList.add('active');
+                        btn.setAttribute('active', '');
                         hasMatch = true;
+                    } else {
+                        btn.removeAttribute('active');
                     }
                 });
                 if (!hasMatch) {
-                    const defaultBtn = group.querySelector('.btn-state[data-value="all"]');
-                    if (defaultBtn) defaultBtn.classList.add('active');
+                    const defaultBtn = group.querySelector('state[data-value="all"]');
+                    if (defaultBtn) defaultBtn.setAttribute('active', '');
                 }
             });
         }
+
 
         function updateActiveMetricCard(filterStr) {
             document.querySelectorAll('.metric-card').forEach(b => {
@@ -419,23 +420,23 @@
         }
 
         document.querySelector('filter-controls').addEventListener('click', async e => {
-            const button = e.target.closest('.btn-state');
+            const button = e.target.closest('state');
             if (!button) return;
 
-            const group = button.closest('.filter-group');
-            group.querySelectorAll('.btn-state').forEach(b => b.classList.remove('active'));
-            button.classList.add('active');
+            const group = button.closest('filter-group');
+            group.querySelectorAll('state').forEach(b => b.removeAttribute('active'));
+            button.setAttribute('active', '');
 
-            const activeFilters = getActiveFiltersFromControls();
+            const activeFilters = filtersFromControls();
             updateActiveMetricCard(activeFilters);
-            await scroller.load(projects(http, activeFilters, currentSearch));
+            await scroller.load(projects(http, activeFilters, null));
         });
 
         document.querySelector('form').addEventListener('submit', async (e) => {
             e.preventDefault();
-            currentSearch = new FormData(e.target).get('search');
-            const activeFilters = getActiveFiltersFromControls();
-            await scroller.load(projects(http, activeFilters, currentSearch));
+            const search = new FormData(e.target).get('search');
+            const activeFilters = filtersFromControls();
+            await scroller.load(projects(http, activeFilters, search));
         });
 
         document.querySelector('body').addEventListener('click', async e => {
@@ -448,8 +449,8 @@
                 button.classList.add('active');
             }
 
-            setControlsFromFilterString(filterStr);
-            await scroller.load(projects(http, filterStr, currentSearch));
+            updateFilterControls(filterStr);
+            await scroller.load(projects(http, filterStr, null));
         });
 
         const stats = await http.get('/api/stats').fetchJson();
