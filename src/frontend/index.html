@@ -18,11 +18,11 @@
                 "integrity": {
                     "https://cdn.jsdelivr.net/npm/@optionfactory/fml@8.0.0/dist/ftl.min.mjs": "sha384-o8jSbzfN8frPZI1vZ6AnCXymJ9qtGYaJdY8ThO2O137DNlcGX1Ug39nS6QZxsY0p",
                     "https://cdn.jsdelivr.net/npm/@optionfactory/fml@8.0.0/dist/httpc.min.mjs": "sha384-9QJP1Q+GlS7keulFI7PAA8amAXjQS6dvYexTmkbKvlJg23ISvRjVUJfDMzJ+9VEL"
-
                 }
             }
         </script>
     <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/@optionfactory/fml@8.0.0/dist/ftl.min.mjs">
+    <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/@optionfactory/fml@8.0.0/dist/httpc.min.mjs">
     <link rel="stylesheet" href="repospect.css">
 </head>
 
@@ -334,46 +334,18 @@
 
     <script type="module">
         import { Templates } from "ftl";
-        import { Spinner, InfiniteScroller, authenticate } from "/repospect.js";
+        import { Spinner, InfiniteScroller, authenticate, projects } from "/repospect.js";
 
         const { config, http } = await authenticate();
 
         const spinner = new Spinner();
         const scroller = new InfiniteScroller('projects-grid', 'scroll-sentinel', '#projects-template', spinner, 5);
 
-        async function* fetchPaginatedProjects(filters, search) {
-            let offset = 0;
-            const limit = 50;
-            while (true) {
-                try {
-                    const data = await http.get(`/api/projects`)
-                        .param("filters", filters == '' ? null : filters)
-                        .param("search", search)
-                        .param("offset", offset)
-                        .param("limit", limit)
-                        .fetchJson();
-                    for (const item of data) {
-                        yield item;
-                    }
-
-                    if (data.length < limit) {
-                        break;
-                    }
-
-                    offset += limit;
-                } catch (e) {
-                    document.body.innerHTML = `<error-box>Failed to load data</error-box>`;
-                    return;
-                }
-            }
-        }
-
-
         document.querySelector('form').addEventListener('submit', async (e) => {
             e.preventDefault();
             document.querySelectorAll('.metric-card').forEach(b => b.classList.remove('active'));
             const search = new FormData(e.target).get('search');
-            await scroller.load(fetchPaginatedProjects(null, search));
+            await scroller.load(projects(null, search));
         });
 
         document.querySelector('body').addEventListener('click', async e => {
@@ -385,12 +357,12 @@
                 document.querySelectorAll('.metric-card').forEach(b => b.classList.remove('active'));
                 button.classList.add('active');
             }
-            await scroller.load(fetchPaginatedProjects(button.dataset.filter, null));
+            await scroller.load(projects(button.dataset.filter, null));
         });
 
         const stats = await http.get('/api/stats').fetchJson();
         Templates.fromSelector('#metrics-template').withOverlay(stats).renderToSelector('metrics-grid');
-        await scroller.load(fetchPaginatedProjects());
+        await scroller.load(projects());
 
     </script>
 </body>

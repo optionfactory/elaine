@@ -47,23 +47,27 @@ class InfiniteScroller {
     async renderNextBatch() {
         this.isFetching = true;
         const batch = [];
+        try {
+            for (let i = 0; i < this.batchSize; i++) {
+                const item = await this.iterator.next();
+                if (item.done) break;
+                batch.push(item.value);
+            }
 
-        for (let i = 0; i < this.batchSize; i++) {
-            const item = await this.iterator.next();
-            if (item.done) break;
-            batch.push(item.value);
-        }
-
-        if (batch.length === 0 && this.grid.children.length === 0) {
-            this.grid.innerHTML = '<error-box>No matching repositories found.</error-box>';
+            if (batch.length === 0 && this.grid.children.length === 0) {
+                this.grid.innerHTML = '<error-box>No matching repositories found.</error-box>';
+                this.observer.unobserve(this.sentinel);
+            } else if (batch.length === 0) {
+                this.observer.unobserve(this.sentinel);
+            } else {
+                this.template.withOverlay(batch).appendTo(this.grid);
+            }
+        } catch (e) {
+            this.grid.innerHTML = '<error-box>Failed to load data.</error-box>';
             this.observer.unobserve(this.sentinel);
-        } else if (batch.length === 0) {
-            this.observer.unobserve(this.sentinel);
-        } else {
-            this.template.withOverlay(batch).appendTo(this.grid);
+        } finally {
+            this.isFetching = false;
         }
-
-        this.isFetching = false;
     }
 }
 
@@ -84,11 +88,20 @@ const authenticate = async () => {
         window.history.replaceState(null, null, window.location.pathname);
     }
 
-    const storedToken = sessionStorage.getItem('google_token');
-    const payload = JSON.parse(atob(storedToken.split('.')[1]));
-    const isTokenExpired = (payload.exp * 1000) < (Date.now() + 60000);
+    const isTokenExpired = (() => {
+        const storedToken = sessionStorage.getItem('google_token');
+        if (!storedToken) {
+            return true;
+        }
+        try {
+            const payload = JSON.parse(atob(storedToken.split('.')[1]));
+            return (payload.exp * 1000) < (Date.now() + 60000);
+        } catch {
+            return true;
+        }
+    })();
 
-    if (!storedToken || isTokenExpired) {
+    if (isTokenExpired) {
         sessionStorage.removeItem('google_token');
         const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
         authUrl.searchParams.set('client_id', config.google_auth.client_id);
@@ -96,9 +109,12 @@ const authenticate = async () => {
         authUrl.searchParams.set('response_type', 'id_token');
         authUrl.searchParams.set('scope', 'openid email profile');
         authUrl.searchParams.set('nonce', Math.random().toString(36).substring(2));
-        authUrl.searchParams.set('hd', config.google_auth.hosted_domain);
+        if (config.google_auth.hosted_domain) {
+            authUrl.searchParams.set('hd', config.google_auth.hosted_domain);
+        }
         window.location.href = authUrl.toString();
-        return new Promise(() => {});
+        await new Promise(() => { });
+        // unreachable
     }
     const http = HttpClient.builder()
         .withInterceptors({
@@ -113,4 +129,28 @@ const authenticate = async () => {
 }
 
 
-export { Spinner, InfiniteScroller, authenticate }
+async function* projects(filters, search) {
+    let offset = 0;
+    const limit = 50;
+    while (true) {
+        const data = await http.get(`/api/projects`)
+            .param("filters", filters == '' ? null : filters)
+            .param("search", search)
+            .param("offset", offset)
+            .param("limit", limit)
+            .fetchJson();
+        for (const item of data) {
+            yield item;
+        }
+
+        if (data.length < limit) {
+            break;
+        }
+
+        offset += limit;
+    }
+}
+
+
+
+export { Spinner, InfiniteScroller, authenticate, projects }
