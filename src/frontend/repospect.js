@@ -1,4 +1,5 @@
 import { Templates } from "ftl";
+import { HttpClient } from "httpc";
 
 class Spinner {
     constructor() {
@@ -23,7 +24,7 @@ class InfiniteScroller {
         this.spinner = spinner;
         this.iterator = null;
         this.isFetching = false;
-        
+
         this.observer = new IntersectionObserver((entries) => {
             if (entries[0].isIntersecting && this.iterator && !this.isFetching) {
                 this.renderNextBatch();
@@ -46,7 +47,7 @@ class InfiniteScroller {
     async renderNextBatch() {
         this.isFetching = true;
         const batch = [];
-        
+
         for (let i = 0; i < this.batchSize; i++) {
             const item = await this.iterator.next();
             if (item.done) break;
@@ -61,9 +62,55 @@ class InfiniteScroller {
         } else {
             this.template.withOverlay(batch).appendTo(this.grid);
         }
-        
+
         this.isFetching = false;
     }
 }
 
-export {Spinner, InfiniteScroller}
+const authenticate = async () => {
+    const configResponse = await fetch('/api/config');
+    const config = await configResponse.json();
+
+
+    if (!config.google_auth) {
+        const http = HttpClient.builder().build();
+        return { config, http };
+    }
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const idTokenFromHash = hashParams.get('id_token');
+
+    if (idTokenFromHash) {
+        sessionStorage.setItem('google_token', idTokenFromHash);
+        window.history.replaceState(null, null, window.location.pathname);
+    }
+
+    const storedToken = sessionStorage.getItem('google_token');
+    const payload = JSON.parse(atob(storedToken.split('.')[1]));
+    const isTokenExpired = (payload.exp * 1000) < (Date.now() + 60000);
+
+    if (!storedToken || isTokenExpired) {
+        sessionStorage.removeItem('google_token');
+        const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+        authUrl.searchParams.set('client_id', config.google_auth.client_id);
+        authUrl.searchParams.set('redirect_uri', window.location.origin + window.location.pathname);
+        authUrl.searchParams.set('response_type', 'id_token');
+        authUrl.searchParams.set('scope', 'openid email profile');
+        authUrl.searchParams.set('nonce', Math.random().toString(36).substring(2));
+        authUrl.searchParams.set('hd', config.google_auth.hosted_domain);
+        window.location.href = authUrl.toString();
+        return new Promise(() => {});
+    }
+    const http = HttpClient.builder()
+        .withInterceptors({
+            async intercept(url, request, chain) {
+                request.headers.set('Authorization', `Bearer ${storedToken}`);
+                return await chain.proceed(url, request);
+            }
+        })
+        .withRedirectOnUnauthorized('/')
+        .build();
+    return { config, http };
+}
+
+
+export { Spinner, InfiniteScroller, authenticate }

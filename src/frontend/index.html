@@ -30,7 +30,7 @@
     <header>
         <h1>OptionFactory System Dashboard</h1>
         <p>Audit overview and projects status loaded from <code>optionfactory/latest.json</code></p>
-        <button type="button" class="btn-roulette" data-filter="roulette">
+        <button type="button" class="btn-roulette" data-filter="live,unaudited,roulette">
             <span>Audit Roulette</span>
         </button>
     </header>
@@ -51,7 +51,7 @@
     <scroll-sentinel></scroll-sentinel>
 
     <template id="metrics-template">
-        <button class="metric-card all" data-filter="all">
+        <button class="metric-card all" data-filter>
             <h2>Total Repositories</h2>
             {{ all }}
         </button>
@@ -332,155 +332,66 @@
         </project-card>
     </template>
 
-<script type="module">
+    <script type="module">
         import { Templates } from "ftl";
-        import { HttpClient } from "httpc";
-        import { Spinner, InfiniteScroller } from "/repospect.js";
+        import { Spinner, InfiniteScroller, authenticate } from "/repospect.js";
+
+        const { config, http } = await authenticate();
 
         const spinner = new Spinner();
-        await spinner.show();
-
         const scroller = new InfiniteScroller('projects-grid', 'scroll-sentinel', '#projects-template', spinner, 5);
 
-        const configResponse = await fetch('/api/config');
-        const appConfig = await configResponse.json();
-
-        function isTokenExpired(token) {
-            try {
-                const payload = JSON.parse(atob(token.split('.')[1]));
-                return (payload.exp * 1000) < (Date.now() + 60000);
-            } catch (e) {
-                return true;
-            }
-        }
-
-        function redirectToGoogleImplicit(googleAuth) {
-            const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-            authUrl.searchParams.set('client_id', googleAuth.client_id);
-            authUrl.searchParams.set('redirect_uri', window.location.origin + window.location.pathname);
-            authUrl.searchParams.set('response_type', 'id_token');
-            authUrl.searchParams.set('scope', 'openid email profile');
-            authUrl.searchParams.set('nonce', Math.random().toString(36).substring(2));
-
-            if (googleAuth.hosted_domain) {
-                authUrl.searchParams.set('hd', googleAuth.hosted_domain);
-            }
-
-            window.location.href = authUrl.toString();
-        }
-
-        let http = null;
-
-        if (appConfig.google_auth) {
-            // Check if returning from Google redirect with #id_token=...
-            const hashParams = new URLSearchParams(window.location.hash.substring(1));
-            const idTokenFromHash = hashParams.get('id_token');
-
-            if (idTokenFromHash) {
-                sessionStorage.setItem('google_token', idTokenFromHash);
-                window.history.replaceState(null, null, window.location.pathname);
-            }
-
-            const storedToken = sessionStorage.getItem('google_token');
-
-            if (storedToken && !isTokenExpired(storedToken)) {
-                http = HttpClient.builder()
-                    .withInterceptors({
-                        async intercept(url, request, chain) {
-                            request.headers.set('Authorization', `Bearer ${storedToken}`);
-                            return await chain.proceed(url, request);
-                        }
-                    })
-                    .build();
-            } else {
-                sessionStorage.removeItem('google_token');
-                redirectToGoogleImplicit(appConfig.google_auth);
-            }
-        } else {
-            http = HttpClient.builder().build();
-        }
-
-        let currentFilter = 'all';
-        let currentSearch = '';
-
-        async function* fetchPaginatedProjects() {
+        async function* fetchPaginatedProjects(filters, search) {
             let offset = 0;
             const limit = 50;
-
             while (true) {
-                const params = new URLSearchParams();
-                if (currentFilter && currentFilter !== 'all') params.set('filters', currentFilter);
-                if (currentSearch) params.set('search', currentSearch);
-                params.set('offset', offset);
-                params.set('limit', limit);
-
-                let data = [];
                 try {
-                    data = await http.get(`/api/projects?${params.toString()}`).fetchJson();
-                } catch (e) {
-                    if (e?.status === 401) {
-                        sessionStorage.removeItem('google_token');
-                        window.location.reload();
-                    } else {
-                        document.body.innerHTML = `<error-box>Failed to load data</error-box>`;
+                    const data = await http.get(`/api/projects`)
+                        .param("filters", filters == '' ? null : filters)
+                        .param("search", search)
+                        .param("offset", offset)
+                        .param("limit", limit)
+                        .fetchJson();
+                    for (const item of data) {
+                        yield item;
                     }
+
+                    if (data.length < limit) {
+                        break;
+                    }
+
+                    offset += limit;
+                } catch (e) {
+                    document.body.innerHTML = `<error-box>Failed to load data</error-box>`;
                     return;
                 }
-
-                for (const item of data) {
-                    yield item;
-                }
-
-                if (data.length < limit) {
-                    break;
-                }
-
-                offset += limit;
             }
         }
 
-        const loadData = async () => {
-            try {
-                const stats = await http.get('/api/stats').fetchJson();
-                Templates.fromSelector('#metrics-template').withOverlay(stats).renderToSelector('metrics-grid');
-                await scroller.load(fetchPaginatedProjects());
-            } catch (e) {
-                if (e?.status === 401) {
-                    sessionStorage.removeItem('google_token');
-                    window.location.reload();
-                } else {
-                    document.body.innerHTML = `<error-box>Failed to load statistics</error-box>`;
-                }
-            }
-        };
 
         document.querySelector('form').addEventListener('submit', async (e) => {
             e.preventDefault();
-            currentSearch = new FormData(e.target).get('search');
-            await scroller.load(fetchPaginatedProjects());
+            document.querySelectorAll('.metric-card').forEach(b => b.classList.remove('active'));
+            const search = new FormData(e.target).get('search');
+            await scroller.load(fetchPaginatedProjects(null, search));
         });
 
         document.querySelector('body').addEventListener('click', async e => {
             const button = e.target.closest('[data-filter]');
-            if (!button) return;
-
+            if (!button) {
+                return;
+            }
             if (button.classList.contains('metric-card')) {
                 document.querySelectorAll('.metric-card').forEach(b => b.classList.remove('active'));
                 button.classList.add('active');
             }
-
-            currentFilter = button.dataset.filter;
-
-            if (currentFilter === 'roulette') {
-                currentFilter = "live,unaudited,roulette";
-            }
-
-            await scroller.load(fetchPaginatedProjects());
+            await scroller.load(fetchPaginatedProjects(button.dataset.filter, null));
         });
 
-        if (http) {
-            await loadData();
-        }
+        const stats = await http.get('/api/stats').fetchJson();
+        Templates.fromSelector('#metrics-template').withOverlay(stats).renderToSelector('metrics-grid');
+        await scroller.load(fetchPaginatedProjects());
+
     </script>
 </body>
 
