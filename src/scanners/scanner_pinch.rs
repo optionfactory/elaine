@@ -24,11 +24,11 @@ impl Scanner for PinchScanner {
             Some(audit) => {
                 stats.audit = Some(audit.project);
                 stats.add_containers(audit.containers);
-            },
+            }
             None => {
                 stats.audit = None;
                 stats.checked_for_containers();
-            },
+            }
         }
         Ok(())
     }

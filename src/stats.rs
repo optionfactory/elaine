@@ -72,8 +72,7 @@ impl StatsStore {
         stats.sort_by(|a, b| a.name.cmp(&b.name));
         let aggregate_path = self.aggregate_file_path();
         let json_data = serde_json::to_string_pretty(&stats)?;
-        fs::write(&aggregate_path, &json_data)
-            .with_context(|| format!("Failed to update aggregate scan data at {:?}", aggregate_path))?;
+        fs::write(&aggregate_path, &json_data).with_context(|| format!("Failed to update aggregate scan data at {:?}", aggregate_path))?;
 
         Ok(aggregate_path)
     }

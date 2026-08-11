@@ -6,10 +6,7 @@ impl Scanner for DockerScanner {
     fn patterns(&self) -> Vec<(&'static str, Pattern)> {
         vec![
             ("docker_files", Pattern::FileName("Dockerfile".to_string())),
-            (
-                "docker_compose_files",
-                Pattern::FileName("docker-compose.yml".to_string()),
-            ),
+            ("docker_compose_files", Pattern::FileName("docker-compose.yml".to_string())),
         ]
     }
 

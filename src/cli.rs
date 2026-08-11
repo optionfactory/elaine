@@ -18,20 +18,14 @@ pub enum Commands {
     Serve {
         #[arg(short, long, default_value_t = 8000, help = "Port to serve the dashboard on")]
         port: u16,
-        #[arg(
-            long,
-            help = "Serve frontend assets from the local filesystem instead of embedded binary"
-        )]
+        #[arg(long, help = "Serve frontend assets from the local filesystem instead of embedded binary")]
         dev: bool,
     },
     #[command(about = "Fetch repository metadata and cache .tar.gz archives from GitHub")]
     Sync {
-        #[arg(
-            long = "force",
-            help = "Force re-downloading archives even if pushed_at timestamps match"
-        )]
+        #[arg(long = "force", help = "Force re-downloading archives even if pushed_at timestamps match")]
         force: bool,
-    },    
+    },
     #[command(about = "Audit cached organization repositories for DevSecOps metadata & SBOMs")]
     Scan,
     #[command(about = "Remove the stats archives for a specific organization or wipe the entire data directory")]
@@ -39,5 +33,4 @@ pub enum Commands {
 
     #[command(about = "Remove cached archives for a specific organization or wipe the entire cache")]
     CleanRepositories,
-
 }

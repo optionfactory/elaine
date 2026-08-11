@@ -63,9 +63,7 @@ impl RepositoryStore {
         let target_tar = self.tarball_path(&repo.name);
         let tmp_tar = target_tar.with_extension("tar.gz.tmp");
 
-        let mut file = File::create(&tmp_tar)
-            .await
-            .context("Failed to create temporary tarball file")?;
+        let mut file = File::create(&tmp_tar).await.context("Failed to create temporary tarball file")?;
 
         let mut stream = resp.bytes_stream();
         while let Some(chunk_result) = stream.next().await {

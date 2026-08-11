@@ -65,7 +65,8 @@ pub struct RepoStats {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum StackInspectionStatus {
-    Success, Failure
+    Success,
+    Failure,
 }
 
 impl RepoStats {
@@ -141,7 +142,7 @@ impl RepoStats {
         if self.containers.is_none() {
             self.containers = Some(Vec::new());
         }
-    }    
+    }
 
     pub fn add_container(&mut self, container: String) {
         self.checked_for_containers();
@@ -155,8 +156,7 @@ impl RepoStats {
         if let Some(ref mut d) = self.containers {
             d.append(&mut upgrades);
         }
-    }    
-
+    }
 }
 
 pub struct ScanContext<'a> {
@@ -175,11 +175,7 @@ pub trait Scanner {
     fn scan(&self, ctx: &ScanContext, stats: &mut RepoStats) -> anyhow::Result<()>;
 }
 
-pub fn scan_repository(
-    repo: &GithubRepository,
-    tarball_path: &Path,
-    pb: Option<ProgressBar>,
-) -> anyhow::Result<RepoStats> {
+pub fn scan_repository(repo: &GithubRepository, tarball_path: &Path, pb: Option<ProgressBar>) -> anyhow::Result<RepoStats> {
     if let Some(ref p) = pb {
         p.set_message(format!("[{}] Unpacking archive...", repo.name));
     }
