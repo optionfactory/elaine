@@ -115,7 +115,7 @@
                 <state data-value="compliant">Compliant</state>
                 <state data-value="non-compliant">Non compliant</state>
             </state-button>
-        </filter-group>        
+        </filter-group>
 
     </filter-controls>
 
@@ -156,7 +156,7 @@
         <project-card data-tpl-each="self">
             <project-header>
                 <h2><a data-tpl-href="html_url" target="_blank" rel="noopener noreferrer">{{ name }}</a></h2>
-                <p>{{ description }}</p>
+                <p>{{ description ?? 'no descrption' }}</p>
                 <badges>
                     <badge data-tpl-if="private" class="private">Private</badge>
                     <badge data-tpl-if="!private" class="public">Public</badge>
@@ -169,6 +169,7 @@
                 </badges>
                 <time>
                     <div>Created: {{ created_at }}</div>
+                    <div>Pushed: {{ pushed_at }}</div>
                     <div>Updated: {{ updated_at }}</div>
                 </time>
             </project-header>
@@ -198,7 +199,9 @@
 
             <section>
                 <h3>Compliance Frameworks</h3>
-                <tag data-tpl-if="!audit?.compliance">No data</tag>
+                <tag-list data-tpl-if="!audit?.compliance">
+                    <tag >No data</tag>
+                </tag-list>
                 <tag-list data-tpl-if="audit?.compliance">
                     <tag>DORA: {{ audit.compliance.dora }}</tag>
                     <tag>CRA: {{audit.compliance.cra }}</tag>
@@ -211,102 +214,113 @@
             </section>
 
             <section data-tpl-if="audit?.environments">
-                <h3>Environments</h3>
-                <table class="environments">
-                    <thead>
-                        <tr>
-                            <th>Environment</th>
-                            <th>Type</th>
-                            <th>Platform</th>
-                            <th>Ingress</th>
-                            <th>Domains</th>
-                            <th>Certs</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr data-tpl-each="audit.environments" data-tpl-var="env">
-                            <td><strong>{{ env.name }}</strong></td>
-                            <td>{{env.type}}</td>
-                            <td>{{env.platform}}</td>
-                            <td>{{env.ingress}}</td>
-                            <td><code>{{env.domains}}</code></td>
-                            <td>{{env.certificates}}</td>
-                        </tr>
-                    </tbody>
-                </table>
+                <details>
+                    <summary>
+                        <h3>Environments</h3>
+                        <tag-list><tag>{{ audit.environments.length }}</tag></tag-list>
+                    </summary>
+                    <table class="environments">
+                        <thead>
+                            <tr>
+                                <th>Environment</th>
+                                <th>Type</th>
+                                <th>Platform</th>
+                                <th>Ingress</th>
+                                <th>Domains</th>
+                                <th>Certs</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr data-tpl-each="audit.environments" data-tpl-var="env">
+                                <td><strong>{{ env.name }}</strong></td>
+                                <td>{{env.type}}</td>
+                                <td>{{env.platform}}</td>
+                                <td>{{env.ingress}}</td>
+                                <td><code>{{env.domains}}</code></td>
+                                <td>{{env.certificates}}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </details>
             </section>
 
             <section>
-                <h3>Outdated Dependencies <span data-tpl-if="outdated_dependencies?.length > 0">({{ outdated_dependencies.length  }})</span></h3>
-                <tag-list data-tpl-if="outdated_dependencies == null">
-                    <tag>No data</tag>
-                </tag-list>
-                <tag-list data-tpl-if="outdated_dependencies?.length == 0">
-                    <tag>No outdated dependencies found in this project</tag>
-                </tag-list>
-                <table class="outdated-dependencies" data-tpl-if="outdated_dependencies?.length > 0">
-                    <thead>
-                        <tr>
-                            <th>Project</th>
-                            <th>Artifact</th>
-                            <th>Current</th>
-                            <th>Latest</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr data-tpl-each="outdated_dependencies" data-tpl-var="dep">
-                            <td><strong>{{ dep.project }}</strong></td>
-                            <td>{{dep.artifact}}</td>
-                            <td>
-                                <tag class="current">{{dep.current}}</tag>
-                            </td>
-                            <td>
-                                <tag class="latest">{{dep.latest}}</tag>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                <details>
+                    <summary>
+                        <h3>Outdated Dependencies</h3>
+                        <tag-list>
+                            <tag data-tpl-if="outdated_dependencies == null">No data</tag>
+                            <tag data-tpl-if="outdated_dependencies?.length == 0">No outdated dependencies found in this project</tag>
+                            <tag data-tpl-if="outdated_dependencies?.length > 0">{{ outdated_dependencies.length }}</tag>
+                        </tag-list>
+                    </summary>
+                    <table class="outdated-dependencies" data-tpl-if="outdated_dependencies?.length > 0">
+                        <thead>
+                            <tr>
+                                <th>Project</th>
+                                <th>Artifact</th>
+                                <th>Current</th>
+                                <th>Latest</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr data-tpl-each="outdated_dependencies" data-tpl-var="dep">
+                                <td><strong>{{ dep.project }}</strong></td>
+                                <td>{{dep.artifact}}</td>
+                                <td>
+                                    <tag class="current">{{dep.current}}</tag>
+                                </td>
+                                <td>
+                                    <tag class="latest">{{dep.latest}}</tag>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </details>
             </section>
 
             <section>
-                <h3>Known vulnerabilities <span data-tpl-if="vulnerabilities?.length > 0">({{ vulnerabilities.length  }})</span></h3>
-                <tag-list data-tpl-if="vulnerabilities == null">
-                    <tag>No data</tag>
-                </tag-list>
-                <tag-list data-tpl-if="vulnerabilities?.length == 0">
-                    <tag>No known vulnerabilities found in this project</tag>
-                </tag-list>
-                <table class="vulnerabilities" data-tpl-if="vulnerabilities?.length > 0">
-                    <thead>
-                        <tr>
-                            <th>Project</th>
-                            <th>Artifact</th>
-                            <th>Version</th>
-                            <th>Vuln ID</th>
-                            <th>Trails</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr data-tpl-each="vulnerabilities" data-tpl-var="vuln">
-                            <td><strong>{{ vuln.project }}</strong></td>
-                            <td>{{vuln.artifact}}</td>
-                            <td>{{vuln.version}}</td>
-                            <td>
-                                <a data-tpl-href="`https://github.com/advisories/{vuln.vuln_id}`" target="_blank" rel="noopener noreferrer">
-                                    {{vuln.vuln_id}}
-                                </a>
-                            </td>
-                            <td>
-                                <tooltip-trigger>
-                                    <tag class="dashed">Depth {{ vuln.trail.length }}</tag>
-                                    <tooltip-content>
-                                        <div data-tpl-each="vuln.trail">{{ self }}</div>
-                                    </tooltip-content>
-                                </tooltip-trigger>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                <details>
+                    <summary>
+                        <h3>Known vulnerabilities</h3>
+                        <tag-list>
+                            <tag data-tpl-if="vulnerabilities == null">No data</tag>
+                            <tag data-tpl-if="vulnerabilities?.length == 0">No known vulnerabilities found in this project</tag>
+                            <tag data-tpl-if="vulnerabilities?.length > 0">{{ vulnerabilities.length }}</tag>
+                        </tag-list>
+                    </summary>
+                    <table class="vulnerabilities" data-tpl-if="vulnerabilities?.length > 0">
+                        <thead>
+                            <tr>
+                                <th>Project</th>
+                                <th>Artifact</th>
+                                <th>Version</th>
+                                <th>Vuln ID</th>
+                                <th>Trails</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr data-tpl-each="vulnerabilities" data-tpl-var="vuln">
+                                <td><strong>{{ vuln.project }}</strong></td>
+                                <td>{{vuln.artifact}}</td>
+                                <td>{{vuln.version}}</td>
+                                <td>
+                                    <a data-tpl-href="`https://github.com/advisories/{vuln.vuln_id}`" target="_blank" rel="noopener noreferrer">
+                                        {{vuln.vuln_id}}
+                                    </a>
+                                </td>
+                                <td>
+                                    <tooltip-trigger>
+                                        <tag class="dashed">Depth {{ vuln.trail.length }}</tag>
+                                        <tooltip-content>
+                                            <div data-tpl-each="vuln.trail">{{ self }}</div>
+                                        </tooltip-content>
+                                    </tooltip-trigger>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </details>
             </section>
 
             <section>

@@ -252,7 +252,7 @@ projects-grid {
             grid-template-areas:
                 "title time"
                 "desc time"
-                "badges badges";
+                "badges time";
             gap: 0.25rem 1rem;
             margin-bottom: 1rem;
             border-bottom: 1px solid var(--border);
@@ -289,12 +289,45 @@ projects-grid {
             }
         }
 
-        &>section>h3 {
+        &>section h3 {
             font-size: 0.9rem;
+            font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.05em;
             color: var(--text-muted);
             margin: 1rem 0 0.5rem;
+        }
+        &>section>details>summary {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+        &>section>details>summary::-webkit-details-marker {
+            display: none;
+        }
+        &>section>details:has(table)>summary {
+            cursor: pointer;
+        }
+        &>section>details>summary tag-list,
+        &>section>details>summary tag {
+            font-weight: 400;
+            text-transform: none;
+        }
+        &>section>details:has(table)>summary h3 {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        &>section>details:has(table)>summary h3::after {
+            content: '›';
+            font-size:  1rem;
+            font-weight: 400;
+            line-height: 1.5;
+            color: var(--text-muted);
+            transition: transform 0.15s ease;
+        }
+        &>section>details:has(table)[open]>summary h3::after {
+            transform: rotate(90deg);
         }
     }
 }
