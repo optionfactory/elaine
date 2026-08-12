@@ -1,8 +1,20 @@
 use crate::scanners::pathcollector::Pattern;
 use crate::scanners::{DependencyUpdate, RepoStats, ScanContext, Scanner, StackInspectionStatus, Vulnerability};
+use crate::scanners::osv::fetch_vulnerabilities;
 use serde::Deserialize;
-use std::path::Path;
+use std::fs;
 use std::process::Command;
+
+#[derive(Deserialize)]
+struct CargoLock {
+    package: Option<Vec<CargoPackage>>,
+}
+
+#[derive(Deserialize)]
+struct CargoPackage {
+    name: String,
+    version: String,
+}
 
 #[derive(Deserialize)]
 struct OutdatedOutput {
@@ -17,38 +29,11 @@ struct OutdatedDep {
     kind: Option<String>,
 }
 
-#[derive(Deserialize)]
-struct AuditOutput {
-    vulnerabilities: AuditVulnerabilities,
-}
-
-#[derive(Deserialize)]
-struct AuditVulnerabilities {
-    list: Vec<AuditVuln>,
-}
-
-#[derive(Deserialize)]
-struct AuditVuln {
-    advisory: Advisory,
-    package: Package,
-}
-
-#[derive(Deserialize)]
-struct Advisory {
-    id: String,
-}
-
-#[derive(Deserialize)]
-struct Package {
-    name: String,
-    version: String,
-}
-
 pub struct RustScanner;
 
 impl Scanner for RustScanner {
     fn patterns(&self) -> Vec<(&'static str, Pattern)> {
-        vec![("cargo_tomls", Pattern::FileName("Cargo.toml".to_string()))]
+        vec![("cargo_locks", Pattern::FileName("Cargo.lock".to_string()))]
     }
 
     fn scan(&self, ctx: &ScanContext, stats: &mut RepoStats) -> anyhow::Result<()> {
@@ -56,87 +41,60 @@ impl Scanner for RustScanner {
             return Ok(());
         }
 
-        let Some(cargo_paths) = ctx.matches.get("cargo_tomls") else {
-            return Ok(());
-        };
+        let Some(lock_paths) = ctx.matches.get("cargo_locks") else { return Ok(()) };
 
-        let mut cargo_dirs: Vec<&Path> = cargo_paths.iter().filter_map(|p| p.parent()).collect();
-        cargo_dirs.sort_by_key(|p| p.components().count());
-        let mut selected_dirs: Vec<&Path> = Vec::new();
-
-        for dir in cargo_dirs {
-            let is_submodule = selected_dirs.iter().any(|selected| dir.starts_with(selected));
-            if is_submodule {
-                continue;
-            }
-            selected_dirs.push(dir);
-            let run_dir = ctx.root.join(dir);
-
-            if let Some(p) = ctx.pb {
-                p.set_message(format!("[{}] Running Cargo checks...", ctx.repo.name));
-            }
+        for lock_path in lock_paths {
+            let run_dir = ctx.root.join(lock_path).parent().unwrap().to_path_buf();
+            let mut success = true;
 
             stats.checked_for_vulnerabilities();
             stats.checked_for_upgrades();
 
-            let mut success = true;
+            let content = fs::read_to_string(ctx.root.join(lock_path))?;
+            if let Ok(lockfile) = toml::from_str::<CargoLock>(&content) {
+                if let Some(packages) = lockfile.package {
+                    let deps: Vec<(&str, &str, &str)> = packages
+                        .iter()
+                        .map(|p| ("crates.io", p.name.as_str(), p.version.as_str()))
+                        .collect();
+
+                    if let Ok(vulns) = fetch_vulnerabilities(&deps) {
+                        let vulnerabilities = vulns.into_iter().map(|(pkg, id)| Vulnerability {
+                            project: ctx.repo.name.clone(),
+                            artifact: pkg,
+                            version: "unknown".to_string(),
+                            vuln_id: id,
+                            trail: vec![],
+                        }).collect();
+                        stats.add_vulnerabilities(vulnerabilities);
+                    } else {
+                        success = false;
+                    }
+                }
+            }
 
             let outdated_cmd = Command::new("cargo")
                 .current_dir(&run_dir)
                 .args(["outdated", "--format", "json", "--workspace"])
                 .output();
 
-            match outdated_cmd {
-                Ok(out) => {
-                    if let Ok(payload) = String::from_utf8(out.stdout) {
-                        for line in payload.lines() {
-                            if let Ok(parsed) = serde_json::from_str::<OutdatedOutput>(line) {
-                                let updates: Vec<DependencyUpdate> = parsed.dependencies.into_iter().map(|dep| DependencyUpdate {
-                                    project: ctx.repo.name.clone(),
-                                    kind: dep.kind.unwrap_or_else(|| "Normal".to_string()),
-                                    artifact: dep.name,
-                                    current: dep.project,
-                                    latest: dep.latest,
-                                }).collect();
-                                stats.add_upgrades(updates);
-                            }
-                        }
-                    }
-                }
-                Err(e) => {
-                    if let Some(p) = ctx.pb {
-                        p.println(format!("[{}]   Failed to execute cargo outdated: {}", ctx.repo.name, e));
-                    }
-                    success = false;
-                }
-            }
-
-            let audit_cmd = Command::new("cargo")
-                .current_dir(&run_dir)
-                .args(["audit", "--json"])
-                .output();
-
-            match audit_cmd {
-                Ok(out) => {
-                    if let Ok(payload) = String::from_utf8(out.stdout) {
-                        if let Ok(parsed) = serde_json::from_str::<AuditOutput>(&payload) {
-                            let vulns: Vec<Vulnerability> = parsed.vulnerabilities.list.into_iter().map(|v| Vulnerability {
+            if let Ok(out) = outdated_cmd {
+                if let Ok(payload) = String::from_utf8(out.stdout) {
+                    for line in payload.lines() {
+                        if let Ok(parsed) = serde_json::from_str::<OutdatedOutput>(line) {
+                            let updates: Vec<DependencyUpdate> = parsed.dependencies.into_iter().map(|dep| DependencyUpdate {
                                 project: ctx.repo.name.clone(),
-                                artifact: v.package.name,
-                                version: v.package.version,
-                                vuln_id: v.advisory.id,
-                                trail: vec![], // Dependency trail not natively exposed in basic audit JSON 
+                                kind: dep.kind.unwrap_or_else(|| "Normal".to_string()),
+                                artifact: dep.name,
+                                current: dep.project,
+                                latest: dep.latest,
                             }).collect();
-                            stats.add_vulnerabilities(vulns);
+                            stats.add_upgrades(updates);
                         }
                     }
                 }
-                Err(e) => {
-                    if let Some(p) = ctx.pb {
-                        p.println(format!("[{}]   Failed to execute cargo audit: {}", ctx.repo.name, e));
-                    }
-                    success = false;
-                }
+            } else {
+                success = false;
             }
 
             if success {
@@ -145,7 +103,6 @@ impl Scanner for RustScanner {
                 stats.put_stack("rust", StackInspectionStatus::Failure);
             }
         }
-
         Ok(())
     }
 }

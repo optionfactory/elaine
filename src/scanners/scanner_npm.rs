@@ -1,9 +1,20 @@
 use crate::scanners::pathcollector::Pattern;
 use crate::scanners::{DependencyUpdate, RepoStats, ScanContext, Scanner, StackInspectionStatus, Vulnerability};
+use crate::scanners::osv::fetch_vulnerabilities;
 use serde::Deserialize;
 use std::collections::HashMap;
-use std::path::Path;
+use std::fs;
 use std::process::Command;
+
+#[derive(Deserialize)]
+struct PackageLock {
+    packages: Option<HashMap<String, NpmPackage>>,
+}
+
+#[derive(Deserialize)]
+struct NpmPackage {
+    version: Option<String>,
+}
 
 #[derive(Deserialize)]
 struct NpmOutdatedDep {
@@ -13,21 +24,11 @@ struct NpmOutdatedDep {
     dep_type: Option<String>,
 }
 
-#[derive(Deserialize)]
-struct NpmAuditOutput {
-    vulnerabilities: Option<HashMap<String, NpmAuditVuln>>,
-}
-
-#[derive(Deserialize)]
-struct NpmAuditVuln {
-    name: String,
-}
-
 pub struct NpmScanner;
 
 impl Scanner for NpmScanner {
     fn patterns(&self) -> Vec<(&'static str, Pattern)> {
-        vec![("package_jsons", Pattern::FileName("package.json".to_string()))]
+        vec![("package_locks", Pattern::FileName("package-lock.json".to_string()))]
     }
 
     fn scan(&self, ctx: &ScanContext, stats: &mut RepoStats) -> anyhow::Result<()> {
@@ -35,87 +36,63 @@ impl Scanner for NpmScanner {
             return Ok(());
         }
 
-        let Some(package_paths) = ctx.matches.get("package_jsons") else {
-            return Ok(());
-        };
+        let Some(lock_paths) = ctx.matches.get("package_locks") else { return Ok(()) };
 
-        let mut pkg_dirs: Vec<&Path> = package_paths.iter().filter_map(|p| p.parent()).collect();
-        pkg_dirs.sort_by_key(|p| p.components().count());
-        let mut selected_dirs: Vec<&Path> = Vec::new();
-
-        for dir in pkg_dirs {
-            let is_submodule = selected_dirs.iter().any(|selected| dir.starts_with(selected));
-            if is_submodule {
-                continue;
-            }
-            selected_dirs.push(dir);
-            let run_dir = ctx.root.join(dir);
-
-            if let Some(p) = ctx.pb {
-                p.set_message(format!("[{}] Running NPM checks...", ctx.repo.name));
-            }
+        for lock_path in lock_paths {
+            let run_dir = ctx.root.join(lock_path).parent().unwrap().to_path_buf();
+            let mut success = true;
 
             stats.checked_for_vulnerabilities();
             stats.checked_for_upgrades();
 
-            let mut success = true;
+            let content = fs::read_to_string(ctx.root.join(lock_path))?;
+            if let Ok(lockfile) = serde_json::from_str::<PackageLock>(&content) {
+                if let Some(packages) = lockfile.packages {
+                    let mut deps = Vec::new();
+                    for (path, pkg) in &packages {
+                        if path.is_empty() { continue; }
+                        let name = path.split("node_modules/").last().unwrap_or(path);
+                        if let Some(version) = &pkg.version {
+                            deps.push(("npm", name, version.as_str()));
+                        }
+                    }
+
+                    if let Ok(vulns) = fetch_vulnerabilities(&deps) {
+                        let vulnerabilities = vulns.into_iter().map(|(pkg, id)| Vulnerability {
+                            project: ctx.repo.name.clone(),
+                            artifact: pkg,
+                            version: "unknown".to_string(),
+                            vuln_id: id,
+                            trail: vec![],
+                        }).collect();
+                        stats.add_vulnerabilities(vulnerabilities);
+                    } else {
+                        success = false;
+                    }
+                }
+            }
 
             let outdated_cmd = Command::new("npm")
                 .current_dir(&run_dir)
                 .args(["outdated", "--json"])
                 .output();
 
-            match outdated_cmd {
-                Ok(out) => {
-                    let payload = String::from_utf8_lossy(&out.stdout);
-                    if let Ok(parsed) = serde_json::from_str::<HashMap<String, NpmOutdatedDep>>(&payload) {
-                        let updates: Vec<DependencyUpdate> = parsed.into_iter().filter_map(|(name, dep)| {
-                            Some(DependencyUpdate {
-                                project: ctx.repo.name.clone(),
-                                kind: dep.dep_type.unwrap_or_else(|| "dependency".to_string()),
-                                artifact: name,
-                                current: dep.current?,
-                                latest: dep.latest?,
-                            })
-                        }).collect();
-                        stats.add_upgrades(updates);
-                    }
+            if let Ok(out) = outdated_cmd {
+                let payload = String::from_utf8_lossy(&out.stdout);
+                if let Ok(parsed) = serde_json::from_str::<HashMap<String, NpmOutdatedDep>>(&payload) {
+                    let updates: Vec<DependencyUpdate> = parsed.into_iter().filter_map(|(name, dep)| {
+                        Some(DependencyUpdate {
+                            project: ctx.repo.name.clone(),
+                            kind: dep.dep_type.unwrap_or_else(|| "dependency".to_string()),
+                            artifact: name,
+                            current: dep.current?,
+                            latest: dep.latest?,
+                        })
+                    }).collect();
+                    stats.add_upgrades(updates);
                 }
-                Err(e) => {
-                    if let Some(p) = ctx.pb {
-                        p.println(format!("[{}]   Failed to execute npm outdated: {}", ctx.repo.name, e));
-                    }
-                    success = false;
-                }
-            }
-
-            let audit_cmd = Command::new("npm")
-                .current_dir(&run_dir)
-                .args(["audit", "--json"])
-                .output();
-
-            match audit_cmd {
-                Ok(out) => {
-                    let payload = String::from_utf8_lossy(&out.stdout);
-                    if let Ok(parsed) = serde_json::from_str::<NpmAuditOutput>(&payload) {
-                        if let Some(vulns_map) = parsed.vulnerabilities {
-                            let vulns: Vec<Vulnerability> = vulns_map.into_values().map(|v| Vulnerability {
-                                project: ctx.repo.name.clone(),
-                                artifact: v.name.clone(),
-                                version: "unknown".to_string(), 
-                                vuln_id: "npm-audit-vuln".to_string(),
-                                trail: vec![],
-                            }).collect();
-                            stats.add_vulnerabilities(vulns);
-                        }
-                    }
-                }
-                Err(e) => {
-                    if let Some(p) = ctx.pb {
-                        p.println(format!("[{}]   Failed to execute npm audit: {}", ctx.repo.name, e));
-                    }
-                    success = false;
-                }
+            } else {
+                success = false;
             }
 
             if success {

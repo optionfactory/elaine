@@ -1,7 +1,7 @@
 use crate::scanners::pathcollector::Pattern;
 use crate::scanners::{DependencyUpdate, RepoStats, ScanContext, Scanner, StackInspectionStatus, Vulnerability};
+use crate::scanners::osv::fetch_vulnerabilities;
 use serde::Deserialize;
-use std::path::Path;
 use std::process::Command;
 
 #[derive(Deserialize)]
@@ -20,17 +20,6 @@ struct GoListUpdate {
     version: String,
 }
 
-#[derive(Deserialize)]
-struct GoVulnFinding {
-    finding: Option<GoVulnDetail>,
-}
-
-#[derive(Deserialize)]
-struct GoVulnDetail {
-    osv: String,
-    fixed_version: Option<String>,
-}
-
 pub struct GolangScanner;
 
 impl Scanner for GolangScanner {
@@ -43,103 +32,65 @@ impl Scanner for GolangScanner {
             return Ok(());
         }
 
-        let Some(go_mod_paths) = ctx.matches.get("go_mods") else {
-            return Ok(());
-        };
+        let Some(go_mod_paths) = ctx.matches.get("go_mods") else { return Ok(()) };
 
-        let mut go_dirs: Vec<&Path> = go_mod_paths.iter().filter_map(|p| p.parent()).collect();
-        go_dirs.sort_by_key(|p| p.components().count());
-        let mut selected_dirs: Vec<&Path> = Vec::new();
-
-        for dir in go_dirs {
-            let is_submodule = selected_dirs.iter().any(|selected| dir.starts_with(selected));
-            if is_submodule {
-                continue;
-            }
-            selected_dirs.push(dir);
-            let run_dir = ctx.root.join(dir);
-
-            if let Some(p) = ctx.pb {
-                p.set_message(format!("[{}] Running Golang checks...", ctx.repo.name));
-            }
-
+        for mod_path in go_mod_paths {
+            let run_dir = ctx.root.join(mod_path).parent().unwrap().to_path_buf();
+            
             stats.checked_for_vulnerabilities();
             stats.checked_for_upgrades();
-
-            let mut success = true;
 
             let list_cmd = Command::new("go")
                 .current_dir(&run_dir)
                 .args(["list", "-u", "-m", "-json", "all"])
                 .output();
 
-            match list_cmd {
-                Ok(out) => {
-                    let payload = String::from_utf8_lossy(&out.stdout);
-                    // go list -json outputs concatenated JSON objects, which requires wrapping into a JSON array for standard parsing
-                    let fixed_payload = payload.replace("}\n{", "},\n{");
-                    let array_payload = format!("[{}]", fixed_payload);
+            if let Ok(out) = list_cmd {
+                let payload = String::from_utf8_lossy(&out.stdout);
+                let fixed_payload = payload.replace("}\n{", "},\n{");
+                let array_payload = format!("[{}]", fixed_payload);
 
-                    if let Ok(parsed) = serde_json::from_str::<Vec<GoListModule>>(&array_payload) {
-                        let updates: Vec<DependencyUpdate> = parsed.into_iter().filter_map(|m| {
-                            let update = m.update?;
-                            Some(DependencyUpdate {
-                                project: ctx.repo.name.clone(),
-                                kind: "module".to_string(),
-                                artifact: m.path,
-                                current: m.version.unwrap_or_else(|| "unknown".to_string()),
-                                latest: update.version,
-                            })
-                        }).collect();
-                        stats.add_upgrades(updates);
-                    }
-                }
-                Err(e) => {
-                    if let Some(p) = ctx.pb {
-                        p.println(format!("[{}]   Failed to execute go list: {}", ctx.repo.name, e));
-                    }
-                    success = false;
-                }
-            }
+                if let Ok(parsed) = serde_json::from_str::<Vec<GoListModule>>(&array_payload) {
+                    
+                    let updates: Vec<DependencyUpdate> = parsed.iter().filter_map(|m| {
+                        let update = m.update.as_ref()?;
+                        Some(DependencyUpdate {
+                            project: ctx.repo.name.clone(),
+                            kind: "module".to_string(),
+                            artifact: m.path.clone(),
+                            current: m.version.clone().unwrap_or_else(|| "unknown".to_string()),
+                            latest: update.version.clone(),
+                        })
+                    }).collect();
+                    stats.add_upgrades(updates);
 
-            let vuln_cmd = Command::new("govulncheck")
-                .current_dir(&run_dir)
-                .args(["-json", "./..."])
-                .output();
-
-            match vuln_cmd {
-                Ok(out) => {
-                    // govulncheck outputs JSON streaming format line-by-line
-                    let payload = String::from_utf8_lossy(&out.stdout);
-                    for line in payload.lines() {
-                        if let Ok(parsed) = serde_json::from_str::<GoVulnFinding>(line) {
-                            if let Some(finding) = parsed.finding {
-                                stats.add_vulnerability(Vulnerability {
-                                    project: ctx.repo.name.clone(),
-                                    artifact: "unknown module".to_string(),
-                                    version: "unknown".to_string(),
-                                    vuln_id: finding.osv,
-                                    trail: vec![],
-                                });
-                            }
+                    let mut osv_deps = Vec::new();
+                    for m in &parsed {
+                        if let Some(ref version) = m.version {
+                            osv_deps.push(("Go", m.path.as_str(), version.as_str()));
                         }
                     }
-                }
-                Err(e) => {
-                    if let Some(p) = ctx.pb {
-                        p.println(format!("[{}]   Failed to execute govulncheck: {}", ctx.repo.name, e));
-                    }
-                    success = false;
-                }
-            }
 
-            if success {
-                stats.put_stack("golang", StackInspectionStatus::Success);
+                    if let Ok(vulns) = fetch_vulnerabilities(&osv_deps) {
+                        let vulnerabilities = vulns.into_iter().map(|(pkg, id)| Vulnerability {
+                            project: ctx.repo.name.clone(),
+                            artifact: pkg,
+                            version: "unknown".to_string(),
+                            vuln_id: id,
+                            trail: vec![],
+                        }).collect();
+                        stats.add_vulnerabilities(vulnerabilities);
+                        stats.put_stack("golang", StackInspectionStatus::Success);
+                    } else {
+                        stats.put_stack("golang", StackInspectionStatus::Failure);
+                    }
+                } else {
+                    stats.put_stack("golang", StackInspectionStatus::Failure);
+                }
             } else {
                 stats.put_stack("golang", StackInspectionStatus::Failure);
             }
         }
-
         Ok(())
     }
 }
