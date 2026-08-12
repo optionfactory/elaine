@@ -59,10 +59,10 @@ impl Scanner for RustScanner {
                         .collect();
 
                     if let Ok(vulns) = fetch_vulnerabilities(&deps) {
-                        let vulnerabilities = vulns.into_iter().map(|(pkg, id)| Vulnerability {
+                        let vulnerabilities = vulns.into_iter().map(|(pkg, ver, id)| Vulnerability {
                             project: ctx.repo.name.clone(),
                             artifact: pkg,
-                            version: "unknown".to_string(),
+                            version: ver,
                             vuln_id: id,
                             trail: vec![],
                         }).collect();

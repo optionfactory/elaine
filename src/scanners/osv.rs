@@ -36,7 +36,7 @@ struct OsvVuln {
 /// Takes a slice of (ecosystem, name, version) and queries OSV in chunks of 1000
 pub fn fetch_vulnerabilities(
     dependencies: &[(&str, &str, &str)],
-) -> anyhow::Result<Vec<(String, String)>> {
+) -> anyhow::Result<Vec<(String, String, String)>> {
     let mut found_vulns = Vec::new();
     
     // Jump back onto the Tokio runtime safely
@@ -62,7 +62,7 @@ pub fn fetch_vulnerabilities(
             // OSV response ordering matches the request ordering
             for (input_dep, result) in chunk.iter().zip(osv_response.results) {
                 for vuln in result.vulns {
-                    found_vulns.push((input_dep.1.to_string(), vuln.id));
+                    found_vulns.push((input_dep.1.to_string(), input_dep.2.to_string(), vuln.id));
                 }
             }
         }
