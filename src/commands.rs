@@ -217,11 +217,11 @@ impl Repospect {
 
                 let tar_path = cache.tarball_path(&repo_name);
 
-                let result = if tar_path.exists() {
+                let result: anyhow::Result<crate::scanners::RepoStats> = if tar_path.exists() {
                     let pb_clone = task_pb.clone();
                     tokio::task::spawn_blocking(move || crate::scanners::scan_repository(&repo, &tar_path, Some(pb_clone)))
                         .await
-                        .unwrap()
+                        .context("scanner task failed")?
                 } else {
                     Err(anyhow::anyhow!("Tarball missing"))
                 };
