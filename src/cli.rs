@@ -16,8 +16,6 @@ pub struct Cli {
 pub enum Commands {
     #[command(about = "Serve the dashboard and stats data over HTTP")]
     Serve {
-        #[arg(short, long, default_value_t = 8000, help = "Port to serve the dashboard on")]
-        port: u16,
         #[arg(long, help = "Serve frontend assets from the local filesystem instead of embedded binary")]
         dev: bool,
     },

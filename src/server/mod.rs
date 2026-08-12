@@ -20,6 +20,8 @@ pub struct GoogleAuthConfig {
 pub struct Config {
     pub github_token: Option<String>,
     pub organization: String,
+    pub address: Option<String>,
+    pub port: Option<u16>,
     pub data_dir: std::path::PathBuf,
     pub google_auth: Option<GoogleAuthConfig>,
 }

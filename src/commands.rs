@@ -27,7 +27,9 @@ impl Repospect {
         })
     }
 
-    pub async fn serve(&self, port: u16, dev: bool) -> Result<()> {
+    pub async fn serve(&self, dev: bool) -> Result<()> {
+        let address = self.config.address.as_deref().unwrap_or("127.0.0.1");
+        let port = self.config.port.unwrap_or(8000);
         let stats_file = self.config.data_dir.join("stats.json");
         if !stats_file.exists() {
             anyhow::bail!("Stats file {:?} does not exist. Run 'repospect scan' first.", stats_file);
@@ -101,9 +103,7 @@ impl Repospect {
         } else {
             eprintln!("Serving embedded frontend assets.");
         }
-        eprintln!("Press Ctrl+C to stop.");
-
-        let listener = tokio::net::TcpListener::bind(("127.0.0.1", port)).await?;
+        let listener = tokio::net::TcpListener::bind((address, port)).await?;
         axum::serve(listener, app).await?;
         Ok(())
     }

@@ -17,7 +17,7 @@ async fn main() -> Result<()> {
     let app = Repospect::new(config)?;
 
     match cli.command {
-        Commands::Serve { port, dev } => app.serve(port, dev).await?,
+        Commands::Serve { dev } => app.serve(dev).await?,
         Commands::Sync { force } => app.sync(force).await?,
         Commands::Scan => app.scan().await?,
         Commands::CleanRepositories => app.clean_repositories()?,
