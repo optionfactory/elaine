@@ -35,18 +35,19 @@ impl Repospect {
             anyhow::bail!("Stats file {:?} does not exist. Run 'repospect scan' first.", stats_file);
         }
 
-        let mut jwks = None;
-        if self.config.google_auth.is_some() {
+        let jwks = if self.config.google_auth.is_some() {
             eprintln!("Fetching Google public keys...");
-            if let Ok(resp) = reqwest::get("https://www.googleapis.com/oauth2/v3/certs").await
-                && let Ok(keys) = resp.json::<jsonwebtoken::jwk::JwkSet>().await
-            {
-                eprintln!("Successfully loaded Google keys.");
-                jwks = Some(keys);
-            } else {
-                eprintln!("Failed to load Google JWKS.");
-            }
-        }
+            let keys = reqwest::get("https://www.googleapis.com/oauth2/v3/certs")
+                .await
+                .context("Failed to reach Google JWKS endpoint")?
+                .json::<jsonwebtoken::jwk::JwkSet>()
+                .await
+                .context("Failed to parse Google JWKS")?;
+            eprintln!("Successfully loaded Google keys.");
+            Some(keys)
+        } else {
+            None
+        };
 
         let initial_data = fs::read_to_string(&stats_file).unwrap_or_else(|_| "[]".to_string());
         let initial_projects: Vec<crate::scanners::RepoStats> = serde_json::from_str(&initial_data).unwrap_or_default();
@@ -144,7 +145,7 @@ impl Repospect {
             let main_pb = pb.clone();
 
             tasks.push(tokio::spawn(async move {
-                let _permit = sem.acquire().await.unwrap();
+                let _permit = sem.acquire().await.expect("semaphore closed");
                 let task_pb = m_clone.add(ProgressBar::new_spinner());
                 task_pb.set_style(ProgressStyle::default_spinner().template("{spinner:.blue} {msg}").unwrap());
                 task_pb.enable_steady_tick(std::time::Duration::from_millis(100));
@@ -202,7 +203,7 @@ impl Repospect {
             let pb = pb.clone();
 
             tasks.push(tokio::spawn(async move {
-                let _permit = sem.acquire().await.unwrap();
+                let _permit = sem.acquire().await.expect("semaphore closed");
                 let repo_name = repo.name.clone();
 
                 if data_store.is_scan_fresh(&repo_name, &repo.updated_at, &repo.pushed_at) {
