@@ -1,18 +1,24 @@
 pub mod pathcollector;
 mod scanner_ansible;
 mod scanner_docker;
+mod scanner_go;
 mod scanner_legopfa;
 mod scanner_maven;
+mod scanner_npm;
 mod scanner_pinch;
+mod scanner_rust;
 
 use crate::github::GithubRepository;
 use crate::sandbox::TarballSandbox;
 use crate::scanners::pathcollector::{PathCollector, Pattern};
 use crate::scanners::scanner_ansible::AnsibleScanner;
 use crate::scanners::scanner_docker::DockerScanner;
+use crate::scanners::scanner_go::GolangScanner;
 use crate::scanners::scanner_legopfa::LegopfaScanner;
 use crate::scanners::scanner_maven::MavenScanner;
+use crate::scanners::scanner_npm::NpmScanner;
 use crate::scanners::scanner_pinch::PinchScanner;
+use crate::scanners::scanner_rust::RustScanner;
 use indicatif::ProgressBar;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -189,6 +195,9 @@ pub fn scan_repository(repo: &GithubRepository, tarball_path: &Path, pb: Option<
         Box::new(PinchScanner),
         Box::new(DockerScanner),
         Box::new(MavenScanner),
+        Box::new(RustScanner),
+        Box::new(GolangScanner),
+        Box::new(NpmScanner),
         Box::new(AnsibleScanner),
         Box::new(LegopfaScanner),
     ];
