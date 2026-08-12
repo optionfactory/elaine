@@ -25,7 +25,7 @@ impl StatsStore {
         self.base_dir.join("stats.json")
     }
 
-    pub fn is_scan_fresh(&self, repo_name: &str, pushed_at: &str) -> bool {
+    pub fn is_scan_fresh(&self, repo_name: &str, updated_at: &str, pushed_at: &str) -> bool {
         let file_path = self.project_file_path(repo_name);
         if !file_path.exists() {
             return false;
@@ -37,8 +37,10 @@ impl StatsStore {
             return false;
         };
         let modified_dt: DateTime<Utc> = modified.into();
-        if let Ok(pushed_dt) = DateTime::parse_from_rfc3339(pushed_at) {
-            return modified_dt >= pushed_dt.with_timezone(&Utc);
+        if let Ok(updated_dt) = DateTime::parse_from_rfc3339(updated_at)
+            && let Ok(pushed_dt) = DateTime::parse_from_rfc3339(pushed_at)
+        {
+            return modified_dt >= updated_dt.with_timezone(&Utc) && modified_dt >= pushed_dt.with_timezone(&Utc);
         }
         false
     }

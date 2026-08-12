@@ -9,11 +9,11 @@ impl Scanner for DockerScanner {
             ("docker_compose_files", Pattern::FileName("docker-compose.yml".to_string())),
         ]
     }
-    fn interested_in_archived(&self) -> bool {
-        false
-    }
 
     fn scan(&self, ctx: &ScanContext, stats: &mut RepoStats) -> anyhow::Result<()> {
+        if ctx.repo.archived || ctx.repo.fork || ctx.repo.disabled {
+            return Ok(());
+        }
         let mut all_docker = Vec::new();
         if let Some(files) = ctx.matches.get("docker_files") {
             all_docker.extend(files.iter().cloned());

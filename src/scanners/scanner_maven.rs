@@ -9,10 +9,10 @@ impl Scanner for MavenScanner {
     fn patterns(&self) -> Vec<(&'static str, Pattern)> {
         vec![("pom_files", Pattern::FileName("pom.xml".to_string()))]
     }
-    fn interested_in_archived(&self) -> bool {
-        false
-    }
     fn scan(&self, ctx: &ScanContext, stats: &mut RepoStats) -> anyhow::Result<()> {
+        if ctx.repo.archived || ctx.repo.fork || ctx.repo.disabled {
+            return Ok(());
+        }
         let Some(pom_paths) = ctx.matches.get("pom_files") else {
             return Ok(());
         };

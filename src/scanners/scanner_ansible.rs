@@ -6,10 +6,10 @@ impl Scanner for AnsibleScanner {
     fn patterns(&self) -> Vec<(&'static str, Pattern)> {
         vec![("ansible_confs", Pattern::FileName("ansible.cfg".to_string()))]
     }
-    fn interested_in_archived(&self) -> bool {
-        false
-    }
     fn scan(&self, ctx: &ScanContext, stats: &mut RepoStats) -> anyhow::Result<()> {
+        if ctx.repo.archived || ctx.repo.fork || ctx.repo.disabled {
+            return Ok(());
+        }
         if let Some(files) = ctx.matches.get("ansible_confs") {
             stats.ansible_confs = files.clone();
         }

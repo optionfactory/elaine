@@ -237,7 +237,7 @@
             </section>
 
             <section>
-                <h3>Outdated Dependencies</h3>
+                <h3>Outdated Dependencies <span data-tpl-if="dependencies?.length > 0">({{ dependencies.length  }})</span></h3>
                 <tag-list data-tpl-if="dependencies == null">
                     <tag>No data</tag>
                 </tag-list>
@@ -269,7 +269,7 @@
             </section>
 
             <section>
-                <h3>Known vulnerabilities</h3>
+                <h3>Known vulnerabilities <span data-tpl-if="vulnerabilities?.length > 0">({{ vulnerabilities.length  }})</span></h3>
                 <tag-list data-tpl-if="vulnerabilities == null">
                     <tag>No data</tag>
                 </tag-list>

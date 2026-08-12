@@ -205,7 +205,7 @@ impl Repospect {
                 let _permit = sem.acquire().await.unwrap();
                 let repo_name = repo.name.clone();
 
-                if data_store.is_scan_fresh(&repo_name, &repo.updated_at) {
+                if data_store.is_scan_fresh(&repo_name, &repo.updated_at, &repo.pushed_at) {
                     pb.inc(1);
                     return Ok(());
                 }

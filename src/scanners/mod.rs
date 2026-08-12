@@ -170,9 +170,6 @@ pub struct ScanContext<'a> {
 pub trait Scanner {
     /// Returns the patterns this scanner wants to collect during the filesystem pass
     fn patterns(&self) -> Vec<(&'static str, Pattern)>;
-
-    fn interested_in_archived(&self) -> bool;
-
     /// Executes the scanner logic using the provided context, updating RepoStats
     fn scan(&self, ctx: &ScanContext, stats: &mut RepoStats) -> anyhow::Result<()>;
 }
@@ -212,9 +209,6 @@ pub fn scan_repository(repo: &GithubRepository, tarball_path: &Path, pb: Option<
         pb: pb.as_ref(),
     };
     for scanner in &scanners {
-        if (repo.disabled || repo.archived) && !scanner.interested_in_archived() {
-            continue;
-        }
         scanner.scan(&ctx, &mut stats)?;
     }
 

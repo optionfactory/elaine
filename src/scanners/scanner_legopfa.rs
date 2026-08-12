@@ -9,11 +9,11 @@ impl Scanner for LegopfaScanner {
             Pattern::FileNamePattern(Box::new(|name| name.starts_with("legopfa") && name.ends_with(".json"))),
         )]
     }
-    fn interested_in_archived(&self) -> bool {
-        false
-    }
 
     fn scan(&self, ctx: &ScanContext, stats: &mut RepoStats) -> anyhow::Result<()> {
+        if ctx.repo.archived || ctx.repo.fork || ctx.repo.disabled {
+            return Ok(());
+        }
         if let Some(files) = ctx.matches.get("legopfa_confs") {
             stats.legopfa_confs = files.clone();
         }
