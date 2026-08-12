@@ -38,16 +38,13 @@ impl Repospect {
         let mut jwks = None;
         if self.config.google_auth.is_some() {
             eprintln!("Fetching Google public keys...");
-            match reqwest::get("https://www.googleapis.com/oauth2/v3/certs").await {
-                Ok(resp) => {
-                    if let Ok(keys) = resp.json::<jsonwebtoken::jwk::JwkSet>().await {
-                        eprintln!("Successfully loaded Google keys.");
-                        jwks = Some(keys);
-                    } else {
-                        eprintln!("Failed to parse JWKS from Google.");
-                    }
-                }
-                Err(e) => eprintln!("Failed to reach Google: {}", e),
+            if let Ok(resp) = reqwest::get("https://www.googleapis.com/oauth2/v3/certs").await
+                && let Ok(keys) = resp.json::<jsonwebtoken::jwk::JwkSet>().await
+            {
+                eprintln!("Successfully loaded Google keys.");
+                jwks = Some(keys);
+            } else {
+                eprintln!("Failed to load Google JWKS.");
             }
         }
 

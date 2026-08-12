@@ -101,25 +101,20 @@ impl RepositoryStore {
     }
 
     pub fn clean_orphans(&self, current_repo_names: &std::collections::HashSet<&str>) -> anyhow::Result<()> {
-        if let Ok(entries) = std::fs::read_dir(&self.dir) {
-            for entry in entries.filter_map(|e| e.ok()) {
-                let path = entry.path();
-                if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
-                    let repo_name = if file_name.ends_with(".json") {
-                        file_name.strip_suffix(".json")
-                    } else if file_name.ends_with(".tar.gz") {
-                        file_name.strip_suffix(".tar.gz")
-                    } else {
-                        None
-                    };
-
-                    if let Some(name) = repo_name
-                        && !current_repo_names.contains(name)
-                    {
-                        eprintln!("  Removing orphaned cache file: {}", file_name);
-                        let _ = std::fs::remove_file(&path);
-                    }
-                }
+        let Ok(entries) = std::fs::read_dir(&self.dir) else {
+            return Ok(());
+        };
+        for entry in entries.filter_map(|e| e.ok()) {
+            let path = entry.path();
+            let Some(file_name) = path.file_name().and_then(|n| n.to_str()) else {
+                continue;
+            };
+            let Some(repo_name) = file_name.strip_suffix(".json").or_else(|| file_name.strip_suffix(".tar.gz")) else {
+                continue;
+            };
+            if !current_repo_names.contains(repo_name) {
+                eprintln!("  Removing orphaned cache file: {}", file_name);
+                let _ = std::fs::remove_file(&path);
             }
         }
         Ok(())

@@ -47,56 +47,57 @@ impl Scanner for GolangScanner {
                 .args(["list", "-u", "-m", "-json", "all"])
                 .output();
 
-            if let Ok(out) = list_cmd {
-                let payload = String::from_utf8_lossy(&out.stdout);
-                let fixed_payload = payload.replace("}\n{", "},\n{");
-                let array_payload = format!("[{}]", fixed_payload);
-
-                if let Ok(parsed) = serde_json::from_str::<Vec<GoListModule>>(&array_payload) {
-                    let updates: Vec<DependencyUpdate> = parsed
-                        .iter()
-                        .filter_map(|m| {
-                            let update = m.update.as_ref()?;
-                            Some(DependencyUpdate {
-                                project: ctx.repo.name.clone(),
-                                kind: "module".to_string(),
-                                artifact: m.path.clone(),
-                                current: m.version.clone().unwrap_or_else(|| "unknown".to_string()),
-                                latest: update.version.clone(),
-                            })
-                        })
-                        .collect();
-                    stats.add_upgrades(updates);
-
-                    let mut osv_deps = Vec::new();
-                    for m in &parsed {
-                        if let Some(ref version) = m.version {
-                            osv_deps.push(("Go", m.path.as_str(), version.as_str()));
-                        }
-                    }
-
-                    if let Ok(vulns) = fetch_vulnerabilities(ctx.client, &osv_deps) {
-                        let vulnerabilities = vulns
-                            .into_iter()
-                            .map(|(pkg, ver, id)| Vulnerability {
-                                project: ctx.repo.name.clone(),
-                                artifact: pkg,
-                                version: ver,
-                                vuln_id: id,
-                                trail: vec![],
-                            })
-                            .collect();
-                        stats.add_vulnerabilities(vulnerabilities);
-                        stats.put_stack("golang", StackInspectionStatus::Success);
-                    } else {
-                        stats.put_stack("golang", StackInspectionStatus::Failure);
-                    }
-                } else {
-                    stats.put_stack("golang", StackInspectionStatus::Failure);
-                }
-            } else {
+            let Ok(out) = list_cmd else {
                 stats.put_stack("golang", StackInspectionStatus::Failure);
+                continue;
+            };
+            let payload = String::from_utf8_lossy(&out.stdout);
+            let fixed_payload = payload.replace("}\n{", "},\n{");
+            let array_payload = format!("[{}]", fixed_payload);
+
+            let Ok(parsed) = serde_json::from_str::<Vec<GoListModule>>(&array_payload) else {
+                stats.put_stack("golang", StackInspectionStatus::Failure);
+                continue;
+            };
+
+            let updates: Vec<DependencyUpdate> = parsed
+                .iter()
+                .filter_map(|m| {
+                    let update = m.update.as_ref()?;
+                    Some(DependencyUpdate {
+                        project: ctx.repo.name.clone(),
+                        kind: "module".to_string(),
+                        artifact: m.path.clone(),
+                        current: m.version.clone().unwrap_or_else(|| "unknown".to_string()),
+                        latest: update.version.clone(),
+                    })
+                })
+                .collect();
+            stats.add_upgrades(updates);
+
+            let mut osv_deps = Vec::new();
+            for m in &parsed {
+                if let Some(ref version) = m.version {
+                    osv_deps.push(("Go", m.path.as_str(), version.as_str()));
+                }
             }
+
+            let Ok(vulns) = fetch_vulnerabilities(ctx.client, &osv_deps) else {
+                stats.put_stack("golang", StackInspectionStatus::Failure);
+                continue;
+            };
+            let vulnerabilities = vulns
+                .into_iter()
+                .map(|(pkg, ver, id)| Vulnerability {
+                    project: ctx.repo.name.clone(),
+                    artifact: pkg,
+                    version: ver,
+                    vuln_id: id,
+                    trail: vec![],
+                })
+                .collect();
+            stats.add_vulnerabilities(vulnerabilities);
+            stats.put_stack("golang", StackInspectionStatus::Success);
         }
         Ok(())
     }
