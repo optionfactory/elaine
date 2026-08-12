@@ -71,7 +71,7 @@ impl Scanner for GolangScanner {
                         }
                     }
 
-                    if let Ok(vulns) = fetch_vulnerabilities(&osv_deps) {
+                    if let Ok(vulns) = fetch_vulnerabilities(ctx.client, &osv_deps) {
                         let vulnerabilities = vulns.into_iter().map(|(pkg, ver, id)| Vulnerability {
                             project: ctx.repo.name.clone(),
                             artifact: pkg,

@@ -35,14 +35,13 @@ struct OsvVuln {
 
 /// Takes a slice of (ecosystem, name, version) and queries OSV in chunks of 1000
 pub fn fetch_vulnerabilities(
+    client: &reqwest::Client,
     dependencies: &[(&str, &str, &str)],
 ) -> anyhow::Result<Vec<(String, String, String)>> {
     let mut found_vulns = Vec::new();
-    
-    // Jump back onto the Tokio runtime safely
+
+    // Scanners run on a spawn_blocking thread; block_on is the intended bridge back to async HTTP.
     tokio::runtime::Handle::current().block_on(async {
-        let client = reqwest::Client::new();
-        
         // OSV API limits batches to 1000 queries
         for chunk in dependencies.chunks(1000) {
             let queries = chunk.iter().map(|(eco, name, ver)| OsvQuery {

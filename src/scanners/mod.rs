@@ -171,6 +171,7 @@ pub struct ScanContext<'a> {
     pub root: &'a Path,
     pub matches: &'a HashMap<String, Vec<PathBuf>>,
     pub pb: Option<&'a ProgressBar>,
+    pub client: &'a reqwest::Client,
 }
 
 /// The Trait implemented by all specific ecosystem/tool scanners
@@ -211,12 +212,14 @@ pub fn scan_repository(repo: &GithubRepository, tarball_path: &Path, pb: Option<
     }
 
     let matches = collector.scan(root);
+    let client = reqwest::Client::new();
     let mut stats = RepoStats::new_from_github(repo);
     let ctx = ScanContext {
         repo,
         root,
         matches: &matches,
         pb: pb.as_ref(),
+        client: &client,
     };
     for scanner in &scanners {
         scanner.scan(&ctx, &mut stats)?;

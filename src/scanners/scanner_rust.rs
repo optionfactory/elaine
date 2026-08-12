@@ -58,7 +58,7 @@ impl Scanner for RustScanner {
                         .map(|p| ("crates.io", p.name.as_str(), p.version.as_str()))
                         .collect();
 
-                    if let Ok(vulns) = fetch_vulnerabilities(&deps) {
+                    if let Ok(vulns) = fetch_vulnerabilities(ctx.client, &deps) {
                         let vulnerabilities = vulns.into_iter().map(|(pkg, ver, id)| Vulnerability {
                             project: ctx.repo.name.clone(),
                             artifact: pkg,
