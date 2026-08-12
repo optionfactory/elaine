@@ -395,7 +395,7 @@ table {
         grid-template-columns: 1fr auto auto auto auto auto;
     }
 
-    &.dependencies {
+    &.outdated-dependencies {
         grid-template-columns: auto 1fr auto auto;
     }
 

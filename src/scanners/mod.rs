@@ -35,7 +35,7 @@ pub struct Vulnerability {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct DependencyUpdate {
+pub struct OutdatedDependency {
     pub project: String,
     pub kind: String,
     pub artifact: String,
@@ -66,7 +66,7 @@ pub struct RepoStats {
     pub legopfa_confs: Vec<PathBuf>,
     //
     pub vulnerabilities: Option<Vec<Vulnerability>>,
-    pub dependencies: Option<Vec<DependencyUpdate>>,
+    pub outdated_dependencies: Option<Vec<OutdatedDependency>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -108,7 +108,7 @@ impl RepoStats {
             docker_files: Vec::new(),
             legopfa_confs: Vec::new(),
             vulnerabilities: None,
-            dependencies: None,
+            outdated_dependencies: None,
         }
     }
     pub fn record_check(&mut self, kind: ScannerKind, check: &str, status: CheckStatus) {
@@ -135,23 +135,23 @@ impl RepoStats {
         }
     }
 
-    pub fn checked_for_upgrades(&mut self) {
-        if self.dependencies.is_none() {
-            self.dependencies = Some(Vec::new());
+    pub fn checked_for_outdated_dependencies(&mut self) {
+        if self.outdated_dependencies.is_none() {
+            self.outdated_dependencies = Some(Vec::new());
         }
     }
 
-    pub fn add_upgrade(&mut self, upgrade: DependencyUpdate) {
-        self.checked_for_upgrades();
-        if let Some(ref mut deps) = self.dependencies {
-            deps.push(upgrade);
+    pub fn add_outdated_dependency(&mut self, dep: OutdatedDependency) {
+        self.checked_for_outdated_dependencies();
+        if let Some(ref mut deps) = self.outdated_dependencies {
+            deps.push(dep);
         }
     }
 
-    pub fn add_upgrades(&mut self, mut upgrades: Vec<DependencyUpdate>) {
-        self.checked_for_upgrades();
-        if let Some(ref mut d) = self.dependencies {
-            d.append(&mut upgrades);
+    pub fn add_outdated_dependencies(&mut self, mut deps: Vec<OutdatedDependency>) {
+        self.checked_for_outdated_dependencies();
+        if let Some(ref mut d) = self.outdated_dependencies {
+            d.append(&mut deps);
         }
     }
 

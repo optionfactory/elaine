@@ -1,6 +1,6 @@
 use crate::scanners::osv::fetch_vulnerabilities;
 use crate::scanners::pathcollector::Pattern;
-use crate::scanners::{CheckStatus, DependencyUpdate, RepoStats, ScanContext, Scanner, ScannerKind, Vulnerability};
+use crate::scanners::{CheckStatus, OutdatedDependency, RepoStats, ScanContext, Scanner, ScannerKind, Vulnerability};
 use serde::Deserialize;
 use std::fs;
 use std::process::Command;
@@ -49,7 +49,7 @@ impl Scanner for RustScanner {
         }
 
         stats.checked_for_vulnerabilities();
-        stats.checked_for_upgrades();
+        stats.checked_for_outdated_dependencies();
 
         let mut vulns_ok = true;
         let mut outdated_ok = true;
@@ -106,10 +106,10 @@ impl Scanner for RustScanner {
                     if let Ok(payload) = String::from_utf8(out.stdout) {
                         for line in payload.lines() {
                             if let Ok(parsed) = serde_json::from_str::<OutdatedOutput>(line) {
-                                let updates: Vec<DependencyUpdate> = parsed
+                                let updates: Vec<OutdatedDependency> = parsed
                                     .dependencies
                                     .into_iter()
-                                    .map(|dep| DependencyUpdate {
+                                    .map(|dep| OutdatedDependency {
                                         project: ctx.repo.name.clone(),
                                         kind: dep.kind.unwrap_or_else(|| "Normal".to_string()),
                                         artifact: dep.name,
@@ -117,7 +117,7 @@ impl Scanner for RustScanner {
                                         latest: dep.latest,
                                     })
                                     .collect();
-                                stats.add_upgrades(updates);
+                                stats.add_outdated_dependencies(updates);
                             }
                         }
                     }

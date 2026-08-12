@@ -1,6 +1,6 @@
 use crate::scanners::osv::fetch_vulnerabilities;
 use crate::scanners::pathcollector::Pattern;
-use crate::scanners::{CheckStatus, DependencyUpdate, RepoStats, ScanContext, Scanner, ScannerKind, Vulnerability};
+use crate::scanners::{CheckStatus, OutdatedDependency, RepoStats, ScanContext, Scanner, ScannerKind, Vulnerability};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
@@ -44,7 +44,7 @@ impl Scanner for NpmScanner {
         }
 
         stats.checked_for_vulnerabilities();
-        stats.checked_for_upgrades();
+        stats.checked_for_outdated_dependencies();
 
         let mut vulns_ok = true;
         let mut outdated_ok = true;
@@ -102,10 +102,10 @@ impl Scanner for NpmScanner {
                 Ok(out) => {
                     let payload = String::from_utf8_lossy(&out.stdout);
                     if let Ok(parsed) = serde_json::from_str::<HashMap<String, NpmOutdatedDep>>(&payload) {
-                        let updates: Vec<DependencyUpdate> = parsed
+                        let updates: Vec<OutdatedDependency> = parsed
                             .into_iter()
                             .filter_map(|(name, dep)| {
-                                Some(DependencyUpdate {
+                                Some(OutdatedDependency {
                                     project: ctx.repo.name.clone(),
                                     kind: dep.dep_type.unwrap_or_else(|| "dependency".to_string()),
                                     artifact: name,
@@ -114,7 +114,7 @@ impl Scanner for NpmScanner {
                                 })
                             })
                             .collect();
-                        stats.add_upgrades(updates);
+                        stats.add_outdated_dependencies(updates);
                     }
                     true
                 }

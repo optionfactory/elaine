@@ -1,5 +1,5 @@
 use crate::scanners::pathcollector::Pattern;
-use crate::scanners::{CheckStatus, DependencyUpdate, RepoStats, ScanContext, Scanner, ScannerKind, Vulnerability};
+use crate::scanners::{CheckStatus, OutdatedDependency, RepoStats, ScanContext, Scanner, ScannerKind, Vulnerability};
 use std::fs;
 use std::path::Path;
 use std::process::Command;
@@ -53,7 +53,7 @@ impl Scanner for MavenScanner {
             match output {
                 Ok(out) if out.status.success() => {
                     stats.checked_for_vulnerabilities();
-                    stats.checked_for_upgrades();
+                    stats.checked_for_outdated_dependencies();
 
                     let vulns_path = run_dir.join("target").join("anarchitect-vulns.json");
                     if let Ok(payload) = fs::read_to_string(&vulns_path)
@@ -66,9 +66,9 @@ impl Scanner for MavenScanner {
 
                     let updates_path = run_dir.join("target").join("anarchitect-dependency-upgrades.json");
                     if let Ok(payload) = fs::read_to_string(&updates_path)
-                        && let Ok(parsed_updates) = serde_json::from_str::<Vec<DependencyUpdate>>(&payload)
+                        && let Ok(parsed_updates) = serde_json::from_str::<Vec<OutdatedDependency>>(&payload)
                     {
-                        stats.add_upgrades(parsed_updates);
+                        stats.add_outdated_dependencies(parsed_updates);
                     } else {
                         outdated_ok = false;
                     }

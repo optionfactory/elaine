@@ -77,14 +77,14 @@
             </state-button>
         </filter-group>
 
-        <filter-group data-group="updates">
-            <label>Upgrades:</label>
+        <filter-group data-group="outdated">
+            <label>Outdated deps:</label>
             <state-button>
                 <state active data-value="any">Any</state>
-                <state data-value="updates">Needed</state>
-                <state data-value="no-updates">Up to date</state>
+                <state data-value="outdated">Needed</state>
+                <state data-value="no-outdated">Up to date</state>
             </state-button>
-        </filter-group>        
+        </filter-group>
 
         <filter-group data-group="tiers">
             <label>Tier:</label>
@@ -237,14 +237,14 @@
             </section>
 
             <section>
-                <h3>Outdated Dependencies <span data-tpl-if="dependencies?.length > 0">({{ dependencies.length  }})</span></h3>
-                <tag-list data-tpl-if="dependencies == null">
+                <h3>Outdated Dependencies <span data-tpl-if="outdated_dependencies?.length > 0">({{ outdated_dependencies.length  }})</span></h3>
+                <tag-list data-tpl-if="outdated_dependencies == null">
                     <tag>No data</tag>
                 </tag-list>
-                <tag-list data-tpl-if="dependencies?.length == 0">
+                <tag-list data-tpl-if="outdated_dependencies?.length == 0">
                     <tag>No outdated dependencies found in this project</tag>
                 </tag-list>
-                <table class="dependencies" data-tpl-if="dependencies?.length > 0">
+                <table class="outdated-dependencies" data-tpl-if="outdated_dependencies?.length > 0">
                     <thead>
                         <tr>
                             <th>Project</th>
@@ -254,7 +254,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr data-tpl-each="dependencies" data-tpl-var="dep">
+                        <tr data-tpl-each="outdated_dependencies" data-tpl-var="dep">
                             <td><strong>{{ dep.project }}</strong></td>
                             <td>{{dep.artifact}}</td>
                             <td>

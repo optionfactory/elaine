@@ -54,7 +54,7 @@ pub async fn api_projects_handler(
             let audited = p.audit.is_some();
             let public = !p.private;
             let has_vulns = p.vulnerabilities.as_ref().map(|v| !v.is_empty()).unwrap_or(false);
-            let has_updates = p.dependencies.as_ref().map(|v| !v.is_empty()).unwrap_or(false);
+            let has_outdated = p.outdated_dependencies.as_ref().map(|v| !v.is_empty()).unwrap_or(false);
 
             if filters.contains(&"live") && !live {
                 return false;
@@ -81,10 +81,10 @@ pub async fn api_projects_handler(
                 return false;
             }
 
-            if filters.contains(&"updates") && !has_updates {
+            if filters.contains(&"outdated") && !has_outdated {
                 return false;
             }
-            if filters.contains(&"no-updates") && has_updates {
+            if filters.contains(&"no-outdated") && has_outdated {
                 return false;
             }
 
