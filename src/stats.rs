@@ -1,6 +1,5 @@
 use crate::scanners::RepoStats;
 use anyhow::{Context, Result};
-use chrono::{DateTime, Utc};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -26,23 +25,13 @@ impl StatsStore {
     }
 
     pub fn is_scan_fresh(&self, repo_name: &str, updated_at: &str, pushed_at: &str) -> bool {
-        let file_path = self.project_file_path(repo_name);
-        if !file_path.exists() {
-            return false;
-        }
-        let Ok(metadata) = fs::metadata(&file_path) else {
+        let Ok(data) = fs::read_to_string(self.project_file_path(repo_name)) else {
             return false;
         };
-        let Ok(modified) = metadata.modified() else {
+        let Ok(prev) = serde_json::from_str::<RepoStats>(&data) else {
             return false;
         };
-        let modified_dt: DateTime<Utc> = modified.into();
-        if let Ok(updated_dt) = DateTime::parse_from_rfc3339(updated_at)
-            && let Ok(pushed_dt) = DateTime::parse_from_rfc3339(pushed_at)
-        {
-            return modified_dt >= updated_dt.with_timezone(&Utc) && modified_dt >= pushed_dt.with_timezone(&Utc);
-        }
-        false
+        prev.pushed_at == pushed_at && prev.updated_at == updated_at
     }
 
     pub fn save_project_scan(&self, stat: &RepoStats) -> Result<PathBuf> {
