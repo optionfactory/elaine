@@ -1,6 +1,6 @@
 use crate::scanners::osv::fetch_vulnerabilities;
 use crate::scanners::pathcollector::Pattern;
-use crate::scanners::{DependencyUpdate, RepoStats, ScanContext, Scanner, StackInspectionStatus, Vulnerability};
+use crate::scanners::{CheckStatus, DependencyUpdate, RepoStats, ScanContext, Scanner, ScannerKind, Vulnerability};
 use serde::Deserialize;
 use std::process::Command;
 
@@ -35,12 +35,18 @@ impl Scanner for GolangScanner {
         let Some(go_mod_paths) = ctx.matches.get("go_mods") else {
             return Ok(());
         };
+        if go_mod_paths.is_empty() {
+            return Ok(());
+        }
+
+        stats.checked_for_vulnerabilities();
+        stats.checked_for_upgrades();
+
+        let mut vulns_ok = true;
+        let mut outdated_ok = true;
 
         for mod_path in go_mod_paths {
             let run_dir = ctx.root.join(mod_path).parent().unwrap().to_path_buf();
-
-            stats.checked_for_vulnerabilities();
-            stats.checked_for_upgrades();
 
             let list_cmd = Command::new("go")
                 .current_dir(&run_dir)
@@ -48,7 +54,8 @@ impl Scanner for GolangScanner {
                 .output();
 
             let Ok(out) = list_cmd else {
-                stats.put_stack("golang", StackInspectionStatus::Failure);
+                vulns_ok = false;
+                outdated_ok = false;
                 continue;
             };
             let payload = String::from_utf8_lossy(&out.stdout);
@@ -56,7 +63,8 @@ impl Scanner for GolangScanner {
             let array_payload = format!("[{}]", fixed_payload);
 
             let Ok(parsed) = serde_json::from_str::<Vec<GoListModule>>(&array_payload) else {
-                stats.put_stack("golang", StackInspectionStatus::Failure);
+                vulns_ok = false;
+                outdated_ok = false;
                 continue;
             };
 
@@ -82,23 +90,34 @@ impl Scanner for GolangScanner {
                 }
             }
 
-            let Ok(vulns) = fetch_vulnerabilities(ctx.client, &osv_deps) else {
-                stats.put_stack("golang", StackInspectionStatus::Failure);
-                continue;
-            };
-            let vulnerabilities = vulns
-                .into_iter()
-                .map(|(pkg, ver, id)| Vulnerability {
-                    project: ctx.repo.name.clone(),
-                    artifact: pkg,
-                    version: ver,
-                    vuln_id: id,
-                    trail: vec![],
-                })
-                .collect();
-            stats.add_vulnerabilities(vulnerabilities);
-            stats.put_stack("golang", StackInspectionStatus::Success);
+            match fetch_vulnerabilities(ctx.client, &osv_deps) {
+                Ok(vulns) => {
+                    let vulnerabilities = vulns
+                        .into_iter()
+                        .map(|(pkg, ver, id)| Vulnerability {
+                            project: ctx.repo.name.clone(),
+                            artifact: pkg,
+                            version: ver,
+                            vuln_id: id,
+                            trail: vec![],
+                        })
+                        .collect();
+                    stats.add_vulnerabilities(vulnerabilities);
+                }
+                Err(_) => vulns_ok = false,
+            }
         }
+
+        stats.record_check(
+            ScannerKind::Golang,
+            "vulns",
+            if vulns_ok { CheckStatus::Ok } else { CheckStatus::Failed },
+        );
+        stats.record_check(
+            ScannerKind::Golang,
+            "outdated",
+            if outdated_ok { CheckStatus::Ok } else { CheckStatus::Failed },
+        );
         Ok(())
     }
 }

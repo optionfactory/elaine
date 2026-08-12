@@ -22,7 +22,7 @@ use crate::scanners::scanner_pinch::PinchScanner;
 use crate::scanners::scanner_rust::RustScanner;
 use indicatif::ProgressBar;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -59,7 +59,7 @@ pub struct RepoStats {
     //
     pub audit: Option<pinch::schema::ProjectManifest>,
     //
-    pub stack: HashMap<String, StackInspectionStatus>,
+    pub health: BTreeMap<ScannerKind, BTreeMap<String, CheckStatus>>,
     pub containers: Option<Vec<String>>,
     pub ansible_confs: Vec<PathBuf>,
     pub docker_files: Vec<PathBuf>,
@@ -69,11 +69,21 @@ pub struct RepoStats {
     pub dependencies: Option<Vec<DependencyUpdate>>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[serde(rename_all = "kebab-case")]
-pub enum StackInspectionStatus {
-    Success,
-    Failure,
+pub enum ScannerKind {
+    Rust,
+    Npm,
+    Golang,
+    Maven,
+    Pinch,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum CheckStatus {
+    Ok,
+    Failed,
 }
 
 impl RepoStats {
@@ -92,7 +102,7 @@ impl RepoStats {
             has_unique_commits: !repo.fork,
             description: repo.description.clone().unwrap_or_default(),
             audit: None,
-            stack: HashMap::new(),
+            health: BTreeMap::new(),
             containers: None,
             ansible_confs: Vec::new(),
             docker_files: Vec::new(),
@@ -101,8 +111,8 @@ impl RepoStats {
             dependencies: None,
         }
     }
-    pub fn put_stack(&mut self, name: &str, status: StackInspectionStatus) {
-        self.stack.insert(name.to_string(), status);
+    pub fn record_check(&mut self, kind: ScannerKind, check: &str, status: CheckStatus) {
+        self.health.entry(kind).or_default().insert(check.to_string(), status);
     }
 
     pub fn checked_for_vulnerabilities(&mut self) {

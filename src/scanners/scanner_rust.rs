@@ -1,6 +1,6 @@
 use crate::scanners::osv::fetch_vulnerabilities;
 use crate::scanners::pathcollector::Pattern;
-use crate::scanners::{DependencyUpdate, RepoStats, ScanContext, Scanner, StackInspectionStatus, Vulnerability};
+use crate::scanners::{CheckStatus, DependencyUpdate, RepoStats, ScanContext, Scanner, ScannerKind, Vulnerability};
 use serde::Deserialize;
 use std::fs;
 use std::process::Command;
@@ -44,14 +44,21 @@ impl Scanner for RustScanner {
         let Some(lock_paths) = ctx.matches.get("cargo_locks") else {
             return Ok(());
         };
+        if lock_paths.is_empty() {
+            return Ok(());
+        }
+
+        stats.checked_for_vulnerabilities();
+        stats.checked_for_upgrades();
+
+        let mut vulns_ok = true;
+        let mut outdated_ok = true;
 
         for lock_path in lock_paths {
             let run_dir = ctx.root.join(lock_path).parent().unwrap().to_path_buf();
-            stats.checked_for_vulnerabilities();
-            stats.checked_for_upgrades();
-
             let content = fs::read_to_string(ctx.root.join(lock_path))?;
-            let vulns_ok = (|| -> Option<()> {
+
+            let per_vulns_ok = (|| -> Option<()> {
                 let lockfile = toml::from_str::<CargoLock>(&content).ok()?;
                 let packages = lockfile.package?;
                 let deps: Vec<(&str, &str, &str)> = packages
@@ -74,8 +81,9 @@ impl Scanner for RustScanner {
                 Some(())
             })()
             .is_some();
+            vulns_ok &= per_vulns_ok;
 
-            let outdated_ok = match Command::new("cargo")
+            let per_outdated_ok = match Command::new("cargo")
                 .current_dir(&run_dir)
                 .args(["outdated", "--format", "json", "--workspace"])
                 .output()
@@ -103,17 +111,19 @@ impl Scanner for RustScanner {
                 }
                 Err(_) => false,
             };
-
-            let success = vulns_ok && outdated_ok;
-            stats.put_stack(
-                "rust",
-                if success {
-                    StackInspectionStatus::Success
-                } else {
-                    StackInspectionStatus::Failure
-                },
-            );
+            outdated_ok &= per_outdated_ok;
         }
+
+        stats.record_check(
+            ScannerKind::Rust,
+            "vulns",
+            if vulns_ok { CheckStatus::Ok } else { CheckStatus::Failed },
+        );
+        stats.record_check(
+            ScannerKind::Rust,
+            "outdated",
+            if outdated_ok { CheckStatus::Ok } else { CheckStatus::Failed },
+        );
         Ok(())
     }
 }
