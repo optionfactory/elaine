@@ -33,7 +33,7 @@ impl RepositoryStore {
     }
 
     pub fn is_cache_valid(&self, repo_name: &str, expected_updated_at: &str, expected_pushed_at: &str) -> bool {
-        if expected_updated_at.is_empty() || expected_updated_at.is_empty() {
+        if expected_updated_at.is_empty() || expected_pushed_at.is_empty() {
             return false;
         }
 
