@@ -47,22 +47,20 @@ impl Scanner for RustScanner {
 
         for lock_path in lock_paths {
             let run_dir = ctx.root.join(lock_path).parent().unwrap().to_path_buf();
-            let mut success = true;
-
             stats.checked_for_vulnerabilities();
             stats.checked_for_upgrades();
 
             let content = fs::read_to_string(ctx.root.join(lock_path))?;
-            if let Ok(lockfile) = toml::from_str::<CargoLock>(&content)
-                && let Some(packages) = lockfile.package
-            {
+            let vulns_ok = (|| -> Option<()> {
+                let lockfile = toml::from_str::<CargoLock>(&content).ok()?;
+                let packages = lockfile.package?;
                 let deps: Vec<(&str, &str, &str)> = packages
                     .iter()
                     .map(|p| ("crates.io", p.name.as_str(), p.version.as_str()))
                     .collect();
-
-                if let Ok(vulns) = fetch_vulnerabilities(ctx.client, &deps) {
-                    let vulnerabilities = vulns
+                let vulns = fetch_vulnerabilities(ctx.client, &deps).ok()?;
+                stats.add_vulnerabilities(
+                    vulns
                         .into_iter()
                         .map(|(pkg, ver, id)| Vulnerability {
                             project: ctx.repo.name.clone(),
@@ -71,46 +69,50 @@ impl Scanner for RustScanner {
                             vuln_id: id,
                             trail: vec![],
                         })
-                        .collect();
-                    stats.add_vulnerabilities(vulnerabilities);
-                } else {
-                    success = false;
-                }
-            }
+                        .collect(),
+                );
+                Some(())
+            })()
+            .is_some();
 
-            let outdated_cmd = Command::new("cargo")
+            let outdated_ok = match Command::new("cargo")
                 .current_dir(&run_dir)
                 .args(["outdated", "--format", "json", "--workspace"])
-                .output();
-
-            if let Ok(out) = outdated_cmd {
-                if let Ok(payload) = String::from_utf8(out.stdout) {
-                    for line in payload.lines() {
-                        if let Ok(parsed) = serde_json::from_str::<OutdatedOutput>(line) {
-                            let updates: Vec<DependencyUpdate> = parsed
-                                .dependencies
-                                .into_iter()
-                                .map(|dep| DependencyUpdate {
-                                    project: ctx.repo.name.clone(),
-                                    kind: dep.kind.unwrap_or_else(|| "Normal".to_string()),
-                                    artifact: dep.name,
-                                    current: dep.project,
-                                    latest: dep.latest,
-                                })
-                                .collect();
-                            stats.add_upgrades(updates);
+                .output()
+            {
+                Ok(out) => {
+                    if let Ok(payload) = String::from_utf8(out.stdout) {
+                        for line in payload.lines() {
+                            if let Ok(parsed) = serde_json::from_str::<OutdatedOutput>(line) {
+                                let updates: Vec<DependencyUpdate> = parsed
+                                    .dependencies
+                                    .into_iter()
+                                    .map(|dep| DependencyUpdate {
+                                        project: ctx.repo.name.clone(),
+                                        kind: dep.kind.unwrap_or_else(|| "Normal".to_string()),
+                                        artifact: dep.name,
+                                        current: dep.project,
+                                        latest: dep.latest,
+                                    })
+                                    .collect();
+                                stats.add_upgrades(updates);
+                            }
                         }
                     }
+                    true
                 }
-            } else {
-                success = false;
-            }
+                Err(_) => false,
+            };
 
-            if success {
-                stats.put_stack("rust", StackInspectionStatus::Success);
-            } else {
-                stats.put_stack("rust", StackInspectionStatus::Failure);
-            }
+            let success = vulns_ok && outdated_ok;
+            stats.put_stack(
+                "rust",
+                if success {
+                    StackInspectionStatus::Success
+                } else {
+                    StackInspectionStatus::Failure
+                },
+            );
         }
         Ok(())
     }

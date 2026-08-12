@@ -42,15 +42,13 @@ impl Scanner for NpmScanner {
 
         for lock_path in lock_paths {
             let run_dir = ctx.root.join(lock_path).parent().unwrap().to_path_buf();
-            let mut success = true;
-
             stats.checked_for_vulnerabilities();
             stats.checked_for_upgrades();
 
             let content = fs::read_to_string(ctx.root.join(lock_path))?;
-            if let Ok(lockfile) = serde_json::from_str::<PackageLock>(&content)
-                && let Some(packages) = lockfile.packages
-            {
+            let vulns_ok = (|| -> Option<()> {
+                let lockfile = serde_json::from_str::<PackageLock>(&content).ok()?;
+                let packages = lockfile.packages?;
                 let mut deps = Vec::new();
                 for (path, pkg) in &packages {
                     if path.is_empty() {
@@ -61,9 +59,9 @@ impl Scanner for NpmScanner {
                         deps.push(("npm", name, version.as_str()));
                     }
                 }
-
-                if let Ok(vulns) = fetch_vulnerabilities(ctx.client, &deps) {
-                    let vulnerabilities = vulns
+                let vulns = fetch_vulnerabilities(ctx.client, &deps).ok()?;
+                stats.add_vulnerabilities(
+                    vulns
                         .into_iter()
                         .map(|(pkg, ver, id)| Vulnerability {
                             project: ctx.repo.name.clone(),
@@ -72,41 +70,44 @@ impl Scanner for NpmScanner {
                             vuln_id: id,
                             trail: vec![],
                         })
-                        .collect();
-                    stats.add_vulnerabilities(vulnerabilities);
-                } else {
-                    success = false;
-                }
-            }
+                        .collect(),
+                );
+                Some(())
+            })()
+            .is_some();
 
-            let outdated_cmd = Command::new("npm").current_dir(&run_dir).args(["outdated", "--json"]).output();
-
-            if let Ok(out) = outdated_cmd {
-                let payload = String::from_utf8_lossy(&out.stdout);
-                if let Ok(parsed) = serde_json::from_str::<HashMap<String, NpmOutdatedDep>>(&payload) {
-                    let updates: Vec<DependencyUpdate> = parsed
-                        .into_iter()
-                        .filter_map(|(name, dep)| {
-                            Some(DependencyUpdate {
-                                project: ctx.repo.name.clone(),
-                                kind: dep.dep_type.unwrap_or_else(|| "dependency".to_string()),
-                                artifact: name,
-                                current: dep.current?,
-                                latest: dep.latest?,
+            let outdated_ok = match Command::new("npm").current_dir(&run_dir).args(["outdated", "--json"]).output() {
+                Ok(out) => {
+                    let payload = String::from_utf8_lossy(&out.stdout);
+                    if let Ok(parsed) = serde_json::from_str::<HashMap<String, NpmOutdatedDep>>(&payload) {
+                        let updates: Vec<DependencyUpdate> = parsed
+                            .into_iter()
+                            .filter_map(|(name, dep)| {
+                                Some(DependencyUpdate {
+                                    project: ctx.repo.name.clone(),
+                                    kind: dep.dep_type.unwrap_or_else(|| "dependency".to_string()),
+                                    artifact: name,
+                                    current: dep.current?,
+                                    latest: dep.latest?,
+                                })
                             })
-                        })
-                        .collect();
-                    stats.add_upgrades(updates);
+                            .collect();
+                        stats.add_upgrades(updates);
+                    }
+                    true
                 }
-            } else {
-                success = false;
-            }
+                Err(_) => false,
+            };
 
-            if success {
-                stats.put_stack("npm", StackInspectionStatus::Success);
-            } else {
-                stats.put_stack("npm", StackInspectionStatus::Failure);
-            }
+            let success = vulns_ok && outdated_ok;
+            stats.put_stack(
+                "npm",
+                if success {
+                    StackInspectionStatus::Success
+                } else {
+                    StackInspectionStatus::Failure
+                },
+            );
         }
         Ok(())
     }
