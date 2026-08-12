@@ -161,7 +161,7 @@ impl Repospect {
                         Ok(())
                     }
                     Err(e) => {
-                        main_pb.println(format!("  [ERROR] {}: {}", repo.name, e));
+                        main_pb.println(format!("[{}] 🔥 Sync failed: {}", repo.name, e));
                         main_pb.inc(1);
                         Err(e)
                     }
@@ -169,10 +169,16 @@ impl Repospect {
             }));
         }
 
+        let mut failures = 0;
         for t in tasks {
-            let _ = t.await?;
+            if !matches!(t.await, Ok(Ok(()))) {
+                failures += 1;
+            }
         }
 
+        if failures > 0 {
+            pb.println(format!("🔥 {failures} repo(s) failed during sync (see errors above)."));
+        }
         pb.finish_with_message("Sync complete!");
         Ok(())
     }
@@ -233,26 +239,31 @@ impl Repospect {
                 match result {
                     Ok(stat) => {
                         if let Err(e) = data_store.save_project_scan(&stat) {
-                            pb.println(format!("  Failed to save scan for {}: {}", repo_name, e));
+                            pb.println(format!("[{}] 🔥 Failed to save scan: {}", repo_name, e));
                         }
                         Ok(())
                     }
                     Err(e) => {
-                        pb.println(format!("  Failed to inspect {}: {}", repo_name, e));
+                        pb.println(format!("[{}] 🔥 Failed to inspect: {}", repo_name, e));
                         Err(e)
                     }
                 }
             }));
         }
 
+        let mut failures = 0;
         for task in tasks {
-            let _ = task.await?;
+            if !matches!(task.await, Ok(Ok(()))) {
+                failures += 1;
+            }
         }
 
-        pb.finish_and_clear();
-
+        if failures > 0 {
+            pb.println(format!("🔥 {failures} repo(s) failed during scan (see errors above)."));
+        }
         let latest_path = self.stats.aggregate_scans()?;
-        eprintln!("Successfully created aggregated data at {:?}", latest_path);
+        pb.println(format!("Successfully created aggregated data at {:?}", latest_path));
+        pb.finish_and_clear();
         Ok(())
     }
 
