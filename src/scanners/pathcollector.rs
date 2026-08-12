@@ -83,3 +83,77 @@ impl PathCollector {
         results
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::TempDir;
+
+    /// Builds a small tree with a mix of files plus vendored/VCS noise that must be pruned.
+    fn make_tree() -> TempDir {
+        let dir = TempDir::new().unwrap();
+        let root = dir.path();
+        fs::write(root.join("pinch.yaml"), "name: x").unwrap();
+        fs::write(root.join("Dockerfile"), "FROM x").unwrap();
+        fs::create_dir_all(root.join("sub")).unwrap();
+        fs::write(root.join("sub").join("Cargo.lock"), "[[package]]").unwrap();
+        // noise that the exclusion filter should prune entirely
+        fs::create_dir_all(root.join(".git")).unwrap();
+        fs::write(root.join(".git").join("config"), "[core]").unwrap();
+        fs::create_dir_all(root.join("node_modules")).unwrap();
+        fs::write(root.join("node_modules").join("pkg.json"), "{}").unwrap();
+        dir
+    }
+
+    #[test]
+    fn collects_by_file_name() {
+        let dir = make_tree();
+        let matches = PathCollector::new()
+            .register("docker", Pattern::FileName("Dockerfile".to_string()))
+            .scan(dir.path());
+        let docker = matches.get("docker").unwrap();
+        assert_eq!(docker, &vec![PathBuf::from("Dockerfile")]);
+    }
+
+    #[test]
+    fn collects_by_exact_path_only_at_root() {
+        let dir = make_tree();
+        let matches = PathCollector::new()
+            .register("pinch", Pattern::ExactPath(PathBuf::from("pinch.yaml")))
+            .scan(dir.path());
+        assert_eq!(matches.get("pinch").unwrap(), &vec![PathBuf::from("pinch.yaml")]);
+
+        // A nested file with the same basename must NOT match an ExactPath rule scoped to root.
+        let nested = PathCollector::new()
+            .register("cargo", Pattern::ExactPath(PathBuf::from("Cargo.lock")))
+            .scan(dir.path());
+        assert!(nested.get("cargo").unwrap().is_empty());
+    }
+
+    #[test]
+    fn prunes_vendored_and_vcs_directories() {
+        let dir = make_tree();
+        // match-everything predicate so we can observe exactly what was visited
+        let matches = PathCollector::new()
+            .register("all", Pattern::FileNamePattern(Box::new(|_| true)))
+            .scan(dir.path());
+        let visited: Vec<String> = matches["all"].iter().map(|p| p.to_string_lossy().into_owned()).collect();
+
+        assert!(visited.iter().all(|p| !(p.starts_with(".git") || p.starts_with("node_modules"))),
+            "VCS/vendored dirs leaked into results: {visited:?}");
+        assert!(visited.iter().any(|p| p == "pinch.yaml"));
+        assert!(visited.iter().any(|p| p == "Dockerfile"));
+        assert!(visited.iter().any(|p| p == "sub/Cargo.lock"));
+    }
+
+    #[test]
+    fn registered_key_always_present_even_with_no_matches() {
+        let dir = make_tree();
+        let matches = PathCollector::new()
+            .register("none", Pattern::FileName("does-not-exist".to_string()))
+            .scan(dir.path());
+        assert!(matches.contains_key("none"));
+        assert!(matches["none"].is_empty());
+    }
+}

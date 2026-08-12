@@ -95,3 +95,62 @@ impl StatsStore {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::github::GithubRepository;
+    use crate::scanners::RepoStats;
+    use tempfile::TempDir;
+
+    fn fresh_store() -> (TempDir, StatsStore) {
+        let dir = TempDir::new().unwrap();
+        let store = StatsStore::new(dir.path()).unwrap();
+        (dir, store)
+    }
+
+    /// Writes a scan file for `name` carrying the given GitHub timestamps.
+    fn write_scan(store: &StatsStore, name: &str, updated_at: &str, pushed_at: &str) {
+        let repo = GithubRepository {
+            name: name.to_string(),
+            updated_at: updated_at.to_string(),
+            pushed_at: pushed_at.to_string(),
+            ..Default::default()
+        };
+        store.save_project_scan(&RepoStats::new_from_github(&repo)).unwrap();
+    }
+
+    #[test]
+    fn fresh_when_fingerprints_match() {
+        let (_dir, store) = fresh_store();
+        write_scan(&store, "acme", "2024-01-01T00:00:00Z", "2024-01-02T00:00:00Z");
+        assert!(store.is_scan_fresh("acme", "2024-01-01T00:00:00Z", "2024-01-02T00:00:00Z"));
+    }
+
+    #[test]
+    fn stale_when_pushed_at_differs() {
+        let (_dir, store) = fresh_store();
+        write_scan(&store, "acme", "2024-01-01T00:00:00Z", "2024-01-02T00:00:00Z");
+        assert!(!store.is_scan_fresh("acme", "2024-01-01T00:00:00Z", "2024-01-09T00:00:00Z"));
+    }
+
+    #[test]
+    fn stale_when_updated_at_differs() {
+        let (_dir, store) = fresh_store();
+        write_scan(&store, "acme", "2024-01-01T00:00:00Z", "2024-01-02T00:00:00Z");
+        assert!(!store.is_scan_fresh("acme", "2024-09-01T00:00:00Z", "2024-01-02T00:00:00Z"));
+    }
+
+    #[test]
+    fn stale_when_no_prior_scan() {
+        let (_dir, store) = fresh_store();
+        assert!(!store.is_scan_fresh("ghost", "2024-01-01T00:00:00Z", "2024-01-02T00:00:00Z"));
+    }
+
+    #[test]
+    fn stale_when_timestamps_empty() {
+        let (_dir, store) = fresh_store();
+        write_scan(&store, "acme", "2024-01-01T00:00:00Z", "2024-01-02T00:00:00Z");
+        assert!(!store.is_scan_fresh("acme", "", "2024-01-02T00:00:00Z"));
+    }
+}

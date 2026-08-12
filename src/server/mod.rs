@@ -132,3 +132,52 @@ where
         Ok(ValidatedUser)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::github::GithubRepository;
+    use crate::scanners::RepoStats;
+
+    fn repo(archived: bool, audited: bool) -> RepoStats {
+        let mut r = RepoStats::new_from_github(&GithubRepository {
+            name: "x".into(),
+            archived,
+            ..Default::default()
+        });
+        if audited {
+            // ProjectManifest only requires `name`; every other field is optional.
+            r.audit = Some(serde_json::from_str(r#"{"name":"x"}"#).unwrap());
+        }
+        r
+    }
+
+    #[test]
+    fn empty_yields_zeros() {
+        let s = DashboardStats::calculate(&[]);
+        assert_eq!((s.all, s.live, s.live_audited, s.live_unaudited), (0, 0, 0, 0));
+    }
+
+    #[test]
+    fn counts_live_audited_vs_unaudited() {
+        let projects = vec![
+            repo(false, true),
+            repo(false, false),
+            repo(false, false),
+            repo(true, true), // archived: excluded from live counts
+        ];
+        let s = DashboardStats::calculate(&projects);
+        assert_eq!(s.all, 4);
+        assert_eq!(s.live, 3);
+        assert_eq!(s.live_audited, 1);
+        assert_eq!(s.live_unaudited, 2);
+    }
+
+    #[test]
+    fn archived_does_not_count_as_live_even_when_audited() {
+        let s = DashboardStats::calculate(&[repo(true, true), repo(false, true)]);
+        assert_eq!(s.all, 2);
+        assert_eq!(s.live, 1);
+        assert_eq!(s.live_audited, 1);
+    }
+}
