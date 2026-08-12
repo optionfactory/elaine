@@ -1,6 +1,6 @@
+use crate::scanners::osv::fetch_vulnerabilities;
 use crate::scanners::pathcollector::Pattern;
 use crate::scanners::{DependencyUpdate, RepoStats, ScanContext, Scanner, StackInspectionStatus, Vulnerability};
-use crate::scanners::osv::fetch_vulnerabilities;
 use serde::Deserialize;
 use std::process::Command;
 
@@ -32,11 +32,13 @@ impl Scanner for GolangScanner {
             return Ok(());
         }
 
-        let Some(go_mod_paths) = ctx.matches.get("go_mods") else { return Ok(()) };
+        let Some(go_mod_paths) = ctx.matches.get("go_mods") else {
+            return Ok(());
+        };
 
         for mod_path in go_mod_paths {
             let run_dir = ctx.root.join(mod_path).parent().unwrap().to_path_buf();
-            
+
             stats.checked_for_vulnerabilities();
             stats.checked_for_upgrades();
 
@@ -51,17 +53,19 @@ impl Scanner for GolangScanner {
                 let array_payload = format!("[{}]", fixed_payload);
 
                 if let Ok(parsed) = serde_json::from_str::<Vec<GoListModule>>(&array_payload) {
-                    
-                    let updates: Vec<DependencyUpdate> = parsed.iter().filter_map(|m| {
-                        let update = m.update.as_ref()?;
-                        Some(DependencyUpdate {
-                            project: ctx.repo.name.clone(),
-                            kind: "module".to_string(),
-                            artifact: m.path.clone(),
-                            current: m.version.clone().unwrap_or_else(|| "unknown".to_string()),
-                            latest: update.version.clone(),
+                    let updates: Vec<DependencyUpdate> = parsed
+                        .iter()
+                        .filter_map(|m| {
+                            let update = m.update.as_ref()?;
+                            Some(DependencyUpdate {
+                                project: ctx.repo.name.clone(),
+                                kind: "module".to_string(),
+                                artifact: m.path.clone(),
+                                current: m.version.clone().unwrap_or_else(|| "unknown".to_string()),
+                                latest: update.version.clone(),
+                            })
                         })
-                    }).collect();
+                        .collect();
                     stats.add_upgrades(updates);
 
                     let mut osv_deps = Vec::new();
@@ -72,13 +76,16 @@ impl Scanner for GolangScanner {
                     }
 
                     if let Ok(vulns) = fetch_vulnerabilities(ctx.client, &osv_deps) {
-                        let vulnerabilities = vulns.into_iter().map(|(pkg, ver, id)| Vulnerability {
-                            project: ctx.repo.name.clone(),
-                            artifact: pkg,
-                            version: ver,
-                            vuln_id: id,
-                            trail: vec![],
-                        }).collect();
+                        let vulnerabilities = vulns
+                            .into_iter()
+                            .map(|(pkg, ver, id)| Vulnerability {
+                                project: ctx.repo.name.clone(),
+                                artifact: pkg,
+                                version: ver,
+                                vuln_id: id,
+                                trail: vec![],
+                            })
+                            .collect();
                         stats.add_vulnerabilities(vulnerabilities);
                         stats.put_stack("golang", StackInspectionStatus::Success);
                     } else {

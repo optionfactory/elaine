@@ -1,5 +1,5 @@
-pub mod pathcollector;
 mod osv;
+pub mod pathcollector;
 mod scanner_ansible;
 mod scanner_docker;
 mod scanner_go;

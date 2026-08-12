@@ -55,11 +55,14 @@ pub fn fetch_vulnerabilities(
             let mut next_round = Vec::new();
 
             for chunk in pending.chunks(1000) {
-                let queries = chunk.iter().map(|(eco, name, ver, token)| OsvQuery {
-                    version: ver,
-                    package: OsvPackage { name, ecosystem: eco },
-                    next_page: token.as_deref(),
-                }).collect();
+                let queries = chunk
+                    .iter()
+                    .map(|(eco, name, ver, token)| OsvQuery {
+                        version: ver,
+                        package: OsvPackage { name, ecosystem: eco },
+                        next_page: token.as_deref(),
+                    })
+                    .collect();
 
                 let response = client
                     .post("https://api.osv.dev/v1/querybatch")

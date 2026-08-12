@@ -110,7 +110,10 @@ impl Repospect {
 
     pub async fn sync(&self, force: bool) -> Result<()> {
         let download_worker_count = get_worker_count().min(8);
-        let client = Arc::new(GithubClient::new(self.config.github_token.clone(), self.config.organization.clone())?);
+        let client = Arc::new(GithubClient::new(
+            self.config.github_token.clone(),
+            self.config.organization.clone(),
+        )?);
 
         let multiprogress = MultiProgress::new();
         let pb = multiprogress.add(ProgressBar::new(1));

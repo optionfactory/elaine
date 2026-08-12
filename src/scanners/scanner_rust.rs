@@ -1,6 +1,6 @@
+use crate::scanners::osv::fetch_vulnerabilities;
 use crate::scanners::pathcollector::Pattern;
 use crate::scanners::{DependencyUpdate, RepoStats, ScanContext, Scanner, StackInspectionStatus, Vulnerability};
-use crate::scanners::osv::fetch_vulnerabilities;
 use serde::Deserialize;
 use std::fs;
 use std::process::Command;
@@ -41,7 +41,9 @@ impl Scanner for RustScanner {
             return Ok(());
         }
 
-        let Some(lock_paths) = ctx.matches.get("cargo_locks") else { return Ok(()) };
+        let Some(lock_paths) = ctx.matches.get("cargo_locks") else {
+            return Ok(());
+        };
 
         for lock_path in lock_paths {
             let run_dir = ctx.root.join(lock_path).parent().unwrap().to_path_buf();
@@ -51,25 +53,28 @@ impl Scanner for RustScanner {
             stats.checked_for_upgrades();
 
             let content = fs::read_to_string(ctx.root.join(lock_path))?;
-            if let Ok(lockfile) = toml::from_str::<CargoLock>(&content) {
-                if let Some(packages) = lockfile.package {
-                    let deps: Vec<(&str, &str, &str)> = packages
-                        .iter()
-                        .map(|p| ("crates.io", p.name.as_str(), p.version.as_str()))
-                        .collect();
+            if let Ok(lockfile) = toml::from_str::<CargoLock>(&content)
+                && let Some(packages) = lockfile.package
+            {
+                let deps: Vec<(&str, &str, &str)> = packages
+                    .iter()
+                    .map(|p| ("crates.io", p.name.as_str(), p.version.as_str()))
+                    .collect();
 
-                    if let Ok(vulns) = fetch_vulnerabilities(ctx.client, &deps) {
-                        let vulnerabilities = vulns.into_iter().map(|(pkg, ver, id)| Vulnerability {
+                if let Ok(vulns) = fetch_vulnerabilities(ctx.client, &deps) {
+                    let vulnerabilities = vulns
+                        .into_iter()
+                        .map(|(pkg, ver, id)| Vulnerability {
                             project: ctx.repo.name.clone(),
                             artifact: pkg,
                             version: ver,
                             vuln_id: id,
                             trail: vec![],
-                        }).collect();
-                        stats.add_vulnerabilities(vulnerabilities);
-                    } else {
-                        success = false;
-                    }
+                        })
+                        .collect();
+                    stats.add_vulnerabilities(vulnerabilities);
+                } else {
+                    success = false;
                 }
             }
 
@@ -82,13 +87,17 @@ impl Scanner for RustScanner {
                 if let Ok(payload) = String::from_utf8(out.stdout) {
                     for line in payload.lines() {
                         if let Ok(parsed) = serde_json::from_str::<OutdatedOutput>(line) {
-                            let updates: Vec<DependencyUpdate> = parsed.dependencies.into_iter().map(|dep| DependencyUpdate {
-                                project: ctx.repo.name.clone(),
-                                kind: dep.kind.unwrap_or_else(|| "Normal".to_string()),
-                                artifact: dep.name,
-                                current: dep.project,
-                                latest: dep.latest,
-                            }).collect();
+                            let updates: Vec<DependencyUpdate> = parsed
+                                .dependencies
+                                .into_iter()
+                                .map(|dep| DependencyUpdate {
+                                    project: ctx.repo.name.clone(),
+                                    kind: dep.kind.unwrap_or_else(|| "Normal".to_string()),
+                                    artifact: dep.name,
+                                    current: dep.project,
+                                    latest: dep.latest,
+                                })
+                                .collect();
                             stats.add_upgrades(updates);
                         }
                     }
