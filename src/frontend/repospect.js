@@ -35,24 +35,28 @@ class InfiniteScroller {
     async load(asyncIterator) {
         this.iterator = asyncIterator;
         this.grid.innerHTML = '';
-        this.observer.observe(this.sentinel);
+        this.observer.disconnect();
         await this.spinner.show();
         try {
             await this.renderNextBatch();
         } finally {
             this.spinner.hide();
         }
+        this.observer.observe(this.sentinel);
     }
 
     async renderNextBatch() {
+        const iterator = this.iterator;
         this.isFetching = true;
         const batch = [];
         try {
             for (let i = 0; i < this.batchSize; i++) {
-                const item = await this.iterator.next();
+                const item = await iterator.next();
                 if (item.done) break;
                 batch.push(item.value);
             }
+
+            if (iterator !== this.iterator) return;
 
             if (batch.length === 0 && this.grid.children.length === 0) {
                 this.grid.innerHTML = '<error-box>No matching repositories found.</error-box>';
@@ -63,10 +67,13 @@ class InfiniteScroller {
                 this.template.withOverlay(batch).appendTo(this.grid);
             }
         } catch (e) {
+            if (iterator !== this.iterator) return;
             this.grid.innerHTML = '<error-box>Failed to load data.</error-box>';
             this.observer.unobserve(this.sentinel);
         } finally {
-            this.isFetching = false;
+            if (iterator === this.iterator) {
+                this.isFetching = false;
+            }
         }
     }
 }
