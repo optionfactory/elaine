@@ -89,9 +89,8 @@ where
 
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
         let app_state = Arc::<AppState>::from_ref(state);
-        let google_auth = match &app_state.config.google_auth {
-            Some(g) => g,
-            None => return Ok(ValidatedUser),
+        let Some(google_auth) = &app_state.config.google_auth else {
+            return Ok(ValidatedUser);
         };
 
         let auth_header = parts
@@ -100,14 +99,12 @@ where
             .and_then(|h| h.to_str().ok())
             .and_then(|h| h.strip_prefix("Bearer "));
 
-        let token = match auth_header {
-            Some(t) => t,
-            None => return Err(AuthError("Missing Bearer token".into())),
+        let Some(token) = auth_header else {
+            return Err(AuthError("Missing Bearer token".into()));
         };
 
-        let jwks = match app_state.jwks.as_ref() {
-            Some(j) => j,
-            None => return Err(AuthError("Google JWKS not loaded on server".into())),
+        let Some(jwks) = app_state.jwks.as_ref() else {
+            return Err(AuthError("Google JWKS not loaded on server".into()));
         };
 
         let header = jsonwebtoken::decode_header(token).map_err(|_| AuthError("Invalid token header".into()))?;

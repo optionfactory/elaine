@@ -50,14 +50,15 @@ impl StatsStore {
         for entry in fs::read_dir(&self.stats_dir)? {
             let entry = entry?;
             let path = entry.path();
-            if path.is_file() && path.extension().unwrap_or_default() == "json" {
-                let data = fs::read_to_string(&path)?;
-                if let Ok(stat) = serde_json::from_str::<RepoStats>(&data) {
-                    stats.push(stat);
-                } else {
-                    eprintln!("Warning: Failed to parse {:?}", path);
-                }
+            if !path.is_file() || path.extension().unwrap_or_default() != "json" {
+                continue;
             }
+            let data = fs::read_to_string(&path)?;
+            let Ok(stat) = serde_json::from_str::<RepoStats>(&data) else {
+                eprintln!("Warning: Failed to parse {:?}", path);
+                continue;
+            };
+            stats.push(stat);
         }
 
         stats.sort_by(|a, b| a.name.cmp(&b.name));
