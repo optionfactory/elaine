@@ -9,6 +9,8 @@ struct OsvBatchQuery<'a> {
 struct OsvQuery<'a> {
     version: &'a str,
     package: OsvPackage<'a>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    next_page: Option<&'a str>,
 }
 
 #[derive(Serialize)]
@@ -26,6 +28,8 @@ struct OsvBatchResponse {
 struct OsvResult {
     #[serde(default)]
     vulns: Vec<OsvVuln>,
+    #[serde(default)]
+    next_page: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -33,39 +37,54 @@ struct OsvVuln {
     id: String,
 }
 
-/// Takes a slice of (ecosystem, name, version) and queries OSV in chunks of 1000
+/// Takes a slice of (ecosystem, name, version) and queries OSV in batches of 1000,
+/// following per-package `next_page` tokens so dependencies with >1000 vulnerabilities
+/// are not silently truncated.
 pub fn fetch_vulnerabilities(
     client: &reqwest::Client,
     dependencies: &[(&str, &str, &str)],
 ) -> anyhow::Result<Vec<(String, String, String)>> {
-    let mut found_vulns = Vec::new();
-
     // Scanners run on a spawn_blocking thread; block_on is the intended bridge back to async HTTP.
-    tokio::runtime::Handle::current().block_on(async {
-        // OSV API limits batches to 1000 queries
-        for chunk in dependencies.chunks(1000) {
-            let queries = chunk.iter().map(|(eco, name, ver)| OsvQuery {
-                version: ver,
-                package: OsvPackage { name, ecosystem: eco },
-            }).collect();
+    let found_vulns = tokio::runtime::Handle::current().block_on(async {
+        let mut found_vulns = Vec::new();
+        // pending entries carry an optional next_page token populated from the previous round.
+        let mut pending: Vec<(&str, &str, &str, Option<String>)> =
+            dependencies.iter().map(|(eco, name, ver)| (*eco, *name, *ver, None)).collect();
 
-            let response = client
-                .post("https://api.osv.dev/v1/querybatch")
-                .json(&OsvBatchQuery { queries })
-                .send()
-                .await?
-                .error_for_status()?;
+        while !pending.is_empty() {
+            let mut next_round = Vec::new();
 
-            let osv_response: OsvBatchResponse = response.json().await?;
+            for chunk in pending.chunks(1000) {
+                let queries = chunk.iter().map(|(eco, name, ver, token)| OsvQuery {
+                    version: ver,
+                    package: OsvPackage { name, ecosystem: eco },
+                    next_page: token.as_deref(),
+                }).collect();
 
-            // OSV response ordering matches the request ordering
-            for (input_dep, result) in chunk.iter().zip(osv_response.results) {
-                for vuln in result.vulns {
-                    found_vulns.push((input_dep.1.to_string(), input_dep.2.to_string(), vuln.id));
+                let response = client
+                    .post("https://api.osv.dev/v1/querybatch")
+                    .json(&OsvBatchQuery { queries })
+                    .send()
+                    .await?
+                    .error_for_status()?;
+
+                let osv_response: OsvBatchResponse = response.json().await?;
+
+                // OSV response ordering matches the request ordering.
+                for (dep, result) in chunk.iter().zip(osv_response.results) {
+                    for vuln in result.vulns {
+                        found_vulns.push((dep.1.to_string(), dep.2.to_string(), vuln.id));
+                    }
+                    if let Some(token) = result.next_page {
+                        next_round.push((dep.0, dep.1, dep.2, Some(token)));
+                    }
                 }
             }
+
+            pending = next_round;
         }
-        Ok::<_, anyhow::Error>(())
+
+        Ok::<_, anyhow::Error>(found_vulns)
     })?;
 
     Ok(found_vulns)
