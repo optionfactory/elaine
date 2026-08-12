@@ -147,7 +147,7 @@ impl Repospect {
             tasks.push(tokio::spawn(async move {
                 let _permit = sem.acquire().await.expect("semaphore closed");
                 let task_pb = m_clone.add(ProgressBar::new_spinner());
-                task_pb.set_style(ProgressStyle::default_spinner().template("{spinner:.blue} {msg}").unwrap());
+                task_pb.set_style(ProgressStyle::default_spinner().template("{spinner:.blue} {msg}").expect("invalid spinner template"));
                 task_pb.enable_steady_tick(std::time::Duration::from_millis(100));
                 task_pb.set_message(format!("Syncing {}...", repo.name));
 
@@ -180,6 +180,9 @@ impl Repospect {
             pb.println(format!("🔥 {failures} repo(s) failed during sync (see errors above)."));
         }
         pb.finish_with_message("Sync complete!");
+        if failures > 0 {
+            anyhow::bail!("sync completed with failures");
+        }
         Ok(())
     }
 
@@ -218,7 +221,7 @@ impl Repospect {
                 }
 
                 let task_pb = multiprogress.add(ProgressBar::new_spinner());
-                task_pb.set_style(ProgressStyle::default_spinner().template("{spinner:.magenta} {msg}").unwrap());
+                task_pb.set_style(ProgressStyle::default_spinner().template("{spinner:.magenta} {msg}").expect("invalid spinner template"));
                 task_pb.enable_steady_tick(std::time::Duration::from_millis(100));
                 task_pb.set_message(format!("[{}] Starting...", repo_name));
 
@@ -264,6 +267,9 @@ impl Repospect {
         let latest_path = self.stats.aggregate_scans()?;
         pb.println(format!("Successfully created aggregated data at {:?}", latest_path));
         pb.finish_and_clear();
+        if failures > 0 {
+            anyhow::bail!("scan completed with failures");
+        }
         Ok(())
     }
 
