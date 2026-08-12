@@ -5,6 +5,7 @@ use axum::{
     response::IntoResponse,
     routing::get,
 };
+use pinch::schema::{AdsResponsibility, AiActClass, CraClass, DoraCriticality, GdprRole, Nis2Category, ProjectType, ServiceTier};
 use serde::Deserialize;
 use std::sync::Arc;
 
@@ -49,21 +50,16 @@ pub async fn api_projects_handler(
             {
                 return false;
             }
-            if filters.contains(&"all") {
-                return true;
-            }
             let live = !p.archived;
             let audited = p.audit.is_some();
             let public = !p.private;
             let has_vulns = p.vulnerabilities.as_ref().map(|v| !v.is_empty()).unwrap_or(false);
+            let has_updates = p.dependencies.as_ref().map(|v| !v.is_empty()).unwrap_or(false);
 
             if filters.contains(&"live") && !live {
                 return false;
             }
-            if filters.contains(&"audited") && !audited {
-                return false;
-            }
-            if filters.contains(&"unaudited") && audited {
+            if filters.contains(&"archived") && live {
                 return false;
             }
             if filters.contains(&"public") && !public {
@@ -72,9 +68,74 @@ pub async fn api_projects_handler(
             if filters.contains(&"private") && public {
                 return false;
             }
+            if filters.contains(&"audited") && !audited {
+                return false;
+            }
+            if filters.contains(&"unaudited") && audited {
+                return false;
+            }
             if filters.contains(&"vulns") && !has_vulns {
                 return false;
             }
+            if filters.contains(&"no-vulns") && has_vulns {
+                return false;
+            }
+
+            if filters.contains(&"updates") && !has_updates {
+                return false;
+            }
+            if filters.contains(&"no-updates") && has_updates {
+                return false;
+            }
+
+            if filters.contains(&"tier1") && !p.audit.as_ref().is_some_and(|a| a.tier == Some(ServiceTier::Tier1)) {
+                return false;
+            }
+            if filters.contains(&"tier2") && !p.audit.as_ref().is_some_and(|a| a.tier == Some(ServiceTier::Tier2)) {
+                return false;
+            }
+            if filters.contains(&"tier3") && !p.audit.as_ref().is_some_and(|a| a.tier == Some(ServiceTier::Tier3)) {
+                return false;
+            }
+            if filters.contains(&"tier4") && !p.audit.as_ref().is_some_and(|a| a.tier == Some(ServiceTier::Tier4)) {
+                return false;
+            }
+
+            if filters.contains(&"service") && !p.audit.as_ref().is_some_and(|a| a.project_type == Some(ProjectType::Service)) {
+                return false;
+            }
+            if filters.contains(&"library") && !p.audit.as_ref().is_some_and(|a| a.project_type == Some(ProjectType::Library)) {
+                return false;
+            }
+            if filters.contains(&"tool") && !p.audit.as_ref().is_some_and(|a| a.project_type == Some(ProjectType::Tool)) {
+                return false;
+            }
+            if filters.contains(&"IaC")
+                && !p
+                    .audit
+                    .as_ref()
+                    .is_some_and(|a| a.project_type == Some(ProjectType::Infrastructure))
+            {
+                return false;
+            }
+
+            let compliant = p.audit.as_ref().and_then(|a| a.compliance.as_ref()).map(|c| {
+                c.ads != AdsResponsibility::PendingAssessment
+                    && c.ads != AdsResponsibility::PendingNomination
+                    && c.ai_act != AiActClass::PendingAssessment
+                    && c.cra != CraClass::PendingAssessment
+                    && c.dora != DoraCriticality::PendingAssessment
+                    && c.gdpr != GdprRole::PendingAssessment
+                    && c.nis2 != Nis2Category::PendingAssessment
+            });
+
+            if filters.contains(&"compliant") && compliant.is_none_or(|c| !c) {
+                return false;
+            }
+            if filters.contains(&"non-compliant") && compliant.is_none_or(|c| c) {
+                return false;
+            }
+
             true
         })
         .collect();

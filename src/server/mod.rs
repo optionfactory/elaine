@@ -30,20 +30,6 @@ pub struct DashboardStats {
     pub live: usize,
     pub live_audited: usize,
     pub live_unaudited: usize,
-    pub public: usize,
-    pub live_public: usize,
-    pub live_public_audited: usize,
-    pub live_public_unaudited: usize,
-    pub private: usize,
-    pub live_private: usize,
-    pub live_private_audited: usize,
-    pub live_private_unaudited: usize,
-    pub public_vulns: usize,
-    pub public_audited_vulns: usize,
-    pub public_unaudited_vulns: usize,
-    pub private_vulns: usize,
-    pub private_audited_vulns: usize,
-    pub private_unaudited_vulns: usize,
 }
 
 impl DashboardStats {
@@ -51,48 +37,14 @@ impl DashboardStats {
         let mut s = Self::default();
         for r in projects {
             s.all += 1;
-            let (tot, live, aud, unaud, vul, aud_v, unaud_v) = match r.private {
-                true => (
-                    &mut s.private,
-                    &mut s.live_private,
-                    &mut s.live_private_audited,
-                    &mut s.live_private_unaudited,
-                    &mut s.private_vulns,
-                    &mut s.private_audited_vulns,
-                    &mut s.private_unaudited_vulns,
-                ),
-                false => (
-                    &mut s.public,
-                    &mut s.live_public,
-                    &mut s.live_public_audited,
-                    &mut s.live_public_unaudited,
-                    &mut s.public_vulns,
-                    &mut s.public_audited_vulns,
-                    &mut s.public_unaudited_vulns,
-                ),
-            };
-            *tot += 1;
             if r.archived {
                 continue;
             }
             s.live += 1;
-            *live += 1;
-            let audited = r.audit.is_some();
-            let has_vulns = r.vulnerabilities.as_ref().is_some_and(|v| !v.is_empty());
-            if audited {
+            if r.audit.is_some() {
                 s.live_audited += 1;
-                *aud += 1;
             } else {
                 s.live_unaudited += 1;
-                *unaud += 1;
-            }
-            if has_vulns {
-                *vul += 1;
-                if audited {
-                    *aud_v += 1;
-                } else {
-                    *unaud_v += 1;
-                }
             }
         }
         s

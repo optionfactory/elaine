@@ -38,39 +38,85 @@
     <metrics-grid></metrics-grid>
 
     <filter-controls>
+        <filter-group data-group="status">
+            <label>Status:</label>
+            <state-button>
+                <state active data-value="any">Any</state>
+                <state data-value="live">Live</state>
+                <state data-value="archived">Archived</state>
+            </state-button>
+        </filter-group>
+
         <filter-group data-group="visibility">
             <label>Visibility:</label>
             <state-button>
-                <state active data-value="all">All</state>
+                <state active data-value="any">Any</state>
                 <state data-value="public">Public</state>
                 <state data-value="private">Private</state>
             </state-button>
         </filter-group>
 
-        <filter-group data-group="status">
-            <label>Status:</label>
-            <state-button>
-                <state active data-value="all">All</state>
-                <state data-value="live">Live</state>
-            </state-button>
-        </filter-group>
 
         <filter-group data-group="audit">
             <label>Audit:</label>
             <state-button>
-                <state active data-value="all">All</state>
+                <state active data-value="any">Any</state>
                 <state data-value="audited">Audited</state>
                 <state data-value="unaudited">Unaudited</state>
             </state-button>
         </filter-group>
 
+
+
         <filter-group data-group="vulnerability">
             <label>Vulnerabilities:</label>
             <state-button>
-                <state active data-value="all">All</state>
+                <state active data-value="any">Any</state>
                 <state data-value="vulns">With Vulns</state>
+                <state data-value="no-vulns">No Vulns</state>
             </state-button>
         </filter-group>
+
+        <filter-group data-group="updates">
+            <label>Upgrades:</label>
+            <state-button>
+                <state active data-value="any">Any</state>
+                <state data-value="updates">Needed</state>
+                <state data-value="no-updates">Up to date</state>
+            </state-button>
+        </filter-group>        
+
+        <filter-group data-group="tiers">
+            <label>Tier:</label>
+            <state-button>
+                <state active data-value="any">Any</state>
+                <state data-value="tier1">1</state>
+                <state data-value="tier2">2</state>
+                <state data-value="tier3">3</state>
+                <state data-value="tier4">4</state>
+            </state-button>
+        </filter-group>
+
+        <filter-group data-group="type">
+            <label>Project type:</label>
+            <state-button>
+                <state active data-value="any">Any</state>
+                <state data-value="service">Service</state>
+                <state data-value="library">Library</state>
+                <state data-value="tool">Tool</state>
+                <state data-value="infrastructure">IaC</state>
+            </state-button>
+        </filter-group>
+
+        <filter-group data-group="compliance">
+            <label>Compliance:</label>
+            <state-button>
+                <state active data-value="any">Any</state>
+                <state data-value="compliant">Compliant</state>
+                <state data-value="non-compliant">Non compliant</state>
+            </state-button>
+        </filter-group>        
+
     </filter-controls>
 
     <search-bar>
@@ -102,68 +148,6 @@
         <button class="metric-card noncompliant" data-filter="live,unaudited">
             <h2>Unaudited Live Repositories</h2>
             {{ live_unaudited }}
-        </button>
-
-        <button class="metric-card public" data-filter="public">
-            <h2>Public Repositories</h2>
-            {{ public }}
-        </button>
-        <button class="metric-card live" data-filter="live,public">
-            <h2>Public Live Repositories</h2>
-            {{ live_public }}
-        </button>
-        <button class="metric-card compliant" data-filter="live,public,audited">
-            <h2>Public Audited Live Repositories</h2>
-            {{ live_public_audited }}
-        </button>
-        <button class="metric-card noncompliant" data-filter="live,public,unaudited">
-            <h2>Public Unaudited Live Repositories</h2>
-            {{ live_public_unaudited }}
-        </button>
-
-        <button class="metric-card private" data-filter="private">
-            <h2>Private Repositories</h2>
-            {{ private }}
-        </button>
-        <button class="metric-card live" data-filter="live,private">
-            <h2>Private Live Repositories</h2>
-            {{ live_private }}
-        </button>
-        <button class="metric-card compliant" data-filter="live,private,audited">
-            <h2>Private Audited Live Repositories</h2>
-            {{ live_private_audited }}
-        </button>
-        <button class="metric-card noncompliant" data-filter="live,private,unaudited">
-            <h2>Private Unaudited Live Repositories</h2>
-            {{ live_private_unaudited }}
-        </button>
-
-        <div></div>
-        <button class="metric-card" data-filter="public,vulns">
-            <h2>Public Live with vulns</h2>
-            {{ public_vulns }}
-        </button>
-        <button class="metric-card compliant" data-filter="public,audited,vulns">
-            <h2>Public Audited Live with vulns</h2>
-            {{ public_audited_vulns }}
-        </button>
-        <button class="metric-card noncompliant" data-filter="public,unaudited,vulns">
-            <h2>Public Unaudited Live with vulns</h2>
-            {{ public_unaudited_vulns }}
-        </button>
-
-        <div></div>
-        <button class="metric-card" data-filter="private,vulns">
-            <h2>Private Live with vulns</h2>
-            {{ private_vulns }}
-        </button>
-        <button class="metric-card compliant" data-filter="private,audited,vulns">
-            <h2>Private Audited Live with vulns</h2>
-            {{ private_audited_vulns }}
-        </button>
-        <button class="metric-card noncompliant" data-filter="private,unaudited,vulns">
-            <h2>Private Unaudited Live with vulns</h2>
-            {{ private_unaudited_vulns }}
         </button>
     </template>
 
@@ -308,8 +292,7 @@
                             <td>{{vuln.artifact}}</td>
                             <td>{{vuln.version}}</td>
                             <td>
-                                <a data-tpl-href="`https://github.com/advisories/{vuln.vuln_id}`" target="_blank"
-                                    rel="noopener noreferrer">
+                                <a data-tpl-href="`https://github.com/advisories/{vuln.vuln_id}`" target="_blank" rel="noopener noreferrer">
                                     {{vuln.vuln_id}}
                                 </a>
                             </td>
@@ -381,7 +364,7 @@
             const activeTags = [];
             document.querySelectorAll('filter-controls filter-group').forEach(group => {
                 const activeBtn = group.querySelector('state[active]');
-                if (activeBtn && activeBtn.dataset.value && activeBtn.dataset.value !== 'all') {
+                if (activeBtn && activeBtn.dataset.value && activeBtn.dataset.value !== 'any') {
                     activeTags.push(activeBtn.dataset.value);
                 }
             });
@@ -402,7 +385,7 @@
                     }
                 });
                 if (!hasMatch) {
-                    const defaultBtn = group.querySelector('state[data-value="all"]');
+                    const defaultBtn = group.querySelector('state[data-value="any"]');
                     if (defaultBtn) defaultBtn.setAttribute('active', '');
                 }
             });
