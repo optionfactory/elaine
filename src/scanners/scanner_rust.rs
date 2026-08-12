@@ -55,30 +55,44 @@ impl Scanner for RustScanner {
         let mut outdated_ok = true;
 
         for lock_path in lock_paths {
+            ctx.set_message(format!("[{}] Running Rust checks...", ctx.repo.name));
             let run_dir = ctx.root.join(lock_path).parent().unwrap().to_path_buf();
             let content = fs::read_to_string(ctx.root.join(lock_path))?;
 
             let per_vulns_ok = (|| -> Option<()> {
-                let lockfile = toml::from_str::<CargoLock>(&content).ok()?;
+                let lockfile = match toml::from_str::<CargoLock>(&content) {
+                    Ok(lf) => lf,
+                    Err(e) => {
+                        ctx.report_error(format!("[{}] 🔥 Failed to parse Cargo.lock: {}", ctx.repo.name, e));
+                        return None;
+                    }
+                };
                 let packages = lockfile.package?;
                 let deps: Vec<(&str, &str, &str)> = packages
                     .iter()
                     .map(|p| ("crates.io", p.name.as_str(), p.version.as_str()))
                     .collect();
-                let vulns = fetch_vulnerabilities(ctx.client, &deps).ok()?;
-                stats.add_vulnerabilities(
-                    vulns
-                        .into_iter()
-                        .map(|(pkg, ver, id)| Vulnerability {
-                            project: ctx.repo.name.clone(),
-                            artifact: pkg,
-                            version: ver,
-                            vuln_id: id,
-                            trail: vec![],
-                        })
-                        .collect(),
-                );
-                Some(())
+                match fetch_vulnerabilities(ctx.client, &deps) {
+                    Ok(vulns) => {
+                        stats.add_vulnerabilities(
+                            vulns
+                                .into_iter()
+                                .map(|(pkg, ver, id)| Vulnerability {
+                                    project: ctx.repo.name.clone(),
+                                    artifact: pkg,
+                                    version: ver,
+                                    vuln_id: id,
+                                    trail: vec![],
+                                })
+                                .collect(),
+                        );
+                        Some(())
+                    }
+                    Err(e) => {
+                        ctx.report_error(format!("[{}] 🔥 OSV check failed: {}", ctx.repo.name, e));
+                        None
+                    }
+                }
             })()
             .is_some();
             vulns_ok &= per_vulns_ok;
@@ -109,7 +123,10 @@ impl Scanner for RustScanner {
                     }
                     true
                 }
-                Err(_) => false,
+                Err(e) => {
+                    ctx.report_error(format!("[{}] 🔥 Failed to execute cargo outdated: {}", ctx.repo.name, e));
+                    false
+                }
             };
             outdated_ok &= per_outdated_ok;
         }

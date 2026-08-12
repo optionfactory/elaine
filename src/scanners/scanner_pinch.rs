@@ -14,6 +14,7 @@ impl Scanner for PinchScanner {
             stats.checked_for_containers();
             return Ok(());
         };
+        ctx.set_message(format!("[{}] Running pinch checks...", ctx.repo.name));
         let manifest = File::open(ctx.root.join(rel_path))
             .ok()
             .and_then(|f| serde_saphyr::from_reader::<_, pinch::schema::PinchManifest>(BufReader::new(f)).ok());
@@ -27,6 +28,7 @@ impl Scanner for PinchScanner {
             None => {
                 stats.audit = None;
                 stats.checked_for_containers();
+                ctx.report_error(format!("[{}] 🔥 Failed to parse pinch.yaml", ctx.repo.name));
                 stats.record_check(ScannerKind::Pinch, "manifest", CheckStatus::Failed);
             }
         }

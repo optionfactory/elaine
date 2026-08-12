@@ -47,22 +47,27 @@ impl Scanner for GolangScanner {
 
         for mod_path in go_mod_paths {
             let run_dir = ctx.root.join(mod_path).parent().unwrap().to_path_buf();
+            ctx.set_message(format!("[{}] Running Go checks...", ctx.repo.name));
 
-            let list_cmd = Command::new("go")
+            let out = match Command::new("go")
                 .current_dir(&run_dir)
                 .args(["list", "-u", "-m", "-json", "all"])
-                .output();
-
-            let Ok(out) = list_cmd else {
-                vulns_ok = false;
-                outdated_ok = false;
-                continue;
+                .output()
+            {
+                Ok(out) => out,
+                Err(e) => {
+                    ctx.report_error(format!("[{}] 🔥 Failed to execute go: {}", ctx.repo.name, e));
+                    vulns_ok = false;
+                    outdated_ok = false;
+                    continue;
+                }
             };
             let payload = String::from_utf8_lossy(&out.stdout);
             let fixed_payload = payload.replace("}\n{", "},\n{");
             let array_payload = format!("[{}]", fixed_payload);
 
             let Ok(parsed) = serde_json::from_str::<Vec<GoListModule>>(&array_payload) else {
+                ctx.report_error(format!("[{}] 🔥 Failed to parse go list output", ctx.repo.name));
                 vulns_ok = false;
                 outdated_ok = false;
                 continue;
@@ -104,7 +109,10 @@ impl Scanner for GolangScanner {
                         .collect();
                     stats.add_vulnerabilities(vulnerabilities);
                 }
-                Err(_) => vulns_ok = false,
+                Err(e) => {
+                    ctx.report_error(format!("[{}] 🔥 OSV check failed: {}", ctx.repo.name, e));
+                    vulns_ok = false;
+                }
             }
         }
 

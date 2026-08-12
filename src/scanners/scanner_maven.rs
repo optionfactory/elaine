@@ -37,9 +37,7 @@ impl Scanner for MavenScanner {
             selected_dirs.push(dir);
             let run_dir = ctx.root.join(dir);
 
-            if let Some(p) = ctx.pb {
-                p.set_message(format!("[{}] Running Maven checks...", ctx.repo.name));
-            }
+            ctx.set_message(format!("[{}] Running Maven checks...", ctx.repo.name));
 
             let output = Command::new("mvn")
                 .current_dir(&run_dir)
@@ -78,16 +76,12 @@ impl Scanner for MavenScanner {
                 Ok(_out) => {
                     vulns_ok = false;
                     outdated_ok = false;
-                    if let Some(p) = ctx.pb {
-                        p.println(format!("[{}] 🔥 Maven failed", ctx.repo.name));
-                    }
+                    ctx.report_error(format!("[{}] 🔥 Maven failed", ctx.repo.name));
                 }
                 Err(e) => {
                     vulns_ok = false;
                     outdated_ok = false;
-                    if let Some(p) = ctx.pb {
-                        p.println(format!("[{}] 🔥 Failed to execute Maven: {}", ctx.repo.name, e));
-                    }
+                    ctx.report_error(format!("[{}] 🔥 Failed to execute Maven: {}", ctx.repo.name, e));
                 }
             }
         }

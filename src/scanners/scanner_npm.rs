@@ -50,11 +50,18 @@ impl Scanner for NpmScanner {
         let mut outdated_ok = true;
 
         for lock_path in lock_paths {
+            ctx.set_message(format!("[{}] Running npm checks...", ctx.repo.name));
             let run_dir = ctx.root.join(lock_path).parent().unwrap().to_path_buf();
             let content = fs::read_to_string(ctx.root.join(lock_path))?;
 
             let per_vulns_ok = (|| -> Option<()> {
-                let lockfile = serde_json::from_str::<PackageLock>(&content).ok()?;
+                let lockfile = match serde_json::from_str::<PackageLock>(&content) {
+                    Ok(lf) => lf,
+                    Err(e) => {
+                        ctx.report_error(format!("[{}] 🔥 Failed to parse package-lock.json: {}", ctx.repo.name, e));
+                        return None;
+                    }
+                };
                 let packages = lockfile.packages?;
                 let mut deps = Vec::new();
                 for (path, pkg) in &packages {
@@ -66,20 +73,27 @@ impl Scanner for NpmScanner {
                         deps.push(("npm", name, version.as_str()));
                     }
                 }
-                let vulns = fetch_vulnerabilities(ctx.client, &deps).ok()?;
-                stats.add_vulnerabilities(
-                    vulns
-                        .into_iter()
-                        .map(|(pkg, ver, id)| Vulnerability {
-                            project: ctx.repo.name.clone(),
-                            artifact: pkg,
-                            version: ver,
-                            vuln_id: id,
-                            trail: vec![],
-                        })
-                        .collect(),
-                );
-                Some(())
+                match fetch_vulnerabilities(ctx.client, &deps) {
+                    Ok(vulns) => {
+                        stats.add_vulnerabilities(
+                            vulns
+                                .into_iter()
+                                .map(|(pkg, ver, id)| Vulnerability {
+                                    project: ctx.repo.name.clone(),
+                                    artifact: pkg,
+                                    version: ver,
+                                    vuln_id: id,
+                                    trail: vec![],
+                                })
+                                .collect(),
+                        );
+                        Some(())
+                    }
+                    Err(e) => {
+                        ctx.report_error(format!("[{}] 🔥 OSV check failed: {}", ctx.repo.name, e));
+                        None
+                    }
+                }
             })()
             .is_some();
             vulns_ok &= per_vulns_ok;
@@ -104,7 +118,10 @@ impl Scanner for NpmScanner {
                     }
                     true
                 }
-                Err(_) => false,
+                Err(e) => {
+                    ctx.report_error(format!("[{}] 🔥 Failed to execute npm outdated: {}", ctx.repo.name, e));
+                    false
+                }
             };
             outdated_ok &= per_outdated_ok;
         }

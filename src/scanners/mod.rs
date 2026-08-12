@@ -184,6 +184,19 @@ pub struct ScanContext<'a> {
     pub client: &'a reqwest::Client,
 }
 
+impl<'a> ScanContext<'a> {
+    pub fn set_message(&self, msg: String) {
+        if let Some(p) = self.pb {
+            p.set_message(msg);
+        }
+    }
+    pub fn report_error(&self, msg: String) {
+        if let Some(p) = self.pb {
+            p.println(msg);
+        }
+    }
+}
+
 /// The Trait implemented by all specific ecosystem/tool scanners
 pub trait Scanner {
     /// Returns the patterns this scanner wants to collect during the filesystem pass
