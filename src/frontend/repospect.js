@@ -29,7 +29,7 @@ class InfiniteScroller {
             if (entries[0].isIntersecting && this.iterator && !this.isFetching) {
                 this.renderNextBatch();
             }
-        }, { rootMargin: '1000px' });
+        }, { rootMargin: `0px 0px ${window.innerHeight}px 0px` });
     }
 
     async load(asyncIterator) {
