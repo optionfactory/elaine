@@ -14,6 +14,11 @@ pub struct Cli {
 
 #[derive(Subcommand, Debug)]
 pub enum Commands {
+    #[command(about = "Sync repositories, scan them, then serve the dashboard")]
+    Bootstrap {
+        #[arg(long, help = "Serve frontend assets from the local filesystem instead of embedded binary")]
+        dev: bool,
+    },
     #[command(about = "Serve the dashboard and stats data over HTTP")]
     Serve {
         #[arg(long, help = "Serve frontend assets from the local filesystem instead of embedded binary")]
@@ -34,4 +39,7 @@ pub enum Commands {
 
     #[command(about = "Remove cached archives for a specific organization or wipe the entire cache")]
     CleanRepositories,
+
+    #[command(about = "Create a stub elaine.yaml manifest in the current folder if it does not exist")]
+    Init,
 }

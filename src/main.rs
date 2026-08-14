@@ -9,6 +9,10 @@ use std::fs;
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
+    if let Commands::Init = cli.command {
+        return Elaine::init();
+    }
+
     let config: Config = fs::read("elaine.conf.json")
         .context("Failed to read 'elaine.conf.json'")
         .and_then(|bytes| serde_json::from_slice(&bytes).map_err(Into::into))
@@ -17,11 +21,13 @@ async fn main() -> Result<()> {
     let app = Elaine::new(config)?;
 
     match cli.command {
+        Commands::Bootstrap { dev } => app.bootstrap(dev).await?,
         Commands::Serve { dev } => app.serve(dev).await?,
         Commands::Sync { force } => app.sync(force).await?,
         Commands::Scan => app.scan().await?,
         Commands::CleanRepositories => app.clean_repositories()?,
         Commands::CleanStats => app.clean_stats()?,
+        Commands::Init => unreachable!(),
     }
 
     Ok(())

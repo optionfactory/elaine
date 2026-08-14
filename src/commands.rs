@@ -27,6 +27,15 @@ impl Elaine {
         })
     }
 
+    pub async fn bootstrap(&self, dev: bool) -> Result<()> {
+        eprintln!("[Bootstrap] Syncing repositories...");
+        self.sync(false).await?;
+        eprintln!("[Bootstrap] Scanning repositories...");
+        self.scan().await?;
+        eprintln!("[Bootstrap] Starting server...");
+        self.serve(dev).await
+    }
+
     pub async fn serve(&self, dev: bool) -> Result<()> {
         let address = self.config.address.as_deref().unwrap_or("127.0.0.1");
         let port = self.config.port.unwrap_or(8000);
@@ -314,6 +323,21 @@ impl Elaine {
     pub fn clean_stats(&self) -> Result<()> {
         self.stats.clean_all().context("Failed to clean stats directory")?;
         eprintln!("Cleaned stats directory.");
+        Ok(())
+    }
+
+    pub fn init() -> Result<()> {
+        let path = std::path::Path::new("elaine.yaml");
+        if path.exists() {
+            anyhow::bail!("elaine.yaml already exists in the current folder");
+        }
+        let name = std::env::current_dir()
+            .ok()
+            .and_then(|p| p.file_name().map(|n| n.to_string_lossy().to_string()))
+            .unwrap_or_else(|| "my-project".to_string());
+        let manifest = include_str!("elaine.prototype.yaml").replace("{name}", &name);
+        std::fs::write(path, manifest).context("Failed to write elaine.yaml")?;
+        eprintln!("Created elaine.yaml stub in the current folder.");
         Ok(())
     }
 }
