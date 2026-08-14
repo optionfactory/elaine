@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
-    <title>OptionFactory Audit Dashboard - Staleness</title>
+    <title>OptionFactory Audit Dashboard - Governance</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <script type="importmap">
             {
@@ -25,16 +25,29 @@
 
 <body>
     <header>
-        <h1><svg class="brand-icon" viewBox="0 0 64 64" aria-hidden="true"><use href="favicon.svg"></use></svg>Elaine <span class="page">/ Staleness</span></h1>
+        <h1><svg class="brand-icon" viewBox="0 0 64 64" aria-hidden="true"><use href="favicon.svg"></use></svg>Elaine <span class="page">/ Governance</span></h1>
         <nav id="view-nav">
             <a href="index.html">Dashboard</a>
-            <a class="active">Staleness</a>
-            <a href="compliance.html">Compliance</a>
-            <a href="risk.html">Risk Matrix</a>
+            <a href="security.html">Security</a>
+            <a class="active">Governance</a>
+            <a href="inventory.html">Inventory</a>
         </nav>
     </header>
 
     <main>
+    <section>
+        <h2>Framework assessment coverage</h2>
+        <p class="section-intro">
+            How far the regulatory assessment has progressed across the repositories that declare compliance data
+            in their <code>elaine.yaml</code>. Each framework is tracked per repository as either <em>assessed</em>
+            (including explicit <em>out-of-scope</em> verdicts: deciding something does not apply is itself an assessment)
+            or <em>pending</em>. Repositories without a manifest are not counted in the coverage percentage; bring them
+            into the audit process first, then use this page to find the frameworks where assessments are still missing.
+        </p>
+
+        <compliance-grid></compliance-grid>
+    </section>
+
     <section>
         <h2>Repositories by inactivity</h2>
         <p class="section-intro">
@@ -47,6 +60,34 @@
         <staleness-grid></staleness-grid>
     </section>
     </main>
+
+    <template id="compliance-template">
+        <table class="compliance">
+            <thead>
+                <tr>
+                    <th>Framework</th>
+                    <th>Assessed</th>
+                    <th>Pending</th>
+                    <th>Unaudited repos</th>
+                    <th>Coverage (audited repos)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr data-tpl-each="self">
+                    <td><strong>{{ framework }}</strong></td>
+                    <td>{{ assessed }}</td>
+                    <td>{{ pending }}</td>
+                    <td>{{ missing }}</td>
+                    <td>
+                        <div class="coverage-bar">
+                            <div class="coverage-fill" data-tpl-attr-append="coverage_attr"></div>
+                            <span>{{ coverage_pct }}%</span>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </template>
 
     <template id="staleness-template">
         <table class="staleness">
@@ -80,6 +121,31 @@
             all.push(p);
         }
 
+        const frameworks = ['dora', 'cra', 'nis2', 'ai_act', 'gdpr', 'data_residency', 'ads'];
+        const audited = all.filter(p => p.audit?.compliance);
+        const rows = frameworks.map(fw => {
+            let assessed = 0, pending = 0;
+            for (const p of audited) {
+                const value = p.audit.compliance[fw];
+                if (String(value).startsWith('pending')) {
+                    pending++;
+                } else {
+                    assessed++;
+                }
+            }
+            const coverage = audited.length ? Math.round((assessed / audited.length) * 100) : 0;
+            const color = coverage >= 80 ? 'var(--success)' : coverage >= 50 ? 'var(--warning)' : 'var(--danger)';
+            return {
+                framework: fw.replace('_', '-').toUpperCase(),
+                assessed, pending,
+                missing: all.length - audited.length,
+                coverage_pct: coverage,
+                coverage_attr: ['style', `width: ${coverage}%; --fill-color: ${color}`],
+            };
+        });
+        rows.sort((a, b) => a.coverage_pct - b.coverage_pct);
+        Templates.fromSelector('#compliance-template').withOverlay(rows).renderToSelector('compliance-grid');
+
         const now = Date.now();
         const enriched = all
             .filter(p => p.pushed_at)
@@ -93,7 +159,6 @@
                 bucket: p.months > 24 ? 'ancient' : p.months > 12 ? 'stale' : p.months > 6 ? 'aging' : 'fresh',
             }))
             .sort((a, b) => b.months - a.months);
-
         Templates.fromSelector('#staleness-template').withOverlay(enriched).renderToSelector('staleness-grid');
     </script>
 </body>

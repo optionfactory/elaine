@@ -573,6 +573,14 @@ table {
         grid-template-columns: 1fr auto auto auto 2fr;
     }
 
+    &.vulns-board {
+        grid-template-columns: 1fr auto auto;
+    }
+
+    &.outdated-board {
+        grid-template-columns: 1fr auto auto;
+    }
+
     &.risk-matrix {
         grid-template-columns: auto repeat(7, 1fr);
     }
@@ -626,6 +634,7 @@ table {
         letter-spacing: 0.05em;
         text-align: left;
         border-bottom: 2px solid var(--border);
+        align-content: center;
     }
 
     td {
@@ -822,15 +831,20 @@ p.section-intro {
     }
 }
 
-staleness-grid,
+main>section+section {
+    margin-top: 3rem;
+}
+
 compliance-grid,
-risk-grid {
+risk-grid,
+vulns-grid,
+outdated-grid {
     table {
         margin-top: 0;
     }
 
     section {
-        margin-top: 3rem;
+        margin-top: 2rem;
     }
 }
 

@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
-    <title>OptionFactory Audit Dashboard - Risk Matrix</title>
+    <title>OptionFactory Audit Dashboard - Security</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <script type="importmap">
             {
@@ -25,12 +25,12 @@
 
 <body>
     <header>
-        <h1><svg class="brand-icon" viewBox="0 0 64 64" aria-hidden="true"><use href="favicon.svg"></use></svg>Elaine <span class="page">/ Risk Matrix</span></h1>
+        <h1><svg class="brand-icon" viewBox="0 0 64 64" aria-hidden="true"><use href="favicon.svg"></use></svg>Elaine <span class="page">/ Security</span></h1>
         <nav id="view-nav">
             <a href="index.html">Dashboard</a>
-            <a href="staleness.html">Staleness</a>
-            <a href="compliance.html">Compliance</a>
-            <a class="active">Risk Matrix</a>
+            <a class="active">Security</a>
+            <a href="governance.html">Governance</a>
+            <a href="inventory.html">Inventory</a>
         </nav>
     </header>
 
@@ -46,7 +46,66 @@
 
         <risk-grid></risk-grid>
     </section>
+
+    <section>
+        <h2>Known vulnerabilities (top 50)</h2>
+        <p class="section-intro">
+            Live repositories with known vulnerabilities, sorted by count. The same advisory often hits many
+            repositories at once, so fixing a shared dependency once can clear multiple rows.
+        </p>
+
+        <vulns-grid></vulns-grid>
+    </section>
+
+    <section>
+        <h2>Outdated dependencies (top 50)</h2>
+        <p class="section-intro">
+            Live repositories by number of outdated dependencies, plus the artifacts that are stale across the
+            organization. An artifact lagging everywhere is one upgrade campaign, not one ticket per repo.
+        </p>
+
+        <outdated-grid></outdated-grid>
+    </section>
     </main>
+
+    <template id="vulns-template">
+        <table class="vulns-board">
+            <thead>
+                <tr>
+                    <th>Repository</th>
+                    <th>Vulnerabilities</th>
+                    <th>Most recent advisory</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr data-tpl-each="self" data-tpl-var="r">
+                    <td><a data-tpl-href="r.html_url" target="_blank" rel="noopener noreferrer">{{ r.name }}</a></td>
+                    <td>{{ r.vulns }}</td>
+                    <td data-tpl-if="r.worst"><a data-tpl-href="r.worst_url" target="_blank" rel="noopener noreferrer">{{ r.worst }}</a></td>
+                    <td data-tpl-if="!r.worst"></td>
+                </tr>
+            </tbody>
+        </table>
+    </template>
+
+    <template id="outdated-template">
+        <table class="outdated-board">
+            <thead>
+                <tr>
+                    <th>Repository</th>
+                    <th>Outdated deps</th>
+                    <th>Tier</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr data-tpl-each="repos" data-tpl-var="r">
+                    <td><a data-tpl-href="r.html_url" target="_blank" rel="noopener noreferrer">{{ r.name }}</a></td>
+                    <td>{{ r.outdated }}</td>
+                    <td>{{ r.tier ?? 'unspecified' }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </template>
 
     <template id="risk-template">
         <table class="risk-matrix">
@@ -62,14 +121,14 @@
                     <td data-tpl-each="row.cells" data-tpl-var="cell">
                         <div class="risk-cell {{ cell.level }}">
                             <span class="risk-count">{{ cell.repos }}</span>
-                            <span class="risk-detail" data-tpl-if="cell.vulns"> {{ cell.vulns }} vulns</span>
+                            <span class="risk-detail"> {{ cell.vulns }} vulns</span>
                         </div>
                     </td>
                 </tr>
             </tbody>
         </table>
         <section>
-            <h2>Highest risk repositories</h2>
+            <h2>Highest risk repositories (top 50)</h2>
             <p class="section-intro">
                 Ranked by tier &times; exposure score, then by known vulnerabilities and outdated dependencies as tie-breakers.
             </p>
@@ -106,6 +165,34 @@
         for await (const p of projects(http, ['live'], null)) {
             all.push(p);
         }
+
+        const vulnsRows = all
+            .map(p => ({ ...p, vulns: p.vulnerabilities?.length ?? 0 }))
+            .filter(p => p.vulns > 0)
+            .sort((a, b) => b.vulns - a.vulns)
+            .slice(0, 50)
+            .map(p => ({
+                name: p.name,
+                html_url: p.html_url,
+                vulns: p.vulns,
+                worst: p.vulnerabilities[0]?.vuln_id ?? null,
+                worst_url: `https://github.com/advisories/${p.vulnerabilities[0]?.vuln_id}`,
+            }));
+        Templates.fromSelector('#vulns-template').withOverlay(vulnsRows).renderToSelector('vulns-grid');
+
+        const byOutdated = all
+            .map(p => ({ ...p, outdated: p.outdated_dependencies?.length ?? 0, tier: p.audit?.tier ?? 'unknown' }))
+            .filter(p => p.outdated > 0)
+            .sort((a, b) => b.outdated - a.outdated)
+            .slice(0, 50);
+        Templates.fromSelector('#outdated-template').withOverlay({
+            repos: byOutdated.map(p => ({
+                name: p.name,
+                html_url: p.html_url,
+                outdated: p.outdated,
+                tier: p.tier,
+            })),
+        }).renderToSelector('outdated-grid');
 
         const tiers = ['tier1', 'tier2', 'tier3', 'tier4'];
         const exposures = ['internet', 'restricted-vpn', 'restricted-ip', 'restricted-pam', 'local', 'none', 'unknown'];
@@ -145,7 +232,7 @@
         const worst = classified
             .filter(r => r.base > 0)
             .sort((a, b) => b.base - a.base || b.vulns - a.vulns || b.outdated - a.outdated)
-            .slice(0, 15);
+            .slice(0, 50);
 
         Templates.fromSelector('#risk-template').withOverlay({ rows, exposures, worst }).renderToSelector('risk-grid');
     </script>
