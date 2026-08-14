@@ -86,6 +86,8 @@ pub enum LifecycleType {
     Maintenance,
     #[doc = "Experimental proof-of-concept; no production SLA."]
     Prototype,
+    #[doc = "In production and running, but no maintenance contract in place."]
+    Unmaintained,
 }
 
 #[doc = "Operational service tier dictating on-call priority and internal incident response targets."]
@@ -331,12 +333,12 @@ pub enum AdsResponsibility {
     ExternalProcessor,
     #[doc = "The client / customer holds AdS responsibility for their own environment."]
     ClientManaged,
+    #[doc = "Pending formal designation letters ('Lettera di Nomina') to be executed."]
+    PendingNomination,
     #[doc = "Status has not yet been assessed."]
     PendingAssessment,
     #[doc = "Not in scope of ADS requirements."]
     OutOfScope,
-    #[doc = "Pending formal designation letters ('Lettera di Nomina') to be executed."]
-    PendingNomination,
 }
 
 #[doc = "Environment-specific deployment configuration."]
@@ -391,19 +393,33 @@ pub struct EnvironmentManifest {
 #[serde(rename_all = "kebab-case")]
 #[serde(deny_unknown_fields)]
 pub enum EnvironmentType {
+    #[doc = "Developer workstation running the project locally."]
     Local,
+    #[doc = "Shared development environment for ongoing feature work."]
     Development,
+    #[doc = "Ephemeral per-branch or per-pull-request preview deployment."]
     Preview,
+    #[doc = "Automated testing environment (unit/integration test runs)."]
     Testing,
+    #[doc = "Dedicated QA environment for manual quality assurance."]
     Qa,
+    #[doc = "User acceptance testing environment validated by end users/customers."]
     Uat,
+    #[doc = "Isolated playground for experiments without production data."]
     Sandbox,
+    #[doc = "Pre-production environment mirroring production for final validation."]
     PreProduction,
+    #[doc = "Staging area replicating production for release rehearsal."]
     Staging,
+    #[doc = "Customer or sales demonstration environment."]
     Demo,
+    #[doc = "Performance and load testing environment."]
     Performance,
+    #[doc = "Shadow environment processing a mirror of live traffic without user-facing effects."]
     Shadow,
+    #[doc = "Live production environment serving real users."]
     Production,
+    #[doc = "Disaster recovery standby environment for failover."]
     DisasterRecovery,
 }
 
@@ -412,16 +428,27 @@ pub enum EnvironmentType {
 #[serde(rename_all = "kebab-case")]
 #[serde(deny_unknown_fields)]
 pub enum PlatformType {
+    #[doc = "Generic cloud provider (unspecified)."]
     Cloud,
+    #[doc = "Amazon Web Services (AWS)."]
     CloudAws,
+    #[doc = "Microsoft Azure."]
     CloudAzure,
+    #[doc = "Google Cloud Platform (GCP)."]
     CloudGcp,
+    #[doc = "Hetzner Cloud."]
     CloudHetzner,
+    #[doc = "Owned/rented datacenter operated by our organization."]
     Datacenter,
+    #[doc = "On-premises infrastructure hosted at the customer's site."]
     OnPremises,
+    #[doc = "Colocation facility housing our own hardware."]
     Colocation,
+    #[doc = "Hybrid mix of cloud and on-premises/datacenter infrastructure."]
     Hybrid,
+    #[doc = "Edge computing nodes close to end users."]
     Edge,
+    #[doc = "Internal development network (not customer reachable)."]
     DevNetwork,
 }
 
@@ -430,9 +457,13 @@ pub enum PlatformType {
 #[serde(rename_all = "kebab-case")]
 #[serde(deny_unknown_fields)]
 pub enum StackLayer {
+    #[doc = "Infrastructure layer (compute, networking, storage provisioning)."]
     Infrastructure,
+    #[doc = "Operating system layer (OS installation, patching, base configuration)."]
     OperatingSystem,
+    #[doc = "Middleware/services layer (databases, message brokers, runtimes)."]
     Services,
+    #[doc = "Application layer (deployed application code and business logic)."]
     Applications,
 }
 
@@ -441,11 +472,17 @@ pub enum StackLayer {
 #[serde(rename_all = "kebab-case")]
 #[serde(deny_unknown_fields)]
 pub enum ExposureType {
+    #[doc = "Reachable only from the local machine or internal network."]
     Local,
+    #[doc = "Reachable only through a VPN connection."]
     RestrictedVpn,
+    #[doc = "Reachable only from an allowlisted set of IP addresses."]
     RestrictedIp,
+    #[doc = "Reachable only through a Privileged Access Management (PAM) bastion."]
     RestrictedPam,
+    #[doc = "Publicly reachable from the Internet."]
     Internet,
+    #[doc = "No network reachability (air-gapped or disabled)."]
     None,
 }
 
@@ -454,7 +491,9 @@ pub enum ExposureType {
 #[serde(rename_all = "kebab-case")]
 #[serde(deny_unknown_fields)]
 pub enum DnsManagement {
+    #[doc = "DNS zones and records managed directly by our organization."]
     Managed,
+    #[doc = "DNS zones and records managed by an external party."]
     External,
 }
 
@@ -463,12 +502,19 @@ pub enum DnsManagement {
 #[serde(rename_all = "kebab-case")]
 #[serde(deny_unknown_fields)]
 pub enum CertManagement {
+    #[doc = "Automatically provisioned and renewed via ACME DNS-01 challenge."]
     ManagedAcmeDns01,
+    #[doc = "Automatically provisioned and renewed via ACME HTTP-01 challenge."]
     ManagedAcmeHttp01,
+    #[doc = "Automatically renewed by a managed tool (non-ACME)."]
     ManagedAutoRenew,
+    #[doc = "Manually provisioned and renewed by our organization."]
     ManagedManual,
+    #[doc = "Certificate supplied by a third party (e.g., customer-provided)."]
     ThirdPartyProvided,
+    #[doc = "Certificate lifecycle fully managed by a third party."]
     ThirdPartyManaged,
+    #[doc = "No TLS certificate in use (plain HTTP or no network endpoint)."]
     NotApplicable,
 }
 

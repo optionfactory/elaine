@@ -98,6 +98,11 @@
           "const": "client-managed"
         },
         {
+          "description": "Pending formal designation letters ('Lettera di Nomina') to be executed.",
+          "type": "string",
+          "const": "pending-nomination"
+        },
+        {
           "description": "Status has not yet been assessed.",
           "type": "string",
           "const": "pending-assessment"
@@ -106,11 +111,6 @@
           "description": "Not in scope of ADS requirements.",
           "type": "string",
           "const": "out-of-scope"
-        },
-        {
-          "description": "Pending formal designation letters ('Lettera di Nomina') to be executed.",
-          "type": "string",
-          "const": "pending-nomination"
         }
       ]
     },
@@ -236,15 +236,42 @@
     },
     "CertManagement": {
       "description": "TLS certificate provisioning and renewal mechanism.",
-      "type": "string",
-      "enum": [
-        "managed-acme-dns01",
-        "managed-acme-http01",
-        "managed-auto-renew",
-        "managed-manual",
-        "third-party-provided",
-        "third-party-managed",
-        "not-applicable"
+      "oneOf": [
+        {
+          "description": "Automatically provisioned and renewed via ACME DNS-01 challenge.",
+          "type": "string",
+          "const": "managed-acme-dns01"
+        },
+        {
+          "description": "Automatically provisioned and renewed via ACME HTTP-01 challenge.",
+          "type": "string",
+          "const": "managed-acme-http01"
+        },
+        {
+          "description": "Automatically renewed by a managed tool (non-ACME).",
+          "type": "string",
+          "const": "managed-auto-renew"
+        },
+        {
+          "description": "Manually provisioned and renewed by our organization.",
+          "type": "string",
+          "const": "managed-manual"
+        },
+        {
+          "description": "Certificate supplied by a third party (e.g., customer-provided).",
+          "type": "string",
+          "const": "third-party-provided"
+        },
+        {
+          "description": "Certificate lifecycle fully managed by a third party.",
+          "type": "string",
+          "const": "third-party-managed"
+        },
+        {
+          "description": "No TLS certificate in use (plain HTTP or no network endpoint).",
+          "type": "string",
+          "const": "not-applicable"
+        }
       ]
     },
     "ComplianceManifest": {
@@ -363,10 +390,17 @@
     },
     "DnsManagement": {
       "description": "Domain management and ownership origin.",
-      "type": "string",
-      "enum": [
-        "managed",
-        "external"
+      "oneOf": [
+        {
+          "description": "DNS zones and records managed directly by our organization.",
+          "type": "string",
+          "const": "managed"
+        },
+        {
+          "description": "DNS zones and records managed by an external party.",
+          "type": "string",
+          "const": "external"
+        }
       ]
     },
     "DoraCriticality": {
@@ -453,34 +487,112 @@
     },
     "EnvironmentType": {
       "description": "Supported deployment environment types.",
-      "type": "string",
-      "enum": [
-        "local",
-        "development",
-        "preview",
-        "testing",
-        "qa",
-        "uat",
-        "sandbox",
-        "pre-production",
-        "staging",
-        "demo",
-        "performance",
-        "shadow",
-        "production",
-        "disaster-recovery"
+      "oneOf": [
+        {
+          "description": "Developer workstation running the project locally.",
+          "type": "string",
+          "const": "local"
+        },
+        {
+          "description": "Shared development environment for ongoing feature work.",
+          "type": "string",
+          "const": "development"
+        },
+        {
+          "description": "Ephemeral per-branch or per-pull-request preview deployment.",
+          "type": "string",
+          "const": "preview"
+        },
+        {
+          "description": "Automated testing environment (unit/integration test runs).",
+          "type": "string",
+          "const": "testing"
+        },
+        {
+          "description": "Dedicated QA environment for manual quality assurance.",
+          "type": "string",
+          "const": "qa"
+        },
+        {
+          "description": "User acceptance testing environment validated by end users/customers.",
+          "type": "string",
+          "const": "uat"
+        },
+        {
+          "description": "Isolated playground for experiments without production data.",
+          "type": "string",
+          "const": "sandbox"
+        },
+        {
+          "description": "Pre-production environment mirroring production for final validation.",
+          "type": "string",
+          "const": "pre-production"
+        },
+        {
+          "description": "Staging area replicating production for release rehearsal.",
+          "type": "string",
+          "const": "staging"
+        },
+        {
+          "description": "Customer or sales demonstration environment.",
+          "type": "string",
+          "const": "demo"
+        },
+        {
+          "description": "Performance and load testing environment.",
+          "type": "string",
+          "const": "performance"
+        },
+        {
+          "description": "Shadow environment processing a mirror of live traffic without user-facing effects.",
+          "type": "string",
+          "const": "shadow"
+        },
+        {
+          "description": "Live production environment serving real users.",
+          "type": "string",
+          "const": "production"
+        },
+        {
+          "description": "Disaster recovery standby environment for failover.",
+          "type": "string",
+          "const": "disaster-recovery"
+        }
       ]
     },
     "ExposureType": {
       "description": "Network ingress reachability for the project.",
-      "type": "string",
-      "enum": [
-        "local",
-        "restricted-vpn",
-        "restricted-ip",
-        "restricted-pam",
-        "internet",
-        "none"
+      "oneOf": [
+        {
+          "description": "Reachable only from the local machine or internal network.",
+          "type": "string",
+          "const": "local"
+        },
+        {
+          "description": "Reachable only through a VPN connection.",
+          "type": "string",
+          "const": "restricted-vpn"
+        },
+        {
+          "description": "Reachable only from an allowlisted set of IP addresses.",
+          "type": "string",
+          "const": "restricted-ip"
+        },
+        {
+          "description": "Reachable only through a Privileged Access Management (PAM) bastion.",
+          "type": "string",
+          "const": "restricted-pam"
+        },
+        {
+          "description": "Publicly reachable from the Internet.",
+          "type": "string",
+          "const": "internet"
+        },
+        {
+          "description": "No network reachability (air-gapped or disabled).",
+          "type": "string",
+          "const": "none"
+        }
       ]
     },
     "GdprRole": {
@@ -545,6 +657,11 @@
           "description": "Experimental proof-of-concept; no production SLA.",
           "type": "string",
           "const": "prototype"
+        },
+        {
+          "description": "In production and running, but no maintenance contract in place.",
+          "type": "string",
+          "const": "unmaintained"
         }
       ]
     },
@@ -575,19 +692,62 @@
     },
     "PlatformType": {
       "description": "Underlying deployment platform or infrastructure substrate.",
-      "type": "string",
-      "enum": [
-        "cloud",
-        "cloud-aws",
-        "cloud-azure",
-        "cloud-gcp",
-        "cloud-hetzner",
-        "datacenter",
-        "on-premises",
-        "colocation",
-        "hybrid",
-        "edge",
-        "dev-network"
+      "oneOf": [
+        {
+          "description": "Generic cloud provider (unspecified).",
+          "type": "string",
+          "const": "cloud"
+        },
+        {
+          "description": "Amazon Web Services (AWS).",
+          "type": "string",
+          "const": "cloud-aws"
+        },
+        {
+          "description": "Microsoft Azure.",
+          "type": "string",
+          "const": "cloud-azure"
+        },
+        {
+          "description": "Google Cloud Platform (GCP).",
+          "type": "string",
+          "const": "cloud-gcp"
+        },
+        {
+          "description": "Hetzner Cloud.",
+          "type": "string",
+          "const": "cloud-hetzner"
+        },
+        {
+          "description": "Owned/rented datacenter operated by our organization.",
+          "type": "string",
+          "const": "datacenter"
+        },
+        {
+          "description": "On-premises infrastructure hosted at the customer's site.",
+          "type": "string",
+          "const": "on-premises"
+        },
+        {
+          "description": "Colocation facility housing our own hardware.",
+          "type": "string",
+          "const": "colocation"
+        },
+        {
+          "description": "Hybrid mix of cloud and on-premises/datacenter infrastructure.",
+          "type": "string",
+          "const": "hybrid"
+        },
+        {
+          "description": "Edge computing nodes close to end users.",
+          "type": "string",
+          "const": "edge"
+        },
+        {
+          "description": "Internal development network (not customer reachable).",
+          "type": "string",
+          "const": "dev-network"
+        }
       ]
     },
     "ProjectType": {
@@ -702,12 +862,27 @@
     },
     "StackLayer": {
       "description": "Architectural stack layer managed directly by our organization.",
-      "type": "string",
-      "enum": [
-        "infrastructure",
-        "operating-system",
-        "services",
-        "applications"
+      "oneOf": [
+        {
+          "description": "Infrastructure layer (compute, networking, storage provisioning).",
+          "type": "string",
+          "const": "infrastructure"
+        },
+        {
+          "description": "Operating system layer (OS installation, patching, base configuration).",
+          "type": "string",
+          "const": "operating-system"
+        },
+        {
+          "description": "Middleware/services layer (databases, message brokers, runtimes).",
+          "type": "string",
+          "const": "services"
+        },
+        {
+          "description": "Application layer (deployed application code and business logic).",
+          "type": "string",
+          "const": "applications"
+        }
       ]
     }
   }
