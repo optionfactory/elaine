@@ -69,6 +69,8 @@ pub enum ProjectType {
     Infrastructure,
     #[doc = "Documentation, slides, courses."]
     Documentation,
+    #[doc = "Personal projects, studies, and learning experiments with no production intent."]
+    Playground,
 }
 
 #[doc = "Operational maintenance status of the repository."]

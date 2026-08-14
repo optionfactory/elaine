@@ -777,6 +777,11 @@
           "description": "Documentation, slides, courses.",
           "type": "string",
           "const": "documentation"
+        },
+        {
+          "description": "Personal projects, studies, and learning experiments with no production intent.",
+          "type": "string",
+          "const": "playground"
         }
       ]
     },

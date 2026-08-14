@@ -226,14 +226,19 @@ fn matches_filters(p: &crate::scanners::RepoStats, filters: &[&str]) -> bool {
     if filters.contains(&"tool") && !p.audit.as_ref().is_some_and(|a| a.project_type == Some(ProjectType::Tool)) {
         return false;
     }
-    if filters.contains(&"infrastructure")
-        && !p
-            .audit
-            .as_ref()
-            .is_some_and(|a| a.project_type == Some(ProjectType::Infrastructure))
-    {
-        return false;
-    }
+            if filters.contains(&"infrastructure")
+                && !p
+                    .audit
+                    .as_ref()
+                    .is_some_and(|a| a.project_type == Some(ProjectType::Infrastructure))
+            {
+                return false;
+            }
+            if filters.contains(&"playground")
+                && !p.audit.as_ref().is_some_and(|a| a.project_type == Some(ProjectType::Playground))
+            {
+                return false;
+            }
 
     let compliant = p
         .audit
