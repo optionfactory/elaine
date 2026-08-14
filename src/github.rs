@@ -6,6 +6,8 @@ use std::process::Command;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct GithubRepository {
+    #[serde(default)]
+    pub id: u64,
     pub name: String,
     pub html_url: String,
     pub default_branch: String,

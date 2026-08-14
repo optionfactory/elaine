@@ -125,6 +125,28 @@ impl Elaine {
 
         let repos = client.fetch_org_repos(&pb).await?;
 
+        pb.set_message("Checking for renamed repositories...");
+        let cached_by_id: std::collections::HashMap<u64, String> = self
+            .repositories
+            .load_all_metadata()?
+            .into_values()
+            .filter(|r| r.id != 0)
+            .map(|r| (r.id, r.name))
+            .collect();
+        for repo in &repos {
+            if let Some(old_name) = cached_by_id.get(&repo.id)
+                && *old_name != repo.name
+            {
+                pb.println(format!(
+                    "[{}] 🔁 Repository renamed from '{}'; removing stale scan data.",
+                    repo.name, old_name
+                ));
+                if let Err(e) = self.stats.remove_project_scan(old_name) {
+                    pb.println(format!("[{}] 🔥 Failed to remove scan for '{}': {}", repo.name, old_name, e));
+                }
+            }
+        }
+
         pb.set_message("Checking for deleted repositories to remove from cache...");
         let current_repo_names: HashSet<&str> = repos.iter().map(|r| r.name.as_str()).collect();
         self.repositories.clean_orphans(&current_repo_names)?;
@@ -193,6 +215,8 @@ impl Elaine {
     pub async fn scan(&self) -> Result<()> {
         let worker_count = get_worker_count();
         let repos = self.repositories.load_all_metadata()?;
+        let current_repo_names: HashSet<&str> = repos.keys().map(|s| s.as_str()).collect();
+        self.stats.clean_orphans(&current_repo_names)?;
         let total = repos.len() as u64;
 
         let sem = Arc::new(Semaphore::new(worker_count.max(1)));
