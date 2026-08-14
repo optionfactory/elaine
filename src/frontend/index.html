@@ -27,8 +27,8 @@
         <h1><svg class="brand-icon" viewBox="0 0 64 64" aria-hidden="true"><use href="favicon.svg"></use></svg>Elaine <span class="page">/ Dashboard</span></h1>
         <nav id="view-nav">
             <a class="active">Dashboard</a>
-            <a href="security.html">Security</a>
             <a href="governance.html">Governance</a>
+            <a href="security.html">Security</a>
             <a href="inventory.html">Inventory</a>
         </nav>
     </header>
@@ -40,8 +40,8 @@
         <filter-group data-group="status">
             <label>Status:</label>
             <state-button>
-                <state title="Any" active data-value="any"><svg><use href="icons.svg#icon-any"></use></svg></state>
-                <state title="Live" data-value="live"><svg><use href="icons.svg#icon-live"></use></svg></state>
+                <state title="Any" data-value="any"><svg><use href="icons.svg#icon-any"></use></svg></state>
+                <state title="Live" active data-value="live"><svg><use href="icons.svg#icon-live"></use></svg></state>
                 <state title="Forked" data-value="forked"><svg><use href="icons.svg#icon-forked"></use></svg></state>
                 <state title="Archived" data-value="archived"><svg><use href="icons.svg#icon-archived"></use></svg></state>
                 <state title="Disabled" data-value="disabled"><svg><use href="icons.svg#icon-disabled"></use></svg></state>
@@ -167,11 +167,11 @@
     </main>
 
     <template id="metrics-template">
-        <button class="metric-card all active" data-filter>
+        <button class="metric-card all" data-filter>
             <h2>Total Repositories</h2>
             {{ all }}
         </button>
-        <button class="metric-card live" data-filter="live">
+        <button class="metric-card live active" data-filter="live">
             <h2>Live Repositories</h2>
             {{ live }}
         </button>
@@ -272,7 +272,7 @@
                                 <td>{{env.type}}</td>
                                 <td>{{env.platform}}</td>
                                 <td>{{env.ingress}}</td>
-                                <td><code>{{env.domains}}</code></td>
+                                <td>{{env.domains}}</td>
                                 <td>{{env.certificates}}</td>
                             </tr>
                         </tbody>
@@ -486,7 +486,7 @@
 
         const stats = await http.get('/api/stats').fetchJson();
         Templates.fromSelector('#metrics-template').withOverlay(stats).renderToSelector('metrics-grid');
-        await scroller.load(projects(http, [], null));
+        await scroller.load(projects(http, ['live'], null));
     </script>
 </body>
 
