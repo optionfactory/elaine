@@ -1,4 +1,4 @@
-use crate::github::GithubClient;
+use crate::github::{GithubClient, GithubRepository};
 use crate::repositories::RepositoryStore;
 use crate::server::{AppState, CacheData, Config, DashboardStats};
 use crate::stats::StatsStore;
@@ -132,7 +132,7 @@ impl Elaine {
         );
         pb.set_message("Fetching repository list...");
 
-        let repos = client.fetch_org_repos(&pb).await?;
+        let repos = self.fetch_all_repos(&client, &pb).await?;
 
         pb.set_message("Checking for renamed repositories...");
         let cached_by_id: std::collections::HashMap<u64, String> = self
@@ -219,6 +219,50 @@ impl Elaine {
             anyhow::bail!("sync completed with failures");
         }
         Ok(())
+    }
+
+    async fn fetch_all_repos(&self, client: &GithubClient, pb: &ProgressBar) -> Result<Vec<GithubRepository>> {
+        use futures::stream::{self, StreamExt};
+
+        const PER_PAGE: usize = 100;
+        let max_concurrent = get_worker_count().min(8);
+
+        let mut all_repos = Vec::new();
+        let mut next_page = 1;
+
+        loop {
+            let batch_size = match all_repos.is_empty() {
+                true => max_concurrent,
+                false => 1,
+            };
+            let pages: Vec<usize> = (next_page..next_page + batch_size).collect();
+            next_page += batch_size;
+
+            pb.set_message(format!("Fetching pages {}-{}...", pages.first().unwrap_or(&1), pages.last().unwrap_or(&1)));
+
+            let results: Vec<anyhow::Result<Vec<GithubRepository>>> = stream::iter(pages)
+                .map(|page| async move { client.fetch_org_repos_page(page).await })
+                .buffered(max_concurrent)
+                .collect()
+                .await;
+
+            let mut short_page = false;
+            for result in results {
+                let repos = result?;
+                if repos.len() < PER_PAGE {
+                    short_page = true;
+                }
+                pb.inc(repos.len() as u64);
+                all_repos.extend(repos);
+            }
+            pb.set_message(format!("{} repositories found so far...", all_repos.len()));
+
+            if short_page {
+                break;
+            }
+        }
+
+        Ok(all_repos)
     }
 
     pub async fn scan(&self) -> Result<()> {
