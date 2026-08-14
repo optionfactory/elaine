@@ -62,6 +62,9 @@ pub async fn api_projects_handler(
             if filters.contains(&"archived") && live {
                 return false;
             }
+            if filters.contains(&"forked") && !p.fork {
+                return false;
+            }
             if filters.contains(&"public") && !public {
                 return false;
             }

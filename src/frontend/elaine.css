@@ -27,6 +27,40 @@
     padding: 0;
 }
 
+html {
+    scrollbar-gutter: stable;
+
+    @supports (-moz-appearance: none) {
+        scrollbar-width: thin;
+        scrollbar-color: var(--border) var(--bg);
+    }
+
+    ::-webkit-scrollbar {
+        width: 12px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: var(--bg);
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background-color: var(--border);
+        border-radius: 6px;
+        border: 3px solid var(--bg);
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background-color: var(--text-muted);
+    }
+
+    ::-webkit-scrollbar-button {
+        display: none !important;
+        width: 0 !important;
+        height: 0 !important;
+    }
+}
+
+
 body {
     background-color: var(--bg);
     color: var(--text);
@@ -50,21 +84,30 @@ header {
     grid-template-areas:
         "title" "subtitle" "button";
 
+    align-items: center;
+    gap: 0.25rem 1.5rem;
+
     @media (min-width: 1024px) {
         grid-template-columns: 1fr auto;
         grid-template-areas:
             "title button"
             "subtitle button";
+        align-items: start;
     }
-
-    align-items: center;
-    gap: 0.25rem 1.5rem;
 
     h1 {
         grid-area: title;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
         font-size: 1.875rem;
         font-weight: 700;
         color: var(--text);
+
+        .brand-icon {
+            width: 1em;
+            height: 1em;
+        }
     }
 
     p {
@@ -74,6 +117,7 @@ header {
 
     .btn-roulette {
         grid-area: button;
+        margin-top: 0.5rem;
         display: inline-flex;
         align-items: center;
         gap: 0.5rem;
@@ -85,6 +129,11 @@ header {
         font-size: 0.875rem;
         font-weight: 600;
         cursor: pointer;
+
+        svg {
+            width: 1.1em;
+            height: 1.1em;
+        }
 
         &:hover {
             background: #6d28d9;
@@ -220,6 +269,16 @@ filter-controls {
                 cursor: pointer;
                 user-select: none;
                 transition: background-color 0.15s ease, color 0.15s ease;
+
+                &>svg {
+                    display: inline-block;
+                    width: 1.1em;
+                    height: 1.1em;
+                    vertical-align: text-bottom;
+                    fill: none;
+                    stroke: currentColor;
+                    flex-shrink: 0;
+                }
 
                 &:hover {
                     color: var(--text);

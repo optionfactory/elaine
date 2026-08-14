@@ -1,14 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
-    <title>OptionFactory Audit Dashboard</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="icon" href="favicon.ico">
-    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;500;700&display=swap" rel="stylesheet">
+    <title>Elaine - Dashboard</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <script type="importmap">
             {
                 "imports": {
@@ -28,9 +24,10 @@
 
 <body>
     <header>
-        <h1>System Dashboard - <span id="organization"></span></h1>
-        <p>Audit overview and projects status</p>
+        <h1><svg class="brand-icon" viewBox="0 0 64 64" aria-hidden="true"><use href="favicon.svg"></use></svg>Elaine - Dashboard</h1>
+        <p id="organization"></p>
         <button type="button" class="btn-roulette" data-filter="live,unaudited,roulette">
+            <svg aria-hidden="true"><use href="icons.svg#icon-roulette"></use></svg>
             <span>Audit Roulette</span>
         </button>
     </header>
@@ -41,28 +38,29 @@
         <filter-group data-group="status">
             <label>Status:</label>
             <state-button>
-                <state active data-value="any">Any</state>
-                <state data-value="live">Live</state>
-                <state data-value="archived">Archived</state>
+                <state title="Any" active data-value="any"><svg><use href="icons.svg#icon-any"></use></svg></state>
+                <state data-value="live"><svg><use href="icons.svg#icon-live"></use></svg></state>
+                <state data-value="forked"><svg><use href="icons.svg#icon-forked"></use></svg></state>
+                <state data-value="archived"><svg><use href="icons.svg#icon-archived"></use></svg></state>
             </state-button>
         </filter-group>
 
         <filter-group data-group="visibility">
             <label>Visibility:</label>
             <state-button>
-                <state active data-value="any">Any</state>
-                <state data-value="public">Public</state>
-                <state data-value="private">Private</state>
+                <state title="Any" active data-value="any"><svg><use href="icons.svg#icon-any"></use></svg></state>
+                <state title="Public" data-value="public"><svg><use href="icons.svg#icon-public"></use></svg></state>
+                <state title="Private" data-value="private"><svg><use href="icons.svg#icon-private"></use></svg></state>
             </state-button>
         </filter-group>
 
 
         <filter-group data-group="audit">
-            <label>Audit:</label>
+            <label>Audited:</label>
             <state-button>
-                <state active data-value="any">Any</state>
-                <state data-value="audited">Audited</state>
-                <state data-value="unaudited">Unaudited</state>
+                <state title="Any" active data-value="any"><svg><use href="icons.svg#icon-any"></use></svg></state>
+                <state title="Audited" data-value="audited"><svg><use href="icons.svg#icon-audited"></use></svg></state>
+                <state title="Not audited" data-value="unaudited"><svg><use href="icons.svg#icon-unaudited"></use></svg></state>
             </state-button>
         </filter-group>
 
@@ -71,49 +69,50 @@
         <filter-group data-group="vulnerability">
             <label>Vulnerabilities:</label>
             <state-button>
-                <state active data-value="any">Any</state>
-                <state data-value="vulns">With Vulns</state>
-                <state data-value="no-vulns">No Vulns</state>
+                <state title="Any" active data-value="any"><svg><use href="icons.svg#icon-any"></use></svg></state>
+                <state title="With vulnerabilities" data-value="vulns"><svg><use href="icons.svg#icon-vulns"></use></svg></state>
+                <state title="No vulnerabilities" data-value="no-vulns"><svg><use href="icons.svg#icon-no-vulns"></use></svg></state>
             </state-button>
         </filter-group>
 
         <filter-group data-group="outdated">
             <label>Outdated deps:</label>
             <state-button>
-                <state active data-value="any">Any</state>
-                <state data-value="outdated">Needed</state>
-                <state data-value="no-outdated">Up to date</state>
+                <state title="Any" active data-value="any"><svg><use href="icons.svg#icon-any"></use></svg></state>
+                <state title="Outdated" data-value="outdated"><svg><use href="icons.svg#icon-outdated"></use></svg></state>
+                <state title="Up to date" data-value="no-outdated"><svg><use href="icons.svg#icon-no-outdated"></use></svg></state>
             </state-button>
         </filter-group>
 
         <filter-group data-group="tiers">
             <label>Tier:</label>
             <state-button>
-                <state active data-value="any">Any</state>
-                <state data-value="tier1">1</state>
-                <state data-value="tier2">2</state>
-                <state data-value="tier3">3</state>
-                <state data-value="tier4">4</state>
+                <state title="Any" active data-value="any"><svg><use href="icons.svg#icon-any"></use></svg></state>
+                <state title="Tier1" data-value="tier1"><svg><use href="icons.svg#icon-tier1"></use></svg></state>
+                <state title="Tier2" data-value="tier2"><svg><use href="icons.svg#icon-tier2"></use></svg></state>
+                <state title="Tier3" data-value="tier3"><svg><use href="icons.svg#icon-tier3"></use></svg></state>
+                <state title="Tier4" data-value="tier4"><svg><use href="icons.svg#icon-tier4"></use></svg></state>
             </state-button>
         </filter-group>
 
         <filter-group data-group="type">
             <label>Project type:</label>
             <state-button>
-                <state active data-value="any">Any</state>
-                <state data-value="service">Service</state>
-                <state data-value="library">Library</state>
-                <state data-value="tool">Tool</state>
-                <state data-value="infrastructure">IaC</state>
+                <state title="Any" active data-value="any"><svg><use href="icons.svg#icon-any"></use></svg></state>
+                <state title="Service" data-value="service"><svg><use href="icons.svg#icon-service"></use></svg></state>
+                <state title="Library" data-value="library"><svg><use href="icons.svg#icon-library"></use></svg></state>
+                <state title="Tool" data-value="tool"><svg><use href="icons.svg#icon-tool"></use></svg></state>
+                <state title="Infrastructure" data-value="infrastructure"><svg><use href="icons.svg#icon-infrastructure"></use></svg></state>
+                <state title="Documentation" data-value="infrastructure"><svg><use href="icons.svg#icon-documentation"></use></svg></state>
             </state-button>
         </filter-group>
 
         <filter-group data-group="compliance">
             <label>Compliance:</label>
             <state-button>
-                <state active data-value="any">Any</state>
-                <state data-value="compliant">Compliant</state>
-                <state data-value="non-compliant">Non compliant</state>
+                <state title="Any" active data-value="any"><svg><use href="icons.svg#icon-any"></use></svg></state>
+                <state title="Compliant" data-value="compliant"><svg><use href="icons.svg#icon-compliant"></use></svg></state>
+                <state title="Non-compliant" data-value="non-compliant"><svg><use href="icons.svg#icon-non-compliant"></use></svg></state>
             </state-button>
         </filter-group>
 
@@ -200,7 +199,7 @@
             <section>
                 <h3>Compliance Frameworks</h3>
                 <tag-list data-tpl-if="!audit?.compliance">
-                    <tag >No data</tag>
+                    <tag>No data</tag>
                 </tag-list>
                 <tag-list data-tpl-if="audit?.compliance">
                     <tag>DORA: {{ audit.compliance.dora }}</tag>
@@ -217,7 +216,9 @@
                 <details>
                     <summary>
                         <h3>Environments</h3>
-                        <tag-list><tag>{{ audit.environments.length }}</tag></tag-list>
+                        <tag-list>
+                            <tag>{{ audit.environments.length }}</tag>
+                        </tag-list>
                     </summary>
                     <table class="environments">
                         <thead>
