@@ -141,7 +141,7 @@ async function* projects(http, filters, search) {
     const limit = 50;
     while (true) {
         const data = await http.get(`/api/projects`)
-            .param("filters", filters == '' ? null : filters)
+            .param("filter", ...filters)
             .param("search", search)
             .param("offset", offset)
             .param("limit", limit)

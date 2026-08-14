@@ -3,12 +3,12 @@ use crate::schema::{
 };
 use axum::{
     Json, Router,
-    extract::{Query, State},
+    extract::State,
     http::StatusCode,
     response::IntoResponse,
     routing::get,
 };
-use serde::Deserialize;
+use axum_extra::extract::Query;use serde::Deserialize;
 use std::sync::Arc;
 
 use super::{AppState, FrontendAssets, ValidatedUser};
@@ -16,7 +16,7 @@ use super::{AppState, FrontendAssets, ValidatedUser};
 #[derive(Deserialize)]
 pub struct ApiQuery {
     pub search: Option<String>,
-    pub filters: Option<String>,
+    pub filter: Option<Vec<String>>,
     pub offset: Option<usize>,
     pub limit: Option<usize>,
 }
@@ -40,7 +40,8 @@ pub async fn api_projects_handler(
 ) -> impl IntoResponse {
     let cache = state.cache.read().await;
     let term = query.search.as_deref().map(|s| s.to_lowercase());
-    let filters: Vec<&str> = query.filters.as_deref().unwrap_or("all").split(',').collect();
+    let filter_values = query.filter.unwrap_or_default();
+    let filters: Vec<&str> = filter_values.iter().map(|s| s.as_str()).collect();
 
     let mut filtered: Vec<&crate::scanners::RepoStats> = cache
         .projects

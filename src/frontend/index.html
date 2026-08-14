@@ -411,16 +411,15 @@
                     activeTags.push(activeBtn.dataset.value);
                 }
             });
-            return activeTags.join(',');
+            return activeTags;
         }
 
-        function updateFilterControls(filterStr) {
-            const activeTags = (filterStr || '').split(',').map(s => s.trim()).filter(Boolean);
+        function updateFilterControls(filters) {
             document.querySelectorAll('filter-controls filter-group').forEach(group => {
                 const buttons = group.querySelectorAll('state');
                 let hasMatch = false;
                 buttons.forEach(btn => {
-                    if (activeTags.includes(btn.dataset.value)) {
+                    if (filters.includes(btn.dataset.value)) {
                         btn.setAttribute('active', '');
                         hasMatch = true;
                     } else {
@@ -435,11 +434,11 @@
         }
 
 
-        function updateActiveMetricCard(filterStr) {
+        function updateActiveMetricCard(filters) {
             document.querySelectorAll('.metric-card').forEach(b => {
                 b.classList.remove('active');
-                const cardFilter = b.dataset.filter || '';
-                if (cardFilter === (filterStr || '')) {
+                const cardFilter = (b.dataset.filter || '').split(',').filter(Boolean);
+                if (cardFilter.length === filters.length && cardFilter.every(f => filters.includes(f))) {
                     b.classList.add('active');
                 }
             });
@@ -469,19 +468,19 @@
             const button = e.target.closest('[data-filter]');
             if (!button || button.closest('filter-controls')) return;
 
-            const filterStr = button.dataset.filter;
+            const filters = (button.dataset.filter || '').split(',').filter(Boolean);
             if (button.classList.contains('metric-card')) {
                 document.querySelectorAll('.metric-card').forEach(b => b.classList.remove('active'));
                 button.classList.add('active');
             }
 
-            updateFilterControls(filterStr);
-            await scroller.load(projects(http, filterStr, null));
+            updateFilterControls(filters);
+            await scroller.load(projects(http, filters, null));
         });
 
         const stats = await http.get('/api/stats').fetchJson();
         Templates.fromSelector('#metrics-template').withOverlay(stats).renderToSelector('metrics-grid');
-        await scroller.load(projects(http));
+        await scroller.load(projects(http, [], null));
     </script>
 </body>
 

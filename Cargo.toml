@@ -34,6 +34,7 @@ tar = "0.4"
 flate2 = "1.1"
 regex = "1.13"
 toml = "0.8"
+axum-extra = { version = "0.9", features = ["query"] }
 
 [build-dependencies]
 schemars = { version = "1.2", features = ["derive"] }
