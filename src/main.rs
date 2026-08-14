@@ -9,10 +9,10 @@ use std::fs;
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    let config: Config = fs::read("elaine.json")
-        .context("Failed to read 'elaine.json'")
+    let config: Config = fs::read("elaine.conf.json")
+        .context("Failed to read 'elaine.conf.json'")
         .and_then(|bytes| serde_json::from_slice(&bytes).map_err(Into::into))
-        .context("Failed to parse 'elaine.json'.")?;
+        .context("Failed to parse 'elaine.conf.json'.")?;
 
     let app = Elaine::new(config)?;
 
