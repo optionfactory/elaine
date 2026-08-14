@@ -30,7 +30,12 @@
 body {
     background-color: var(--bg);
     color: var(--text);
-    padding: 2rem;
+    padding: 1rem;
+
+    @media (min-width: 1024px) {
+        padding: 1rem;
+    }
+
     line-height: 1.5;
     margin: 0 auto;
     max-width: 1200px;
@@ -41,10 +46,17 @@ body {
 header {
     margin-bottom: 2rem;
     display: grid;
-    grid-template-columns: 1fr auto;
+    grid-template-columns: 1fr;
     grid-template-areas:
-        "title button"
-        "subtitle button";
+        "title" "subtitle" "button";
+
+    @media (min-width: 1024px) {
+        grid-template-columns: 1fr auto;
+        grid-template-areas:
+            "title button"
+            "subtitle button";
+    }
+
     align-items: center;
     gap: 0.25rem 1.5rem;
 
@@ -82,7 +94,12 @@ header {
 
 metrics-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(2, 1fr);
+
+    @media (min-width: 1024px) {
+        grid-template-columns: repeat(4, 1fr);
+    }
+
     gap: 1rem;
     margin-bottom: 2rem;
 
@@ -155,7 +172,13 @@ metrics-grid {
 
 filter-controls {
     display: grid;
-    grid-template-columns: repeat(2, max-content 1fr);
+    grid-template-columns: max-content 1fr;
+
+    @media (min-width: 1024px) {
+        grid-template-columns: repeat(2, max-content 1fr);
+
+    }
+
     gap: 0.75rem 1.5rem;
     margin-bottom: 1.5rem;
 
@@ -190,7 +213,7 @@ filter-controls {
                 justify-content: center;
                 background: transparent;
                 color: var(--text-muted);
-                padding: 0.35rem 0.75rem;
+                padding: 0.35rem 0;
                 font-size: 0.8rem;
                 font-weight: 500;
                 border-radius: 4px;
@@ -244,15 +267,32 @@ projects-grid {
         background: var(--card-bg);
         border: 1px solid var(--border);
         border-radius: 10px;
-        padding: 1.5rem;
+        padding: 0.8rem;
+
+        @media (min-width: 1024px) {
+            padding: 1.5rem;
+        }
 
         project-header {
             display: grid;
             grid-template-columns: 1fr auto;
             grid-template-areas:
-                "title time"
-                "desc time"
-                "badges time";
+                "title"
+                "desc"
+                "time"
+                "badges"
+            ;
+
+            @media (min-width: 1024px) {
+                grid-template-columns: 1fr auto;
+                grid-template-areas:
+                    "title time"
+                    "desc time"
+                    "badges time";
+            }
+
+
+
             gap: 0.25rem 1rem;
             margin-bottom: 1rem;
             border-bottom: 1px solid var(--border);
@@ -297,35 +337,42 @@ projects-grid {
             color: var(--text-muted);
             margin: 1rem 0 0.5rem;
         }
+
         &>section>details>summary {
             list-style: none;
             margin: 0;
             padding: 0;
         }
+
         &>section>details>summary::-webkit-details-marker {
             display: none;
         }
+
         &>section>details:has(table)>summary {
             cursor: pointer;
         }
+
         &>section>details>summary tag-list,
         &>section>details>summary tag {
             font-weight: 400;
             text-transform: none;
         }
+
         &>section>details:has(table)>summary h3 {
             display: flex;
             align-items: center;
             gap: 0.5rem;
         }
+
         &>section>details:has(table)>summary h3::after {
             content: '›';
-            font-size:  1rem;
+            font-size: 1rem;
             font-weight: 400;
             line-height: 1.5;
             color: var(--text-muted);
             transition: transform 0.15s ease;
         }
+
         &>section>details:has(table)[open]>summary h3::after {
             transform: rotate(90deg);
         }
@@ -422,7 +469,7 @@ badges {
 
 table {
     display: grid;
-    grid-template-columns: 1.5fr 2fr 0.8fr 1fr 3fr;
+    grid-template-columns: 1fr auto auto auto auto;
 
     &.environments {
         grid-template-columns: 1fr auto auto auto auto auto;
@@ -451,6 +498,7 @@ table {
     }
 
     th {
+        min-width: 0;
         background: rgba(0, 0, 0, 0.35);
         color: var(--text-muted);
         font-weight: 600;
@@ -463,6 +511,7 @@ table {
     }
 
     td {
+        min-width: 0;
         padding: 0.875rem 1rem;
         text-align: left;
         border-bottom: 1px solid rgba(51, 65, 85, 0.5);
@@ -490,10 +539,13 @@ table {
 
 tag-list {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr;
     gap: 0.4rem;
     margin-top: 0.25rem;
 
+    @media (min-width: 1024px) {
+        grid-template-columns: 1fr 1fr;
+    }
 
 }
 
