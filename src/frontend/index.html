@@ -39,9 +39,10 @@
             <label>Status:</label>
             <state-button>
                 <state title="Any" active data-value="any"><svg><use href="icons.svg#icon-any"></use></svg></state>
-                <state data-value="live"><svg><use href="icons.svg#icon-live"></use></svg></state>
-                <state data-value="forked"><svg><use href="icons.svg#icon-forked"></use></svg></state>
-                <state data-value="archived"><svg><use href="icons.svg#icon-archived"></use></svg></state>
+                <state title="Live" data-value="live"><svg><use href="icons.svg#icon-live"></use></svg></state>
+                <state title="Forked" data-value="forked"><svg><use href="icons.svg#icon-forked"></use></svg></state>
+                <state title="Archived" data-value="archived"><svg><use href="icons.svg#icon-archived"></use></svg></state>
+                <state title="Disabled" data-value="disabled"><svg><use href="icons.svg#icon-disabled"></use></svg></state>
             </state-button>
         </filter-group>
 
@@ -104,6 +105,32 @@
                 <state title="Tool" data-value="tool"><svg><use href="icons.svg#icon-tool"></use></svg></state>
                 <state title="Infrastructure" data-value="infrastructure"><svg><use href="icons.svg#icon-infrastructure"></use></svg></state>
                 <state title="Documentation" data-value="infrastructure"><svg><use href="icons.svg#icon-documentation"></use></svg></state>
+            </state-button>
+        </filter-group>
+
+        <filter-group data-group="lifecycle">
+            <label>Lifecycle:</label>
+            <state-button>
+                <state title="Any" active data-value="any"><svg><use href="icons.svg#icon-any"></use></svg></state>
+                <state title="Active" data-value="lifecycle-active"><svg><use href="icons.svg#icon-lifecycle-active"></use></svg></state>
+                <state title="Deprecated" data-value="lifecycle-deprecated"><svg><use href="icons.svg#icon-lifecycle-deprecated"></use></svg></state>
+                <state title="End of life" data-value="lifecycle-end-of-life"><svg><use href="icons.svg#icon-lifecycle-end-of-life"></use></svg></state>
+                <state title="Maintenance" data-value="lifecycle-maintenance"><svg><use href="icons.svg#icon-lifecycle-maintenance"></use></svg></state>
+                <state title="Prototype" data-value="lifecycle-prototype"><svg><use href="icons.svg#icon-lifecycle-prototype"></use></svg></state>
+                <state title="Unmaintained" data-value="lifecycle-unmaintained"><svg><use href="icons.svg#icon-lifecycle-unmaintained"></use></svg></state>
+            </state-button>
+        </filter-group>
+
+        <filter-group data-group="ingress">
+            <label>Ingress:</label>
+            <state-button>
+                <state title="Any" active data-value="any"><svg><use href="icons.svg#icon-any"></use></svg></state>
+                <state title="Local" data-value="ingress-local"><svg><use href="icons.svg#icon-ingress-local"></use></svg></state>
+                <state title="Restricted VPN" data-value="ingress-restricted-vpn"><svg><use href="icons.svg#icon-ingress-restricted-vpn"></use></svg></state>
+                <state title="Restricted IP" data-value="ingress-restricted-ip"><svg><use href="icons.svg#icon-ingress-restricted-ip"></use></svg></state>
+                <state title="Restricted PAM" data-value="ingress-restricted-pam"><svg><use href="icons.svg#icon-ingress-restricted-pam"></use></svg></state>
+                <state title="Internet" data-value="ingress-internet"><svg><use href="icons.svg#icon-ingress-internet"></use></svg></state>
+                <state title="None" data-value="ingress-none"><svg><use href="icons.svg#icon-ingress-none"></use></svg></state>
             </state-button>
         </filter-group>
 

@@ -1,4 +1,6 @@
-use crate::schema::{AdsResponsibility, AiActClass, CraClass, DoraCriticality, GdprRole, Nis2Category, ProjectType, ServiceTier};
+use crate::schema::{
+    AdsResponsibility, AiActClass, CraClass, DoraCriticality, ExposureType, GdprRole, LifecycleType, Nis2Category, ProjectType, ServiceTier,
+};
 use axum::{
     Json, Router,
     extract::{Query, State},
@@ -50,96 +52,7 @@ pub async fn api_projects_handler(
             {
                 return false;
             }
-            let live = !p.archived;
-            let audited = p.audit.is_some();
-            let public = !p.private;
-            let has_vulns = p.vulnerabilities.as_ref().map(|v| !v.is_empty()).unwrap_or(false);
-            let has_outdated = p.outdated_dependencies.as_ref().map(|v| !v.is_empty()).unwrap_or(false);
-
-            if filters.contains(&"live") && !live {
-                return false;
-            }
-            if filters.contains(&"archived") && live {
-                return false;
-            }
-            if filters.contains(&"forked") && !p.fork {
-                return false;
-            }
-            if filters.contains(&"public") && !public {
-                return false;
-            }
-            if filters.contains(&"private") && public {
-                return false;
-            }
-            if filters.contains(&"audited") && !audited {
-                return false;
-            }
-            if filters.contains(&"unaudited") && audited {
-                return false;
-            }
-            if filters.contains(&"vulns") && !has_vulns {
-                return false;
-            }
-            if filters.contains(&"no-vulns") && has_vulns {
-                return false;
-            }
-
-            if filters.contains(&"outdated") && !has_outdated {
-                return false;
-            }
-            if filters.contains(&"no-outdated") && has_outdated {
-                return false;
-            }
-
-            if filters.contains(&"tier1") && !p.audit.as_ref().is_some_and(|a| a.tier == Some(ServiceTier::Tier1)) {
-                return false;
-            }
-            if filters.contains(&"tier2") && !p.audit.as_ref().is_some_and(|a| a.tier == Some(ServiceTier::Tier2)) {
-                return false;
-            }
-            if filters.contains(&"tier3") && !p.audit.as_ref().is_some_and(|a| a.tier == Some(ServiceTier::Tier3)) {
-                return false;
-            }
-            if filters.contains(&"tier4") && !p.audit.as_ref().is_some_and(|a| a.tier == Some(ServiceTier::Tier4)) {
-                return false;
-            }
-
-            if filters.contains(&"service") && !p.audit.as_ref().is_some_and(|a| a.project_type == Some(ProjectType::Service)) {
-                return false;
-            }
-            if filters.contains(&"library") && !p.audit.as_ref().is_some_and(|a| a.project_type == Some(ProjectType::Library)) {
-                return false;
-            }
-            if filters.contains(&"tool") && !p.audit.as_ref().is_some_and(|a| a.project_type == Some(ProjectType::Tool)) {
-                return false;
-            }
-            if filters.contains(&"infrastructure")
-                && !p
-                    .audit
-                    .as_ref()
-                    .is_some_and(|a| a.project_type == Some(ProjectType::Infrastructure))
-            {
-                return false;
-            }
-
-            let compliant = p.audit.as_ref().and_then(|a| a.compliance.as_ref()).map(|c| {
-                c.ads != AdsResponsibility::PendingAssessment
-                    && c.ads != AdsResponsibility::PendingNomination
-                    && c.ai_act != AiActClass::PendingAssessment
-                    && c.cra != CraClass::PendingAssessment
-                    && c.dora != DoraCriticality::PendingAssessment
-                    && c.gdpr != GdprRole::PendingAssessment
-                    && c.nis2 != Nis2Category::PendingAssessment
-            });
-
-            if filters.contains(&"compliant") && compliant.is_none_or(|c| !c) {
-                return false;
-            }
-            if filters.contains(&"non-compliant") && compliant.is_none_or(|c| c) {
-                return false;
-            }
-
-            true
+            matches_filters(p, &filters)
         })
         .collect();
 
@@ -187,4 +100,188 @@ pub fn create_router(app_state: Arc<AppState>, dev: bool) -> Router {
     }
 
     app
+}
+
+fn matches_filters(p: &crate::scanners::RepoStats, filters: &[&str]) -> bool {
+    let live = !p.archived;
+    let audited = p.audit.is_some();
+    let public = !p.private;
+    let has_vulns = p.vulnerabilities.as_ref().map(|v| !v.is_empty()).unwrap_or(false);
+    let has_outdated = p.outdated_dependencies.as_ref().map(|v| !v.is_empty()).unwrap_or(false);
+
+    if filters.contains(&"live") && !live {
+        return false;
+    }
+    if filters.contains(&"archived") && live {
+        return false;
+    }
+    if filters.contains(&"forked") && !p.fork {
+        return false;
+    }
+    if filters.contains(&"disabled") && !p.disabled {
+        return false;
+    }
+    if filters.contains(&"public") && !public {
+        return false;
+    }
+    if filters.contains(&"private") && public {
+        return false;
+    }
+    if filters.contains(&"audited") && !audited {
+        return false;
+    }
+    if filters.contains(&"unaudited") && audited {
+        return false;
+    }
+    if filters.contains(&"vulns") && !has_vulns {
+        return false;
+    }
+    if filters.contains(&"no-vulns") && has_vulns {
+        return false;
+    }
+    if filters.contains(&"outdated") && !has_outdated {
+        return false;
+    }
+    if filters.contains(&"no-outdated") && has_outdated {
+        return false;
+    }
+
+    if filters.contains(&"tier1") && !p.audit.as_ref().is_some_and(|a| a.tier == Some(ServiceTier::Tier1)) {
+        return false;
+    }
+    if filters.contains(&"tier2") && !p.audit.as_ref().is_some_and(|a| a.tier == Some(ServiceTier::Tier2)) {
+        return false;
+    }
+    if filters.contains(&"tier3") && !p.audit.as_ref().is_some_and(|a| a.tier == Some(ServiceTier::Tier3)) {
+        return false;
+    }
+    if filters.contains(&"tier4") && !p.audit.as_ref().is_some_and(|a| a.tier == Some(ServiceTier::Tier4)) {
+        return false;
+    }
+
+    if filters.contains(&"lifecycle-active")
+        && !p.audit.as_ref().is_some_and(|a| a.lifecycle == Some(LifecycleType::Active))
+    {
+        return false;
+    }
+    if filters.contains(&"lifecycle-deprecated")
+        && !p.audit.as_ref().is_some_and(|a| a.lifecycle == Some(LifecycleType::Deprecated))
+    {
+        return false;
+    }
+    if filters.contains(&"lifecycle-end-of-life")
+        && !p.audit.as_ref().is_some_and(|a| a.lifecycle == Some(LifecycleType::EndOfLife))
+    {
+        return false;
+    }
+    if filters.contains(&"lifecycle-maintenance")
+        && !p.audit.as_ref().is_some_and(|a| a.lifecycle == Some(LifecycleType::Maintenance))
+    {
+        return false;
+    }
+    if filters.contains(&"lifecycle-prototype")
+        && !p.audit.as_ref().is_some_and(|a| a.lifecycle == Some(LifecycleType::Prototype))
+    {
+        return false;
+    }
+    if filters.contains(&"lifecycle-unmaintained")
+        && !p.audit.as_ref().is_some_and(|a| a.lifecycle == Some(LifecycleType::Unmaintained))
+    {
+        return false;
+    }
+
+    let has_ingress = |exposure: ExposureType| {
+        p.audit.as_ref().is_some_and(|a| {
+            a.environments
+                .as_ref()
+                .is_some_and(|envs| envs.iter().any(|e| e.ingress == Some(exposure)))
+        })
+    };
+
+    if filters.contains(&"ingress-local") && !has_ingress(ExposureType::Local) {
+        return false;
+    }
+    if filters.contains(&"ingress-restricted-vpn") && !has_ingress(ExposureType::RestrictedVpn) {
+        return false;
+    }
+    if filters.contains(&"ingress-restricted-ip") && !has_ingress(ExposureType::RestrictedIp) {
+        return false;
+    }
+    if filters.contains(&"ingress-restricted-pam") && !has_ingress(ExposureType::RestrictedPam) {
+        return false;
+    }
+    if filters.contains(&"ingress-internet") && !has_ingress(ExposureType::Internet) {
+        return false;
+    }
+    if filters.contains(&"ingress-none") && !has_ingress(ExposureType::None) {
+        return false;
+    }
+
+    if filters.contains(&"service") && !p.audit.as_ref().is_some_and(|a| a.project_type == Some(ProjectType::Service)) {
+        return false;
+    }
+    if filters.contains(&"library") && !p.audit.as_ref().is_some_and(|a| a.project_type == Some(ProjectType::Library)) {
+        return false;
+    }
+    if filters.contains(&"tool") && !p.audit.as_ref().is_some_and(|a| a.project_type == Some(ProjectType::Tool)) {
+        return false;
+    }
+    if filters.contains(&"infrastructure")
+        && !p
+            .audit
+            .as_ref()
+            .is_some_and(|a| a.project_type == Some(ProjectType::Infrastructure))
+    {
+        return false;
+    }
+
+    let compliant = p
+        .audit
+        .as_ref()
+        .and_then(|a| a.compliance.as_ref())
+        .map(|c| {
+            c.ads != AdsResponsibility::PendingAssessment
+                && c.ads != AdsResponsibility::PendingNomination
+                && c.ai_act != AiActClass::PendingAssessment
+                && c.cra != CraClass::PendingAssessment
+                && c.dora != DoraCriticality::PendingAssessment
+                && c.gdpr != GdprRole::PendingAssessment
+                && c.nis2 != Nis2Category::PendingAssessment
+        });
+
+    if filters.contains(&"compliant") && compliant.is_none_or(|c| !c) {
+        return false;
+    }
+    if filters.contains(&"non-compliant") && compliant.is_none_or(|c| c) {
+        return false;
+    }
+
+    true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::github::GithubRepository;
+    use crate::scanners::RepoStats;
+
+    fn repo(audit_json: Option<&str>) -> RepoStats {
+        let mut r = RepoStats::new_from_github(&GithubRepository {
+            name: "x".into(),
+            ..Default::default()
+        });
+        if let Some(json) = audit_json {
+            r.audit = Some(serde_json::from_str(json).unwrap());
+        }
+        r
+    }
+
+    #[test]
+    fn ingress_filters_match_any_environment_ingress() {
+        let exposed = repo(
+            Some(r#"{ "schema_version": 1, "name": "x", "environments": [ { "name": "prod", "type": "production", "ingress": "internet" } ] }"#),
+        );
+        assert!(matches_filters(&exposed, &["ingress-internet"]));
+        assert!(!matches_filters(&exposed, &["ingress-local"]));
+    }
 }
