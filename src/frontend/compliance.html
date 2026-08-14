@@ -101,12 +101,13 @@
                 }
             }
             const coverage = audited.length ? Math.round((assessed / audited.length) * 100) : 0;
+            const color = coverage >= 80 ? 'var(--success)' : coverage >= 50 ? 'var(--warning)' : 'var(--danger)';
             return {
                 framework: fw.replace('_', '-').toUpperCase(),
                 assessed, pending,
                 missing: all.length - audited.length,
                 coverage_pct: coverage,
-                coverage_attr: ['style', `width: ${coverage}%`],
+                coverage_attr: ['style', `width: ${coverage}%; --fill-color: ${color}`],
             };
         });
         rows.sort((a, b) => a.coverage_pct - b.coverage_pct);
