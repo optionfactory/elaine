@@ -146,8 +146,8 @@ mod tests {
             ..Default::default()
         });
         if audited {
-            // ProjectManifest only requires `name`; every other field is optional.
-            r.audit = Some(serde_json::from_str(r#"{"name":"x"}"#).unwrap());
+            // ElaineManifest only requires `schema_version` and `name`; every other field is optional.
+            r.audit = Some(serde_json::from_str(r#"{"schema_version":1,"name":"x"}"#).unwrap());
         }
         r
     }

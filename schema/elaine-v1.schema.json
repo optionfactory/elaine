@@ -1,0 +1,714 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ElaineManifest",
+  "description": "Root governance manifest for an Elaine-audited repository (`elaine.yaml`).",
+  "type": "object",
+  "properties": {
+    "authentication": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/AuthType"
+      }
+    },
+    "channel": {
+      "description": "Channel partner, agency, or system integrator brokering the project relationship.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "commissioner": {
+      "description": "Company or legal entity that commissioned or paid for the project.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "compliance": {
+      "description": "Regulatory compliance and resilience framework mappings.",
+      "$ref": "#/$defs/ComplianceManifest"
+    },
+    "environments": {
+      "description": "Environment-specific deployment configurations.",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/$defs/EnvironmentManifest"
+      }
+    },
+    "lifecycle": {
+      "$ref": "#/$defs/LifecycleType"
+    },
+    "name": {
+      "type": "string"
+    },
+    "schema_version": {
+      "description": "Explicit schema version for manifest compatibility (must be 1).",
+      "type": "integer",
+      "const": 1
+    },
+    "sensitivity": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Sensitivity"
+      }
+    },
+    "stewards": {
+      "description": "Internal project stewards and domain experts to contact for reference and context.",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
+    "tier": {
+      "description": "Operational service tier dictating on-call priority and internal incident response targets.",
+      "$ref": "#/$defs/ServiceTier"
+    },
+    "type": {
+      "$ref": "#/$defs/ProjectType"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "name"
+  ],
+  "$defs": {
+    "AdsResponsibility": {
+      "description": "System Administrator (AdS) operational responsibility boundary.",
+      "oneOf": [
+        {
+          "description": "Our organization directly manages the system/infrastructure as AdS.",
+          "type": "string",
+          "const": "internal"
+        },
+        {
+          "description": "An external Managed Service Provider (MSP) / Vendor holds AdS duties.",
+          "type": "string",
+          "const": "external-processor"
+        },
+        {
+          "description": "The client / customer holds AdS responsibility for their own environment.",
+          "type": "string",
+          "const": "client-managed"
+        },
+        {
+          "description": "Status has not yet been assessed.",
+          "type": "string",
+          "const": "pending-assessment"
+        },
+        {
+          "description": "Not in scope of ADS requirements.",
+          "type": "string",
+          "const": "out-of-scope"
+        },
+        {
+          "description": "Pending formal designation letters ('Lettera di Nomina') to be executed.",
+          "type": "string",
+          "const": "pending-nomination"
+        }
+      ]
+    },
+    "AiActClass": {
+      "description": "EU AI Act risk classification tier.\nApplicable to systems integrating AI/ML models, LLMs, or automated inference.",
+      "oneOf": [
+        {
+          "description": "High-Risk AI System (biometrics, critical infrastructure, employment, credit scoring).",
+          "type": "string",
+          "const": "high-risk"
+        },
+        {
+          "description": "General Purpose AI (GPAI) model or foundation model integration.",
+          "type": "string",
+          "const": "general-purpose-ai"
+        },
+        {
+          "description": "Limited Risk AI System (requires transparency disclosures, e.g., chatbots/AI assistants).",
+          "type": "string",
+          "const": "limited-risk"
+        },
+        {
+          "description": "Minimal or no risk AI system.",
+          "type": "string",
+          "const": "minimal-risk"
+        },
+        {
+          "description": "Not in scope of AI Act requirements.",
+          "type": "string",
+          "const": "out-of-scope"
+        },
+        {
+          "description": "Applicability has not yet been assessed.",
+          "type": "string",
+          "const": "pending-assessment"
+        }
+      ]
+    },
+    "AuthType": {
+      "description": "Primary authentication mechanism for ingress requests.",
+      "oneOf": [
+        {
+          "description": "Identity provider abstraction.",
+          "type": "string",
+          "const": "idp"
+        },
+        {
+          "description": "OpenID Connect (OIDC) identity authentication layer.",
+          "type": "string",
+          "const": "oidc"
+        },
+        {
+          "description": "Generic OAuth 2.0 framework.",
+          "type": "string",
+          "const": "oauth2"
+        },
+        {
+          "description": "Generic SAML 2.0 Web SSO.",
+          "type": "string",
+          "const": "saml"
+        },
+        {
+          "description": "API Key header or query parameter validation.",
+          "type": "string",
+          "const": "api-key"
+        },
+        {
+          "description": "Stateless JSON Web Token (JWT) signature validation.",
+          "type": "string",
+          "const": "jwt"
+        },
+        {
+          "description": "Mutual TLS client certificate authentication.",
+          "type": "string",
+          "const": "mtls"
+        },
+        {
+          "description": "HMAC request signature validation (e.g., webhooks).",
+          "type": "string",
+          "const": "hmac"
+        },
+        {
+          "description": "Stateful cookie or HTTP session authentication.",
+          "type": "string",
+          "const": "session"
+        },
+        {
+          "description": "Custom bearer token or generic token authentication.",
+          "type": "string",
+          "const": "token"
+        },
+        {
+          "description": "HTTP Basic authentication (legacy/internal).",
+          "type": "string",
+          "const": "basic"
+        },
+        {
+          "description": "Passkey authentication.",
+          "type": "string",
+          "const": "passkey"
+        },
+        {
+          "description": "LDAP authentication.",
+          "type": "string",
+          "const": "ldap"
+        },
+        {
+          "description": "Custom HTML form authentication.",
+          "type": "string",
+          "const": "form"
+        },
+        {
+          "description": "Explicitly public endpoint accepting unauthenticated requests (e.g., public API or landing page).",
+          "type": "string",
+          "const": "unauthenticated"
+        },
+        {
+          "description": "Authentication is not applicable (e.g., offline CLI utility, library, or background job).",
+          "type": "string",
+          "const": "not-applicable"
+        }
+      ]
+    },
+    "CertManagement": {
+      "description": "TLS certificate provisioning and renewal mechanism.",
+      "type": "string",
+      "enum": [
+        "managed-acme-dns01",
+        "managed-acme-http01",
+        "managed-auto-renew",
+        "managed-manual",
+        "third-party-provided",
+        "third-party-managed",
+        "not-applicable"
+      ]
+    },
+    "ComplianceManifest": {
+      "description": "Regulatory compliance and cybersecurity resilience specifications.",
+      "type": "object",
+      "properties": {
+        "ads": {
+          "description": "Italian Garante Privacy 'Amministratore di Sistema' (AdS) compliance block.\nApplicable to projects falling under the Italian Provvedimento Garante AdS for tracking privileged IT and database administrators.",
+          "$ref": "#/$defs/AdsResponsibility"
+        },
+        "ai_act": {
+          "description": "EU AI Act risk classification tier.\nApplicable to systems integrating AI/ML models, LLMs, or automated inference.",
+          "$ref": "#/$defs/AiActClass"
+        },
+        "cra": {
+          "description": "EU Cyber Resilience Act (CRA) product classification tier.\nApplicable if your software product contains digital elements and is sold or distributed within the EU.",
+          "$ref": "#/$defs/CraClass"
+        },
+        "data_residency": {
+          "description": "Whether personal data is processed or stored strictly within the EU/EEA.",
+          "$ref": "#/$defs/DataResidency"
+        },
+        "dora": {
+          "description": "DORA (Digital Operational Resilience Act) criticality tag.\nApplicable if your project serves the EU financial sector or acts as an ICT third-party provider to financial entities.",
+          "$ref": "#/$defs/DoraCriticality"
+        },
+        "gdpr": {
+          "description": "GDPR data protection role.\nApplicable to any project that processes, stores, or transmits EU/EEA personal data.",
+          "$ref": "#/$defs/GdprRole"
+        },
+        "nis2": {
+          "description": "EU NIS2 Directive criticality classification.\nApplicable to non-financial critical and important infrastructure operating in the EU (e.g., energy, health, SaaS, MSPs).",
+          "$ref": "#/$defs/Nis2Category"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "dora",
+        "cra",
+        "nis2",
+        "ai_act",
+        "gdpr",
+        "data_residency",
+        "ads"
+      ]
+    },
+    "CraClass": {
+      "description": "EU Cyber Resilience Act (CRA) product classification tier for cybersecurity compliance.\nApplicable if your software product contains digital elements and is sold or distributed within the EU.",
+      "oneOf": [
+        {
+          "description": "Default category: Standard software product with digital elements.",
+          "type": "string",
+          "const": "default"
+        },
+        {
+          "description": "Important Class I: Identity management, password managers, VPNs, network monitors.",
+          "type": "string",
+          "const": "important-class1"
+        },
+        {
+          "description": "Important Class II: Hypervisors, container runtimes, firewalls, IDS/IPS.",
+          "type": "string",
+          "const": "important-class2"
+        },
+        {
+          "description": "Critical: Smartcards, hardware security modules, and core cryptographic hardware/software.",
+          "type": "string",
+          "const": "critical"
+        },
+        {
+          "description": "Not in scope of CRA requirements.",
+          "type": "string",
+          "const": "out-of-scope"
+        },
+        {
+          "description": "Applicability has not yet been assessed.",
+          "type": "string",
+          "const": "pending-assessment"
+        }
+      ]
+    },
+    "DataResidency": {
+      "description": "Geographic data storage and processing boundary for compliance.",
+      "oneOf": [
+        {
+          "description": "Data is stored and processed strictly within European Union member states.",
+          "type": "string",
+          "const": "eu"
+        },
+        {
+          "description": "Data is stored and processed within the European Economic Area (EU + Iceland, Liechtenstein, Norway).",
+          "type": "string",
+          "const": "eea"
+        },
+        {
+          "description": "Data is stored or processed in the US.",
+          "type": "string",
+          "const": "us"
+        },
+        {
+          "description": "Data is stored or processed globally across international regions.",
+          "type": "string",
+          "const": "global"
+        },
+        {
+          "description": "No data is stored.",
+          "type": "string",
+          "const": "not-applicable"
+        },
+        {
+          "description": "Applicability has not yet been assessed.",
+          "type": "string",
+          "const": "pending-assessment"
+        }
+      ]
+    },
+    "DnsManagement": {
+      "description": "Domain management and ownership origin.",
+      "type": "string",
+      "enum": [
+        "managed",
+        "external"
+      ]
+    },
+    "DoraCriticality": {
+      "description": "DORA (Digital Operational Resilience Act) operational criticality tag.\nApplicable if your project serves the EU financial sector or acts as an ICT third-party provider to financial entities.",
+      "oneOf": [
+        {
+          "description": "Supports a Critical or Important Function (CIF) subject to strict RTO/RPO SLAs.",
+          "type": "string",
+          "const": "cif-supported"
+        },
+        {
+          "description": "Non-critical ICT supporting service or internal developer utility.",
+          "type": "string",
+          "const": "non-critical"
+        },
+        {
+          "description": "Not in scope of DORA requirements.",
+          "type": "string",
+          "const": "out-of-scope"
+        },
+        {
+          "description": "Applicability has not yet been assessed.",
+          "type": "string",
+          "const": "pending-assessment"
+        }
+      ]
+    },
+    "EnvironmentManifest": {
+      "description": "Environment-specific deployment configuration.",
+      "type": "object",
+      "properties": {
+        "certificates": {
+          "description": "TLS certificate provisioning and renewal mechanism.",
+          "$ref": "#/$defs/CertManagement"
+        },
+        "dns": {
+          "description": "DNS management and ownership origin.",
+          "$ref": "#/$defs/DnsManagement"
+        },
+        "domains": {
+          "description": "List of domain names assigned to this environment.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "ingress": {
+          "description": "Network ingress reachability for this specific environment.",
+          "$ref": "#/$defs/ExposureType"
+        },
+        "management": {
+          "description": "Network management reachability for this specific environment.",
+          "$ref": "#/$defs/ExposureType"
+        },
+        "name": {
+          "description": "Target deployment environment.",
+          "type": "string",
+          "pattern": "^[A-Za-z0-9-_]+$"
+        },
+        "ownership": {
+          "description": "Architectural stack layers owned and maintained directly by our organization.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/StackLayer"
+          }
+        },
+        "platform": {
+          "description": "Underlying deployment platform (cloud, on-premises, edge).",
+          "$ref": "#/$defs/PlatformType"
+        },
+        "type": {
+          "description": "Target deployment environment type.",
+          "$ref": "#/$defs/EnvironmentType"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "type"
+      ]
+    },
+    "EnvironmentType": {
+      "description": "Supported deployment environment types.",
+      "type": "string",
+      "enum": [
+        "local",
+        "development",
+        "preview",
+        "testing",
+        "qa",
+        "uat",
+        "sandbox",
+        "pre-production",
+        "staging",
+        "demo",
+        "performance",
+        "shadow",
+        "production",
+        "disaster-recovery"
+      ]
+    },
+    "ExposureType": {
+      "description": "Network ingress reachability for the project.",
+      "type": "string",
+      "enum": [
+        "local",
+        "restricted-vpn",
+        "restricted-ip",
+        "restricted-pam",
+        "internet",
+        "none"
+      ]
+    },
+    "GdprRole": {
+      "description": "Legal processing role under GDPR (Art. 4).",
+      "oneOf": [
+        {
+          "description": "Data Controller (Titolare del trattamento) - determines purposes and means of processing.",
+          "type": "string",
+          "const": "controller"
+        },
+        {
+          "description": "Data Processor (Responsabile del trattamento) - processes data on behalf of a Controller.",
+          "type": "string",
+          "const": "processor"
+        },
+        {
+          "description": "Sub-processor (Sub-responsabile) - third-party processor engaged by a Processor.",
+          "type": "string",
+          "const": "sub-processor"
+        },
+        {
+          "description": "No personal data processed.",
+          "type": "string",
+          "const": "none"
+        },
+        {
+          "description": "Not in scope of GRPR requirements.",
+          "type": "string",
+          "const": "out-of-scope"
+        },
+        {
+          "description": "Applicability has not yet been assessed.",
+          "type": "string",
+          "const": "pending-assessment"
+        }
+      ]
+    },
+    "LifecycleType": {
+      "description": "Operational maintenance status of the repository.",
+      "oneOf": [
+        {
+          "description": "Actively developed and supported in production.",
+          "type": "string",
+          "const": "active"
+        },
+        {
+          "description": "Scheduled for decommissioning; do not add new dependencies.",
+          "type": "string",
+          "const": "deprecated"
+        },
+        {
+          "description": "Decommissioned, no longer actively developed, deployed or running.",
+          "type": "string",
+          "const": "end-of-life"
+        },
+        {
+          "description": "In production but receiving only critical bug/security fixes.",
+          "type": "string",
+          "const": "maintenance"
+        },
+        {
+          "description": "Experimental proof-of-concept; no production SLA.",
+          "type": "string",
+          "const": "prototype"
+        }
+      ]
+    },
+    "Nis2Category": {
+      "description": "EU NIS2 Directive classification tier for cybersecurity resilience.\nApplicable to non-financial critical and important infrastructure operating in the EU (e.g., energy, health, SaaS, MSPs).",
+      "oneOf": [
+        {
+          "description": "Essential Entity (Soggetti Essenziali): Energy, transport, banking, health, digital infrastructure.",
+          "type": "string",
+          "const": "essential-entity"
+        },
+        {
+          "description": "Important Entity (Soggetti Importanti): Postal, waste, chemicals, food, digital providers (SaaS/marketplaces).",
+          "type": "string",
+          "const": "important-entity"
+        },
+        {
+          "description": "Not in scope of NIS2 requirements.",
+          "type": "string",
+          "const": "out-of-scope"
+        },
+        {
+          "description": "Applicability has not yet been assessed.",
+          "type": "string",
+          "const": "pending-assessment"
+        }
+      ]
+    },
+    "PlatformType": {
+      "description": "Underlying deployment platform or infrastructure substrate.",
+      "type": "string",
+      "enum": [
+        "cloud",
+        "cloud-aws",
+        "cloud-azure",
+        "cloud-gcp",
+        "cloud-hetzner",
+        "datacenter",
+        "on-premises",
+        "colocation",
+        "hybrid",
+        "edge",
+        "dev-network"
+      ]
+    },
+    "ProjectType": {
+      "description": "Primary architectural role of the project.",
+      "oneOf": [
+        {
+          "description": "Shared code dependency imported by other projects.",
+          "type": "string",
+          "const": "library"
+        },
+        {
+          "description": "Long-running server, API, or backend daemon.",
+          "type": "string",
+          "const": "service"
+        },
+        {
+          "description": "CLI utility or internal developer tool.",
+          "type": "string",
+          "const": "tool"
+        },
+        {
+          "description": "Infrastructure-as-Code or IAC libraries (e.g., Terraform, OpenTofu, Pulumi, or Ansible blueprints).",
+          "type": "string",
+          "const": "infrastructure"
+        },
+        {
+          "description": "Documentation, slides, courses.",
+          "type": "string",
+          "const": "documentation"
+        }
+      ]
+    },
+    "Sensitivity": {
+      "description": "Sensitive data classifications handled by the service.\n\n### Data Classification Hierarchy\n* **Public** → **Internal** → **Confidential** → **Restricted**\n\n### Regulatory Standards Covered\n* **GDPR / CCPA / BIPA:** `Pii`, `Spi`, `Biometric`\n* **PCI-DSS:** `Pci`\n* **SOX:** `Financial`\n* **HIPAA:** `Phi`",
+      "oneOf": [
+        {
+          "description": "Non-sensitive data safe for public distribution.",
+          "type": "string",
+          "const": "public"
+        },
+        {
+          "description": "Standard internal business data.",
+          "type": "string",
+          "const": "internal"
+        },
+        {
+          "description": "Restricted company intellectual property or business trade secrets.",
+          "type": "string",
+          "const": "confidential"
+        },
+        {
+          "description": "Maximum security assets requiring strict isolation (e.g., root credentials, master keys).",
+          "type": "string",
+          "const": "restricted"
+        },
+        {
+          "description": "Personally Identifiable Information (names, emails, addresses).",
+          "type": "string",
+          "const": "pii"
+        },
+        {
+          "description": "Sensitive PII / Special Category Data (genetics, political/religious beliefs under GDPR Art. 9).",
+          "type": "string",
+          "const": "spi"
+        },
+        {
+          "description": "Biometric identification data (fingerprints, facial recognition, voice signatures).",
+          "type": "string",
+          "const": "biometric"
+        },
+        {
+          "description": "Payment Card Industry data (credit cards, billing details, PANs).",
+          "type": "string",
+          "const": "pci"
+        },
+        {
+          "description": "Non-PCI financial records (SOX audit trails, payroll, company accounting, bank accounts).",
+          "type": "string",
+          "const": "financial"
+        },
+        {
+          "description": "Protected Health Information (medical records, insurance claims, health data).",
+          "type": "string",
+          "const": "phi"
+        }
+      ]
+    },
+    "ServiceTier": {
+      "description": "Operational service tier dictating on-call priority and internal incident response targets.",
+      "oneOf": [
+        {
+          "description": "Tier 1: Critical production path (24/7 on-call, immediate response SLO).",
+          "type": "string",
+          "const": "tier1"
+        },
+        {
+          "description": "Tier 2: Core supporting functionality (business hours support, rapid degradation fallback).",
+          "type": "string",
+          "const": "tier2"
+        },
+        {
+          "description": "Tier 3: Internal developer tools, async batch jobs, or non-critical support utilities.",
+          "type": "string",
+          "const": "tier3"
+        },
+        {
+          "description": "Tier 4: Experimental prototypes, sandbox playgrounds, or best-effort utilities.",
+          "type": "string",
+          "const": "tier4"
+        }
+      ]
+    },
+    "StackLayer": {
+      "description": "Architectural stack layer managed directly by our organization.",
+      "type": "string",
+      "enum": [
+        "infrastructure",
+        "operating-system",
+        "services",
+        "applications"
+      ]
+    }
+  }
+}

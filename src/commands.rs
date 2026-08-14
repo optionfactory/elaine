@@ -9,13 +9,13 @@ use std::fs;
 use std::sync::Arc;
 use tokio::sync::{RwLock, Semaphore};
 
-pub struct Repospect {
+pub struct Elaine {
     config: Config,
     repositories: Arc<RepositoryStore>,
     stats: Arc<StatsStore>,
 }
 
-impl Repospect {
+impl Elaine {
     pub fn new(config: Config) -> Result<Self> {
         let repositories = Arc::new(RepositoryStore::new(&config.data_dir)?);
         let stats = Arc::new(StatsStore::new(&config.data_dir)?);
@@ -32,7 +32,7 @@ impl Repospect {
         let port = self.config.port.unwrap_or(8000);
         let stats_file = self.config.data_dir.join("stats.json");
         if !stats_file.exists() {
-            anyhow::bail!("Stats file {:?} does not exist. Run 'repospect scan' first.", stats_file);
+            anyhow::bail!("Stats file {:?} does not exist. Run 'elaine scan' first.", stats_file);
         }
 
         let jwks = if self.config.google_auth.is_some() {
@@ -147,7 +147,11 @@ impl Repospect {
             tasks.push(tokio::spawn(async move {
                 let _permit = sem.acquire().await.expect("semaphore closed");
                 let task_pb = m_clone.add(ProgressBar::new_spinner());
-                task_pb.set_style(ProgressStyle::default_spinner().template("{spinner:.blue} {msg}").expect("invalid spinner template"));
+                task_pb.set_style(
+                    ProgressStyle::default_spinner()
+                        .template("{spinner:.blue} {msg}")
+                        .expect("invalid spinner template"),
+                );
                 task_pb.enable_steady_tick(std::time::Duration::from_millis(100));
                 task_pb.set_message(format!("Syncing {}...", repo.name));
 
@@ -221,7 +225,11 @@ impl Repospect {
                 }
 
                 let task_pb = multiprogress.add(ProgressBar::new_spinner());
-                task_pb.set_style(ProgressStyle::default_spinner().template("{spinner:.magenta} {msg}").expect("invalid spinner template"));
+                task_pb.set_style(
+                    ProgressStyle::default_spinner()
+                        .template("{spinner:.magenta} {msg}")
+                        .expect("invalid spinner template"),
+                );
                 task_pb.enable_steady_tick(std::time::Duration::from_millis(100));
                 task_pb.set_message(format!("[{}] Starting...", repo_name));
 

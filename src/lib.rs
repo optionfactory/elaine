@@ -4,5 +4,6 @@ pub mod github;
 pub mod repositories;
 pub mod sandbox;
 pub mod scanners;
+pub mod schema;
 pub mod server;
 pub mod stats;

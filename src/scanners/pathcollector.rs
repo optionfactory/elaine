@@ -140,8 +140,10 @@ mod tests {
             .scan(dir.path());
         let visited: Vec<String> = matches["all"].iter().map(|p| p.to_string_lossy().into_owned()).collect();
 
-        assert!(visited.iter().all(|p| !(p.starts_with(".git") || p.starts_with("node_modules"))),
-            "VCS/vendored dirs leaked into results: {visited:?}");
+        assert!(
+            visited.iter().all(|p| !(p.starts_with(".git") || p.starts_with("node_modules"))),
+            "VCS/vendored dirs leaked into results: {visited:?}"
+        );
         assert!(visited.iter().any(|p| p == "pinch.yaml"));
         assert!(visited.iter().any(|p| p == "Dockerfile"));
         assert!(visited.iter().any(|p| p == "sub/Cargo.lock"));

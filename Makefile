@@ -1,5 +1,5 @@
 REPO_OWNER=optionfactory
-REPO_NAME=repospect
+REPO_NAME=elaine
 
 build:
 	@cargo build
@@ -11,7 +11,7 @@ run:
 	@cargo run
 
 install:
-	@sudo cp target/x86_64-unknown-linux-musl/release/repospect /usr/local/bin/repospect
+	@sudo cp target/x86_64-unknown-linux-musl/release/elaine /usr/local/bin/elaine
 
 clean:
 	-@rm -rf target/

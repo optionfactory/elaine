@@ -2,7 +2,7 @@ use clap::{Parser, Subcommand};
 
 #[derive(Parser, Debug)]
 #[command(
-    name = "repospect",
+    name = "elaine",
     version,
     about = "Multi-ecosystem repository, archive, and DevSecOps SBOM inspector",
     infer_subcommands = true

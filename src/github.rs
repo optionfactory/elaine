@@ -73,7 +73,7 @@ impl GithubClient {
                 .get(&url)
                 .header(AUTHORIZATION, format!("Bearer {}", self.token))
                 .header(ACCEPT, "application/vnd.github+json")
-                .header(USER_AGENT, "repospect")
+                .header(USER_AGENT, "elaine")
                 .send()
                 .await?
                 .error_for_status()?;
@@ -100,7 +100,7 @@ impl GithubClient {
             .get(&url)
             .header(AUTHORIZATION, format!("Bearer {}", self.token))
             .header(ACCEPT, "application/vnd.github+json")
-            .header(USER_AGENT, "repospect-rust")
+            .header(USER_AGENT, "elaine-rust")
             .send()
             .await?
             .error_for_status()?;

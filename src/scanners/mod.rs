@@ -2,6 +2,7 @@ mod osv;
 pub mod pathcollector;
 mod scanner_ansible;
 mod scanner_docker;
+mod scanner_elaine;
 mod scanner_go;
 mod scanner_legopfa;
 mod scanner_maven;
@@ -14,6 +15,7 @@ use crate::sandbox::TarballSandbox;
 use crate::scanners::pathcollector::{PathCollector, Pattern};
 use crate::scanners::scanner_ansible::AnsibleScanner;
 use crate::scanners::scanner_docker::DockerScanner;
+use crate::scanners::scanner_elaine::ElaineScanner;
 use crate::scanners::scanner_go::GolangScanner;
 use crate::scanners::scanner_legopfa::LegopfaScanner;
 use crate::scanners::scanner_maven::MavenScanner;
@@ -57,7 +59,7 @@ pub struct RepoStats {
     pub has_unique_commits: bool,
     pub description: String,
     //
-    pub audit: Option<pinch::schema::ProjectManifest>,
+    pub audit: Option<crate::schema::ElaineManifest>,
     //
     pub health: BTreeMap<ScannerKind, BTreeMap<String, CheckStatus>>,
     pub containers: Option<Vec<String>>,
@@ -77,6 +79,7 @@ pub enum ScannerKind {
     Golang,
     Maven,
     Pinch,
+    Elaine,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
@@ -218,6 +221,7 @@ pub fn scan_repository(repo: &GithubRepository, tarball_path: &Path, pb: Option<
 
     let scanners: Vec<Box<dyn Scanner>> = vec![
         Box::new(PinchScanner),
+        Box::new(ElaineScanner),
         Box::new(DockerScanner),
         Box::new(MavenScanner),
         Box::new(RustScanner),
