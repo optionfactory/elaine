@@ -110,7 +110,7 @@ pub async fn api_projects_handler(
             if filters.contains(&"tool") && !p.audit.as_ref().is_some_and(|a| a.project_type == Some(ProjectType::Tool)) {
                 return false;
             }
-            if filters.contains(&"IaC")
+            if filters.contains(&"infrastructure")
                 && !p
                     .audit
                     .as_ref()
