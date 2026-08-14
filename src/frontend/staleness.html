@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
+    <title>OptionFactory Audit Dashboard - Staleness</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <script type="importmap">
+            {
+                "imports": {
+                    "ftl": "https://cdn.jsdelivr.net/npm/@optionfactory/fml@8.0.0/dist/ftl.min.mjs",
+                    "httpc": "https://cdn.jsdelivr.net/npm/@optionfactory/fml@8.0.0/dist/httpc.min.mjs"
+                },
+                "integrity": {
+                    "https://cdn.jsdelivr.net/npm/@optionfactory/fml@8.0.0/dist/ftl.min.mjs": "sha384-o8jSbzfN8frPZI1vZ6AnCXymJ9qtGYaJdY8ThO2O137DNlcGX1Ug39nS6QZxsY0p",
+                    "https://cdn.jsdelivr.net/npm/@optionfactory/fml@8.0.0/dist/httpc.min.mjs": "sha384-9QJP1Q+GlS7keulFI7PAA8amAXjQS6dvYexTmkbKvlJg23ISvRjVUJfDMzJ+9VEL"
+                }
+            }
+        </script>
+    <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/@optionfactory/fml@8.0.0/dist/ftl.min.mjs">
+    <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/@optionfactory/fml@8.0.0/dist/httpc.min.mjs">
+    <link rel="stylesheet" href="elaine.css">
+</head>
+
+<body>
+    <header>
+        <h1><svg class="brand-icon" viewBox="0 0 64 64" aria-hidden="true"><use href="favicon.svg"></use></svg>Elaine <span class="page">/ Staleness</span></h1>
+        <nav id="view-nav">
+            <a href="index.html">Dashboard</a>
+            <a class="active">Staleness</a>
+            <a href="compliance.html">Compliance</a>
+            <a href="risk.html">Risk Matrix</a>
+        </nav>
+    </header>
+
+    <main>
+    <section>
+        <h2>Repositories by inactivity</h2>
+        <p class="section-intro">
+            Time since the last push for every live repository. Repos receiving no commits for 6+ months are likely
+            neglected: dependencies stop receiving updates, knowledge evaporates, and nobody notices when something breaks.
+            Compare the age with the declared lifecycle: an <em>active</em> project that is a year stale is a red flag,
+            while an <em>end-of-life</em> or <em>unmaintained</em> one being stale is expected.
+        </p>
+
+        <staleness-grid></staleness-grid>
+    </section>
+    </main>
+
+    <template id="staleness-template">
+        <table class="staleness">
+            <thead>
+                <tr>
+                    <th>Repository</th>
+                    <th>Last push</th>
+                    <th>Stale for</th>
+                    <th>Lifecycle</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr data-tpl-each="self">
+                    <td><a data-tpl-href="html_url" target="_blank" rel="noopener noreferrer">{{ name }}</a></td>
+                    <td>{{ pushed_at }}</td>
+                    <td><badge class="stale-{{ bucket }}">{{ months }} months</badge></td>
+                    <td>{{ lifecycle ?? 'unknown' }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </template>
+
+    <script type="module">
+        import { Templates } from "ftl";
+        import { authenticate, projects } from "/elaine.js";
+
+        const { config, http } = await authenticate();
+
+        const all = [];
+        for await (const p of projects(http, ['live'], null)) {
+            all.push(p);
+        }
+
+        const now = Date.now();
+        const enriched = all
+            .filter(p => p.pushed_at)
+            .map(p => ({
+                ...p,
+                months: Math.floor((now - new Date(p.pushed_at).getTime()) / (1000 * 60 * 60 * 24 * 30.44)),
+                lifecycle: p.audit?.lifecycle ?? null,
+            }))
+            .map(p => ({
+                ...p,
+                bucket: p.months > 24 ? 'ancient' : p.months > 12 ? 'stale' : p.months > 6 ? 'aging' : 'fresh',
+            }))
+            .sort((a, b) => b.months - a.months);
+
+        Templates.fromSelector('#staleness-template').withOverlay(enriched).renderToSelector('staleness-grid');
+    </script>
+</body>
+
+</html>

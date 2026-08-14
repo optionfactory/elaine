@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
+    <title>OptionFactory Audit Dashboard - Risk Matrix</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <script type="importmap">
+            {
+                "imports": {
+                    "ftl": "https://cdn.jsdelivr.net/npm/@optionfactory/fml@8.0.0/dist/ftl.min.mjs",
+                    "httpc": "https://cdn.jsdelivr.net/npm/@optionfactory/fml@8.0.0/dist/httpc.min.mjs"
+                },
+                "integrity": {
+                    "https://cdn.jsdelivr.net/npm/@optionfactory/fml@8.0.0/dist/ftl.min.mjs": "sha384-o8jSbzfN8frPZI1vZ6AnCXymJ9qtGYaJdY8ThO2O137DNlcGX1Ug39nS6QZxsY0p",
+                    "https://cdn.jsdelivr.net/npm/@optionfactory/fml@8.0.0/dist/httpc.min.mjs": "sha384-9QJP1Q+GlS7keulFI7PAA8amAXjQS6dvYexTmkbKvlJg23ISvRjVUJfDMzJ+9VEL"
+                }
+            }
+        </script>
+    <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/@optionfactory/fml@8.0.0/dist/ftl.min.mjs">
+    <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/@optionfactory/fml@8.0.0/dist/httpc.min.mjs">
+    <link rel="stylesheet" href="elaine.css">
+</head>
+
+<body>
+    <header>
+        <h1><svg class="brand-icon" viewBox="0 0 64 64" aria-hidden="true"><use href="favicon.svg"></use></svg>Elaine <span class="page">/ Risk Matrix</span></h1>
+        <nav id="view-nav">
+            <a href="index.html">Dashboard</a>
+            <a href="staleness.html">Staleness</a>
+            <a href="compliance.html">Compliance</a>
+            <a class="active">Risk Matrix</a>
+        </nav>
+    </header>
+
+    <main>
+    <section>
+        <h2>Tier &times; exposure matrix</h2>
+        <p class="section-intro">
+            Live repositories classified by operational criticality (tier) and network exposure (most permissive
+            ingress across their environments). The top-left corner, high tier on the open internet, is where
+            a vulnerability has the highest chance of turning into an incident, so it deserves attention first.
+            Cell intensity reflects the combined tier &times; exposure weight.
+        </p>
+
+        <risk-grid></risk-grid>
+    </section>
+    </main>
+
+    <template id="risk-template">
+        <table class="risk-matrix">
+            <thead>
+                <tr>
+                    <th></th>
+                    <th data-tpl-each="exposures">{{ self }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr data-tpl-each="rows" data-tpl-var="row">
+                    <th>{{ row.tier }}</th>
+                    <td data-tpl-each="row.cells" data-tpl-var="cell">
+                        <div class="risk-cell {{ cell.level }}">
+                            <span class="risk-count">{{ cell.repos }}</span>
+                            <span class="risk-detail" data-tpl-if="cell.vulns"> {{ cell.vulns }} vulns</span>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+        <section>
+            <h2>Highest risk repositories</h2>
+            <p class="section-intro">
+                Ranked by tier &times; exposure score, then by known vulnerabilities and outdated dependencies as tie-breakers.
+            </p>
+            <table class="risk-repos">
+                <thead>
+                    <tr>
+                        <th>Repository</th>
+                        <th>Tier</th>
+                        <th>Exposure</th>
+                        <th>Vulns</th>
+                        <th>Outdated</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr data-tpl-each="worst" data-tpl-var="r">
+                        <td><a data-tpl-href="r.html_url" target="_blank" rel="noopener noreferrer">{{ r.name }}</a></td>
+                        <td>{{ r.tier }}</td>
+                        <td>{{ r.exposure }}</td>
+                        <td>{{ r.vulns }}</td>
+                        <td>{{ r.outdated }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+    </template>
+
+    <script type="module">
+        import { Templates } from "ftl";
+        import { authenticate, projects } from "/elaine.js";
+
+        const { config, http } = await authenticate();
+
+        const all = [];
+        for await (const p of projects(http, ['live'], null)) {
+            all.push(p);
+        }
+
+        const tiers = ['tier1', 'tier2', 'tier3', 'tier4'];
+        const exposures = ['internet', 'restricted-vpn', 'restricted-ip', 'restricted-pam', 'local', 'none', 'unknown'];
+
+        function repoExposure(p) {
+            const envs = p.audit?.environments;
+            if (!envs?.length) return 'unknown';
+            const priorities = { 'internet': 0, 'restricted-vpn': 1, 'restricted-ip': 2, 'restricted-pam': 3, 'local': 4, 'none': 5 };
+            return envs.map(e => e.ingress).filter(Boolean).sort((a, b) => priorities[a] - priorities[b])[0] ?? 'unknown';
+        }
+
+        function riskScore(tier, exposure) {
+            const tierWeight = { 'tier1': 4, 'tier2': 3, 'tier3': 2, 'tier4': 1 };
+            const expWeight = { 'internet': 4, 'restricted-vpn': 3, 'restricted-ip': 3, 'restricted-pam': 2, 'local': 1, 'none': 0, 'unknown': 2 };
+            return (tierWeight[tier] ?? 0) * (expWeight[exposure] ?? 0);
+        }
+
+        const classified = all.map(p => {
+            const tier = p.audit?.tier ?? 'tier4';
+            const exposure = repoExposure(p);
+            const vulns = p.vulnerabilities?.length ?? 0;
+            const outdated = p.outdated_dependencies?.length ?? 0;
+            return { ...p, tier, exposure, vulns, outdated, base: riskScore(tier, exposure) };
+        });
+
+        const rows = tiers.map(tier => ({
+            tier,
+            cells: exposures.map(exposure => {
+                const repos = classified.filter(r => r.tier === tier && r.exposure === exposure);
+                const vulns = repos.reduce((sum, r) => sum + r.vulns, 0);
+                const score = riskScore(tier, exposure);
+                const level = score >= 12 ? 'critical' : score >= 6 ? 'high' : score >= 2 ? 'medium' : 'low';
+                return { repos: repos.length, vulns, level };
+            }),
+        }));
+
+        const worst = classified
+            .filter(r => r.base > 0)
+            .sort((a, b) => b.base - a.base || b.vulns - a.vulns || b.outdated - a.outdated)
+            .slice(0, 15);
+
+        Templates.fromSelector('#risk-template').withOverlay({ rows, exposures, worst }).renderToSelector('risk-grid');
+    </script>
+</body>
+
+</html>

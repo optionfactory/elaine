@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
+    <title>OptionFactory Audit Dashboard - Compliance</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <script type="importmap">
+            {
+                "imports": {
+                    "ftl": "https://cdn.jsdelivr.net/npm/@optionfactory/fml@8.0.0/dist/ftl.min.mjs",
+                    "httpc": "https://cdn.jsdelivr.net/npm/@optionfactory/fml@8.0.0/dist/httpc.min.mjs"
+                },
+                "integrity": {
+                    "https://cdn.jsdelivr.net/npm/@optionfactory/fml@8.0.0/dist/ftl.min.mjs": "sha384-o8jSbzfN8frPZI1vZ6AnCXymJ9qtGYaJdY8ThO2O137DNlcGX1Ug39nS6QZxsY0p",
+                    "https://cdn.jsdelivr.net/npm/@optionfactory/fml@8.0.0/dist/httpc.min.mjs": "sha384-9QJP1Q+GlS7keulFI7PAA8amAXjQS6dvYexTmkbKvlJg23ISvRjVUJfDMzJ+9VEL"
+                }
+            }
+        </script>
+    <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/@optionfactory/fml@8.0.0/dist/ftl.min.mjs">
+    <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/@optionfactory/fml@8.0.0/dist/httpc.min.mjs">
+    <link rel="stylesheet" href="elaine.css">
+</head>
+
+<body>
+    <header>
+        <h1><svg class="brand-icon" viewBox="0 0 64 64" aria-hidden="true"><use href="favicon.svg"></use></svg>Elaine <span class="page">/ Compliance</span></h1>
+        <nav id="view-nav">
+            <a href="index.html">Dashboard</a>
+            <a href="staleness.html">Staleness</a>
+            <a class="active">Compliance</a>
+            <a href="risk.html">Risk Matrix</a>
+        </nav>
+    </header>
+
+    <main>
+    <section>
+        <h2>Framework assessment coverage</h2>
+        <p class="section-intro">
+            How far the regulatory assessment has progressed across the repositories that declare compliance data
+            in their <code>elaine.yaml</code>. Each framework is tracked per repository as either <em>assessed</em>
+            (including explicit <em>out-of-scope</em> verdicts: deciding something does not apply is itself an assessment)
+            or <em>pending</em>. Repositories without a manifest are not counted in the coverage percentage; bring them
+            into the audit process first, then use this page to find the frameworks where assessments are still missing.
+        </p>
+
+        <compliance-grid></compliance-grid>
+    </section>
+    </main>
+
+    <template id="compliance-template">
+        <table class="compliance">
+            <thead>
+                <tr>
+                    <th>Framework</th>
+                    <th>Assessed</th>
+                    <th>Pending</th>
+                    <th>Unaudited repos</th>
+                    <th>Coverage (audited repos)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr data-tpl-each="self">
+                    <td><strong>{{ framework }}</strong></td>
+                    <td>{{ assessed }}</td>
+                    <td>{{ pending }}</td>
+                    <td>{{ missing }}</td>
+                    <td>
+                        <div class="coverage-bar">
+                            <div class="coverage-fill" data-tpl-attr-append="coverage_attr"></div>
+                            <span>{{ coverage_pct }}%</span>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </template>
+
+    <script type="module">
+        import { Templates } from "ftl";
+        import { authenticate, projects } from "/elaine.js";
+
+        const { config, http } = await authenticate();
+
+        const all = [];
+        for await (const p of projects(http, ['live'], null)) {
+            all.push(p);
+        }
+
+        const frameworks = ['dora', 'cra', 'nis2', 'ai_act', 'gdpr', 'data_residency', 'ads'];
+        const audited = all.filter(p => p.audit?.compliance);
+        const rows = frameworks.map(fw => {
+            let assessed = 0, pending = 0;
+            for (const p of audited) {
+                const value = p.audit.compliance[fw];
+                if (String(value).startsWith('pending')) {
+                    pending++;
+                } else {
+                    assessed++;
+                }
+            }
+            const coverage = audited.length ? Math.round((assessed / audited.length) * 100) : 0;
+            return {
+                framework: fw.replace('_', '-').toUpperCase(),
+                assessed, pending,
+                missing: all.length - audited.length,
+                coverage_pct: coverage,
+                coverage_attr: ['style', `width: ${coverage}%`],
+            };
+        });
+        rows.sort((a, b) => a.coverage_pct - b.coverage_pct);
+
+        Templates.fromSelector('#compliance-template').withOverlay(rows).renderToSelector('compliance-grid');
+    </script>
+</body>
+
+</html>

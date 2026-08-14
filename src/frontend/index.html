@@ -24,14 +24,16 @@
 
 <body>
     <header>
-        <h1><svg class="brand-icon" viewBox="0 0 64 64" aria-hidden="true"><use href="favicon.svg"></use></svg>Elaine - Dashboard</h1>
-        <p id="organization"></p>
-        <button type="button" class="btn-roulette" data-filter="live,unaudited,roulette">
-            <svg aria-hidden="true"><use href="icons.svg#icon-roulette"></use></svg>
-            <span>Audit Roulette</span>
-        </button>
+        <h1><svg class="brand-icon" viewBox="0 0 64 64" aria-hidden="true"><use href="favicon.svg"></use></svg>Elaine <span class="page">/ Dashboard</span></h1>
+        <nav id="view-nav">
+            <a class="active">Dashboard</a>
+            <a href="staleness.html">Staleness</a>
+            <a href="compliance.html">Compliance</a>
+            <a href="risk.html">Risk Matrix</a>
+        </nav>
     </header>
 
+    <main>
     <metrics-grid></metrics-grid>
 
     <filter-controls>
@@ -148,6 +150,10 @@
 
     <search-bar>
         <form>
+            <button type="button" class="btn-roulette" data-filter="live,unaudited,roulette">
+                <svg aria-hidden="true"><use href="icons.svg#icon-roulette"></use></svg>
+                <span>Audit Roulette</span>
+            </button>
             <input type="text" name="search" placeholder="Search by repository, commissioner, steward, or domain..." />
         </form>
     </search-bar>
@@ -158,6 +164,7 @@
 
     <projects-grid></projects-grid>
     <scroll-sentinel></scroll-sentinel>
+    </main>
 
     <template id="metrics-template">
         <button class="metric-card all active" data-filter>
@@ -402,7 +409,6 @@
         const spinner = new Spinner();
         const scroller = new InfiniteScroller('projects-grid', 'scroll-sentinel', '#projects-template', spinner, 5);
 
-        document.querySelector('#organization').innerText = config.organization;
         function filtersFromControls() {
             const activeTags = [];
             document.querySelectorAll('filter-controls filter-group').forEach(group => {
