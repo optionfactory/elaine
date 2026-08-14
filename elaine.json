@@ -1,8 +1,0 @@
-{
-  "organization": "optionfactory",
-  "data_dir": "data",
-  "google_auth": {
-    "client_id": "{{ id }}.apps.googleusercontent.com",
-    "hosted_domain": "optionfactory.net"
-  }
-}
