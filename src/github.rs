@@ -84,7 +84,7 @@ impl GithubClient {
             .get(&url)
             .header(AUTHORIZATION, format!("Bearer {}", self.token))
             .header(ACCEPT, "application/vnd.github+json")
-            .header(USER_AGENT, "elaine-rust")
+            .header(USER_AGENT, "elaine")
             .send()
             .await?
             .error_for_status()?;
