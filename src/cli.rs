@@ -4,7 +4,7 @@ use clap::{Parser, Subcommand};
 #[command(
     name = "elaine",
     version,
-    about = "Multi-ecosystem repository, archive, and DevSecOps SBOM inspector",
+    about = "Multi-ecosystem repository auditor: governance manifests, vulnerabilities, and outdated dependencies",
     infer_subcommands = true
 )]
 pub struct Cli {
@@ -29,7 +29,7 @@ pub enum Commands {
         #[arg(long = "force", help = "Force re-downloading archives even if updated_at and pushed_at timestamps match")]
         force: bool,
     },
-    #[command(about = "Audit cached organization repositories for DevSecOps metadata & SBOMs")]
+    #[command(about = "Audit cached organization repositories for governance metadata, vulnerabilities, and outdated dependencies")]
     Scan,
     #[command(about = "Remove cached per-repository scan data and the aggregated stats file")]
     CleanStats,
