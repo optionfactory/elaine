@@ -197,9 +197,9 @@
                     <badge data-tpl-if="fork" class="fork">Fork</badge>
                     <badge data-tpl-if="disabled" class="disabled">Disabled</badge>
                     <badge data-tpl-if="archived" class="archived">Archived</badge>
-                    <badge data-tpl-if="!audit" class="unaudited">No Audit</badge>
-                    <badge data-tpl-if="audit?.tier" class="tier">{{ audit.tier }}</badge>
-                    <badge data-tpl-if="audit?.lifecycle" class="lifecycle">{{ audit.lifecycle }}</badge>
+                    <badge data-tpl-if="!manifest" class="unaudited">No Audit</badge>
+                    <badge data-tpl-if="manifest?.tier" class="tier">{{ manifest.tier }}</badge>
+                    <badge data-tpl-if="manifest?.lifecycle" class="lifecycle">{{ manifest.lifecycle }}</badge>
                 </badges>
                 <time>
                     <div>Created: {{ created_at }}</div>
@@ -208,7 +208,7 @@
                 </time>
             </project-header>
 
-            <info-group data-tpl-if="audit" data-tpl-with="audit">
+            <info-group data-tpl-if="manifest" data-tpl-with="manifest">
                 <info-item>
                     <span class="label">Project type</span>
                     <span class="value">{{ type}}</span>
@@ -233,26 +233,26 @@
 
             <section>
                 <h3>Compliance Frameworks</h3>
-                <tag-list data-tpl-if="!audit?.compliance">
+                <tag-list data-tpl-if="!manifest?.compliance">
                     <tag>No data</tag>
                 </tag-list>
-                <tag-list data-tpl-if="audit?.compliance">
-                    <tag>DORA: {{ audit.compliance.dora }}</tag>
-                    <tag>CRA: {{audit.compliance.cra }}</tag>
-                    <tag>NIS2: {{audit.compliance.nis2}}</tag>
-                    <tag>AI Act: {{audit.compliance.ai_act}}</tag>
-                    <tag>GDPR: {{ audit.compliance.gdpr }}</tag>
-                    <tag>Data Residency: {{audit.compliance.data_residency}}</tag>
-                    <tag>Ads: {{audit.compliance.ads}}</tag>
+                <tag-list data-tpl-if="manifest?.compliance">
+                    <tag>DORA: {{ manifest.compliance.dora }}</tag>
+                    <tag>CRA: {{manifest.compliance.cra }}</tag>
+                    <tag>NIS2: {{manifest.compliance.nis2}}</tag>
+                    <tag>AI Act: {{manifest.compliance.ai_act}}</tag>
+                    <tag>GDPR: {{ manifest.compliance.gdpr }}</tag>
+                    <tag>Data Residency: {{manifest.compliance.data_residency}}</tag>
+                    <tag>Ads: {{manifest.compliance.ads}}</tag>
                 </tag-list>
             </section>
 
-            <section data-tpl-if="audit?.environments">
+            <section data-tpl-if="manifest?.environments">
                 <details>
                     <summary>
                         <h3>Environments</h3>
                         <tag-list>
-                            <tag>{{ audit.environments.length }}</tag>
+                            <tag>{{ manifest.environments.length }}</tag>
                         </tag-list>
                     </summary>
                     <table class="environments">
@@ -267,7 +267,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <tr data-tpl-each="audit.environments" data-tpl-var="env">
+                            <tr data-tpl-each="manifest.environments" data-tpl-var="env">
                                 <td><strong>{{ env.name }}</strong></td>
                                 <td>{{env.type}}</td>
                                 <td>{{env.platform}}</td>
