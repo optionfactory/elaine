@@ -2,7 +2,6 @@ use crate::scanners::osv::fetch_vulnerabilities;
 use crate::scanners::pathcollector::Pattern;
 use crate::scanners::{CheckStatus, OutdatedDependency, RepoStats, ScanContext, Scanner, ScannerKind, Vulnerability};
 use serde::Deserialize;
-use std::process::Command;
 
 #[derive(Deserialize)]
 struct GoListModule {
@@ -20,9 +19,9 @@ struct GoListUpdate {
     version: String,
 }
 
-pub struct GolangScanner;
+pub struct GoScanner;
 
-impl Scanner for GolangScanner {
+impl Scanner for GoScanner {
     fn patterns(&self) -> Vec<(&'static str, Pattern)> {
         vec![("go_mods", Pattern::FileName("go.mod".to_string()))]
     }
@@ -49,11 +48,7 @@ impl Scanner for GolangScanner {
             let run_dir = ctx.root.join(mod_path).parent().unwrap().to_path_buf();
             ctx.set_message(format!("[{}] Running Go checks...", ctx.repo.name));
 
-            let out = match Command::new("go")
-                .current_dir(&run_dir)
-                .args(["list", "-u", "-m", "-json", "all"])
-                .output()
-            {
+            let out = match ctx.run_logged("go", "go", &["list", "-u", "-m", "-json", "all"], &run_dir) {
                 Ok(out) => out,
                 Err(e) => {
                     ctx.report_error(format!("[{}] 🔥 Failed to execute go: {}", ctx.repo.name, e));
@@ -117,12 +112,12 @@ impl Scanner for GolangScanner {
         }
 
         stats.record_check(
-            ScannerKind::Golang,
+            ScannerKind::Go,
             "vulns",
             if vulns_ok { CheckStatus::Ok } else { CheckStatus::Failed },
         );
         stats.record_check(
-            ScannerKind::Golang,
+            ScannerKind::Go,
             "outdated",
             if outdated_ok { CheckStatus::Ok } else { CheckStatus::Failed },
         );

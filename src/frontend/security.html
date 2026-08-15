@@ -80,13 +80,14 @@
     </main>
 
     <template id="failures-template">
-        <p data-tpl-if="self.length == 0">All applicable checks passed.</p>
+        <p data-tpl-if="self.length == 0">All applicable checks passed. 🎉</p>
         <table class="failures" data-tpl-if="self.length > 0">
             <thead>
                 <tr>
                     <th>Repository</th>
                     <th>Scanner</th>
                     <th>Failed checks</th>
+                    <th>Log</th>
                 </tr>
             </thead>
             <tbody>
@@ -94,6 +95,7 @@
                     <td><a data-tpl-href="r.html_url" target="_blank" rel="noopener noreferrer">{{ r.name }}</a></td>
                     <td>{{ r.scanner }}</td>
                     <td>{{ r.checks.join(', ') }}</td>
+                    <td><a href="#" data-tpl-attr="r.log_attr">view</a></td>
                 </tr>
             </tbody>
         </table>
@@ -209,7 +211,13 @@
             }))
             .filter(p => p.per_scanner.length > 0)
             .sort((a, b) => b.per_scanner.length - a.per_scanner.length || a.name.localeCompare(b.name))
-            .flatMap(p => p.per_scanner.map(s => ({ name: p.name, html_url: p.html_url, scanner: s.scanner, checks: s.checks })));
+            .flatMap(p => p.per_scanner.map(s => ({
+                name: p.name,
+                html_url: p.html_url,
+                scanner: s.scanner,
+                checks: s.checks,
+                log_attr: ['href', `/api/logs?repo=${encodeURIComponent(p.name)}&scanner=${encodeURIComponent(s.scanner)}`],
+            })));
         Templates.fromSelector('#failures-template').withOverlay(failures).renderToSelector('failures-grid');
 
         const vulnsRows = all

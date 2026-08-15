@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 pub struct StatsStore {
     pub base_dir: PathBuf,
     pub stats_dir: PathBuf,
+    pub logs_dir: PathBuf,
 }
 
 impl StatsStore {
@@ -13,11 +14,21 @@ impl StatsStore {
         let base_dir = data_dir.as_ref().to_path_buf();
         let stats_dir = base_dir.join("stats");
         fs::create_dir_all(&stats_dir)?;
-        Ok(Self { base_dir, stats_dir })
+        let logs_dir = base_dir.join("stats").join("logs");
+        fs::create_dir_all(&logs_dir)?;
+        Ok(Self {
+            base_dir,
+            stats_dir,
+            logs_dir,
+        })
     }
 
     pub fn project_file_path(&self, repo_name: &str) -> PathBuf {
         self.stats_dir.join(format!("{}.json", repo_name))
+    }
+
+    pub fn repo_logs_dir(&self, repo_name: &str) -> PathBuf {
+        self.logs_dir.join(repo_name)
     }
 
     pub fn aggregate_file_path(&self) -> PathBuf {
@@ -46,6 +57,10 @@ impl StatsStore {
         if path.exists() {
             fs::remove_file(&path).with_context(|| format!("Failed to remove scan data at {:?}", path))?;
         }
+        let logs = self.repo_logs_dir(repo_name);
+        if logs.is_dir() {
+            fs::remove_dir_all(&logs).with_context(|| format!("Failed to remove scan logs at {:?}", logs))?;
+        }
         Ok(())
     }
 
@@ -55,6 +70,9 @@ impl StatsStore {
         };
         for entry in entries.filter_map(|e| e.ok()) {
             let path = entry.path();
+            if !path.is_file() {
+                continue;
+            }
             let Some(file_name) = path.file_name().and_then(|n| n.to_str()) else {
                 continue;
             };
@@ -64,6 +82,10 @@ impl StatsStore {
             if !current_repo_names.contains(repo_name) {
                 eprintln!("  Removing orphaned scan file: {}", file_name);
                 let _ = fs::remove_file(&path);
+                let logs = self.repo_logs_dir(repo_name);
+                if logs.is_dir() {
+                    let _ = fs::remove_dir_all(&logs);
+                }
             }
         }
         Ok(())

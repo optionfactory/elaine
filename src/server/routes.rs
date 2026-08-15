@@ -83,11 +83,42 @@ pub async fn embedded_assets_handler(uri: axum::http::Uri) -> impl IntoResponse 
     }
 }
 
+#[derive(Deserialize)]
+pub struct LogQuery {
+    pub repo: String,
+    pub scanner: String,
+}
+
+/// Serves saved scanner failure logs from <data_dir>/stats/logs/<repo>/<scanner>.log.
+/// Repo/scanner names are validated (no separators) to prevent path traversal.
+pub async fn api_logs_handler(
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<LogQuery>,
+    _auth: ValidatedUser,
+) -> impl IntoResponse {
+    let is_safe = |s: &str| !s.is_empty() && !s.contains('/') && !s.contains('\\') && !s.contains("..");
+    if !is_safe(&query.repo) || !is_safe(&query.scanner) {
+        return (StatusCode::BAD_REQUEST, "Invalid repo or scanner").into_response();
+    }
+    let path = state
+        .config
+        .data_dir
+        .join("stats")
+        .join("logs")
+        .join(&query.repo)
+        .join(format!("{}.log", query.scanner));
+    match tokio::fs::read_to_string(&path).await {
+        Ok(content) => ([(axum::http::header::CONTENT_TYPE, "text/plain; charset=utf-8")], content).into_response(),
+        Err(_) => (StatusCode::NOT_FOUND, "Log not found").into_response(),
+    }
+}
+
 pub fn create_router(app_state: Arc<AppState>, dev: bool) -> Router {
     let mut app = Router::new()
         .route("/api/config", get(api_config_handler))
         .route("/api/stats", get(api_stats_handler))
         .route("/api/projects", get(api_projects_handler))
+        .route("/api/logs", get(api_logs_handler))
         .with_state(app_state);
 
     if dev {

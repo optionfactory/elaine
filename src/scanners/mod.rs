@@ -15,7 +15,7 @@ use crate::sandbox::TarballSandbox;
 use crate::scanners::ansible::AnsibleScanner;
 use crate::scanners::docker::DockerScanner;
 use crate::scanners::elaine::ElaineScanner;
-use crate::scanners::go::GolangScanner;
+use crate::scanners::go::GoScanner;
 use crate::scanners::legopfa::LegopfaScanner;
 use crate::scanners::maven::MavenScanner;
 use crate::scanners::npm::NpmScanner;
@@ -24,8 +24,11 @@ use crate::scanners::pinch::PinchScanner;
 use crate::scanners::rust::RustScanner;
 use indicatif::ProgressBar;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashMap};
+use std::cell::RefCell;
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Vulnerability {
@@ -75,7 +78,7 @@ pub struct RepoStats {
 pub enum ScannerKind {
     Rust,
     Npm,
-    Golang,
+    Go,
     Maven,
     Pinch,
     Elaine,
@@ -183,6 +186,8 @@ pub struct ScanContext<'a> {
     pub matches: &'a HashMap<String, Vec<PathBuf>>,
     pub pb: Option<&'a ProgressBar>,
     pub client: &'a reqwest::Client,
+    pub logs_dir: Option<&'a Path>,
+    opened_logs: RefCell<HashSet<String>>,
 }
 
 impl<'a> ScanContext<'a> {
@@ -196,6 +201,96 @@ impl<'a> ScanContext<'a> {
             p.println(msg);
         }
     }
+
+    /// Runs a command, streaming its stdout/stderr to `<logs_dir>/<scanner>.log`
+    /// while it executes, and returning the captured output for parsing.
+    /// The log is truncated on the first command of a scanner per scan and
+    /// appended to for subsequent ones. Errors only on spawn/IO failure;
+    /// a non-zero exit is reported via `CommandOutput::success`.
+    pub fn run_logged(&self, scanner: &str, program: &str, args: &[&str], current_dir: &Path) -> anyhow::Result<CommandOutput> {
+        let (mut log_file, log_enabled) = match self.logs_dir {
+            Some(dir) => {
+                std::fs::create_dir_all(dir)?;
+                let path = dir.join(format!("{}.log", scanner));
+                let first_for_scanner = self.opened_logs.borrow_mut().insert(scanner.to_string());
+                // Truncate on the first command of the scan, then append.
+                let mut opts = std::fs::OpenOptions::new();
+                opts.create(true)
+                    .append(!first_for_scanner)
+                    .write(first_for_scanner)
+                    .truncate(first_for_scanner);
+                let file = opts.open(&path)?;
+                (Some(file), true)
+            }
+            None => (None, false),
+        };
+
+        if log_enabled && let Some(f) = log_file.as_mut() {
+            let _ = writeln!(f, "> {} {}", program, args.join(" "));
+        }
+
+        let mut child = match Command::new(program)
+            .args(args)
+            .current_dir(current_dir)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+        {
+            Ok(c) => c,
+            Err(e) => {
+                if let Some(f) = log_file.as_mut() {
+                    let _ = writeln!(f, "[spawn error] {}: {}", program, e);
+                }
+                return Err(e.into());
+            }
+        };
+
+        let stdout_pipe = child.stdout.take().expect("stdout piped");
+        let stderr_pipe = child.stderr.take().expect("stderr piped");
+
+        fn tee(mut pipe: impl Read, mut sink: Option<std::fs::File>) -> Vec<u8> {
+            let mut captured = Vec::new();
+            let mut chunk = [0u8; 8192];
+            loop {
+                match pipe.read(&mut chunk) {
+                    Ok(0) | Err(_) => break,
+                    Ok(n) => {
+                        if let Some(f) = sink.as_mut() {
+                            let _ = f.write_all(&chunk[..n]);
+                        }
+                        captured.extend_from_slice(&chunk[..n]);
+                    }
+                }
+            }
+            captured
+        }
+
+        let stderr_file = log_file.as_ref().and_then(|f| f.try_clone().ok());
+        let stdout_file = log_file.as_ref().and_then(|f| f.try_clone().ok());
+        let stderr_handle = std::thread::spawn(move || tee(stderr_pipe, stderr_file));
+        let stdout_handle = std::thread::spawn(move || tee(stdout_pipe, stdout_file));
+
+        let status = child.wait()?;
+        let stdout = stdout_handle.join().unwrap_or_default();
+        let stderr = stderr_handle.join().unwrap_or_default();
+
+        if let Some(f) = log_file.as_mut() {
+            let _ = writeln!(f, "[exit: {}]", status);
+        }
+
+        Ok(CommandOutput {
+            success: status.success(),
+            stdout,
+            stderr,
+        })
+    }
+}
+
+/// Captured result of a command spawned via `ScanContext::run_logged`.
+pub struct CommandOutput {
+    pub success: bool,
+    pub stdout: Vec<u8>,
+    pub stderr: Vec<u8>,
 }
 
 /// The Trait implemented by all specific ecosystem/tool scanners
@@ -206,7 +301,12 @@ pub trait Scanner {
     fn scan(&self, ctx: &ScanContext, stats: &mut RepoStats) -> anyhow::Result<()>;
 }
 
-pub fn scan_repository(repo: &GithubRepository, tarball_path: &Path, pb: Option<ProgressBar>) -> anyhow::Result<RepoStats> {
+pub fn scan_repository(
+    repo: &GithubRepository,
+    tarball_path: &Path,
+    pb: Option<ProgressBar>,
+    logs_dir: Option<&Path>,
+) -> anyhow::Result<RepoStats> {
     if let Some(ref p) = pb {
         p.set_message(format!("[{}] Unpacking archive...", repo.name));
     }
@@ -223,7 +323,7 @@ pub fn scan_repository(repo: &GithubRepository, tarball_path: &Path, pb: Option<
         Box::new(DockerScanner),
         Box::new(MavenScanner),
         Box::new(RustScanner),
-        Box::new(GolangScanner),
+        Box::new(GoScanner),
         Box::new(NpmScanner),
         Box::new(AnsibleScanner),
         Box::new(LegopfaScanner),
@@ -245,6 +345,8 @@ pub fn scan_repository(repo: &GithubRepository, tarball_path: &Path, pb: Option<
         matches: &matches,
         pb: pb.as_ref(),
         client: &client,
+        logs_dir,
+        opened_logs: RefCell::new(HashSet::new()),
     };
     for scanner in &scanners {
         scanner.scan(&ctx, &mut stats)?;
@@ -255,4 +357,72 @@ pub fn scan_repository(repo: &GithubRepository, tarball_path: &Path, pb: Option<
     }
 
     Ok(stats)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::github::GithubRepository;
+    use tempfile::TempDir;
+
+    #[test]
+    fn run_logged_truncates_then_appends_with_command_headers() {
+        let dir = TempDir::new().unwrap();
+        let repo = GithubRepository::default();
+        let matches = HashMap::new();
+        let client = reqwest::Client::new();
+        let ctx = ScanContext {
+            repo: &repo,
+            root: dir.path(),
+            matches: &matches,
+            pb: None,
+            client: &client,
+            logs_dir: Some(dir.path()),
+            opened_logs: RefCell::new(HashSet::new()),
+        };
+
+        let first = ctx.run_logged("echo-test", "sh", &["-c", "echo one"], dir.path()).unwrap();
+        assert!(first.success);
+        assert_eq!(String::from_utf8_lossy(&first.stdout).trim(), "one");
+
+        let second = ctx.run_logged("echo-test", "sh", &["-c", "echo two"], dir.path()).unwrap();
+        assert!(second.success);
+
+        let log = std::fs::read_to_string(dir.path().join("echo-test.log")).unwrap();
+        let lines: Vec<&str> = log.lines().collect();
+        assert_eq!(
+            lines[0], "> sh -c echo one",
+            "first run must start with a > header and truncate prior content"
+        );
+        assert!(log.contains("one"));
+        assert!(log.contains("> sh -c echo two"), "second run must append with its own > header");
+        assert!(log.contains("two"));
+        assert!(log.contains("[exit:"));
+        // Content from run one must survive the append of run two.
+        let one_pos = log.find("one").unwrap();
+        let two_pos = log.find("two").unwrap();
+        assert!(one_pos < two_pos);
+    }
+
+    #[test]
+    fn run_logged_streams_stderr_too() {
+        let dir = TempDir::new().unwrap();
+        let repo = GithubRepository::default();
+        let matches = HashMap::new();
+        let client = reqwest::Client::new();
+        let ctx = ScanContext {
+            repo: &repo,
+            root: dir.path(),
+            matches: &matches,
+            pb: None,
+            client: &client,
+            logs_dir: Some(dir.path()),
+            opened_logs: RefCell::new(HashSet::new()),
+        };
+        let out = ctx.run_logged("err-test", "sh", &["-c", "echo oops 1>&2"], dir.path()).unwrap();
+        assert!(out.success);
+        assert_eq!(String::from_utf8_lossy(&out.stderr).trim(), "oops");
+        let log = std::fs::read_to_string(dir.path().join("err-test.log")).unwrap();
+        assert!(log.contains("oops"), "stderr must be teed into the log file");
+    }
 }

@@ -317,7 +317,8 @@ impl Elaine {
 
                 let result: anyhow::Result<crate::scanners::RepoStats> = if tar_path.exists() {
                     let pb_clone = task_pb.clone();
-                    tokio::task::spawn_blocking(move || crate::scanners::scan_repository(&repo, &tar_path, Some(pb_clone)))
+                    let logs_dir = data_store.repo_logs_dir(&repo_name);
+                    tokio::task::spawn_blocking(move || crate::scanners::scan_repository(&repo, &tar_path, Some(pb_clone), Some(&logs_dir)))
                         .await
                         .context("scanner task failed")?
                 } else {

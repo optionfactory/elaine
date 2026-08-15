@@ -4,7 +4,6 @@ use crate::scanners::{CheckStatus, OutdatedDependency, RepoStats, ScanContext, S
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
-use std::process::Command;
 
 #[derive(Deserialize)]
 struct PackageLock {
@@ -98,7 +97,7 @@ impl Scanner for NpmScanner {
             .is_some();
             vulns_ok &= per_vulns_ok;
 
-            let per_outdated_ok = match Command::new("npm").current_dir(&run_dir).args(["outdated", "--json"]).output() {
+            let per_outdated_ok = match ctx.run_logged("npm", "npm", &["outdated", "--json"], &run_dir) {
                 Ok(out) => {
                     let payload = String::from_utf8_lossy(&out.stdout);
                     if let Ok(parsed) = serde_json::from_str::<HashMap<String, NpmOutdatedDep>>(&payload) {

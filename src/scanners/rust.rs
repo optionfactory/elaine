@@ -3,7 +3,6 @@ use crate::scanners::pathcollector::Pattern;
 use crate::scanners::{CheckStatus, OutdatedDependency, RepoStats, ScanContext, Scanner, ScannerKind, Vulnerability};
 use serde::Deserialize;
 use std::fs;
-use std::process::Command;
 
 #[derive(Deserialize)]
 struct CargoLock {
@@ -97,11 +96,7 @@ impl Scanner for RustScanner {
             .is_some();
             vulns_ok &= per_vulns_ok;
 
-            let per_outdated_ok = match Command::new("cargo")
-                .current_dir(&run_dir)
-                .args(["outdated", "--format", "json", "--workspace"])
-                .output()
-            {
+            let per_outdated_ok = match ctx.run_logged("rust", "cargo", &["outdated", "--format", "json", "--workspace"], &run_dir) {
                 Ok(out) => {
                     if let Ok(payload) = String::from_utf8(out.stdout) {
                         for line in payload.lines() {

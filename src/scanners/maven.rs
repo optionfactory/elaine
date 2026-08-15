@@ -2,7 +2,6 @@ use crate::scanners::pathcollector::Pattern;
 use crate::scanners::{CheckStatus, OutdatedDependency, RepoStats, ScanContext, Scanner, ScannerKind, Vulnerability};
 use std::fs;
 use std::path::Path;
-use std::process::Command;
 
 pub struct MavenScanner;
 impl Scanner for MavenScanner {
@@ -39,19 +38,21 @@ impl Scanner for MavenScanner {
 
             ctx.set_message(format!("[{}] Running Maven checks...", ctx.repo.name));
 
-            let output = Command::new("mvn")
-                .current_dir(&run_dir)
-                .args([
+            let output = ctx.run_logged(
+                "maven",
+                "mvn",
+                &[
                     "-B",
                     "-U",
                     "-ntp",
                     "net.optionfactory:anarchitect-maven-plugin:LATEST:check-vulns",
                     "net.optionfactory:anarchitect-maven-plugin:LATEST:check-updates",
-                ])
-                .output();
+                ],
+                &run_dir,
+            );
 
             match output {
-                Ok(out) if out.status.success() => {
+                Ok(out) if out.success => {
                     stats.checked_for_vulnerabilities();
                     stats.checked_for_outdated_dependencies();
 
