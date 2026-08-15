@@ -26,16 +26,20 @@
 <body>
     <header>
         <h1><svg class="brand-icon" viewBox="0 0 64 64" aria-hidden="true"><use href="favicon.svg"></use></svg>Elaine <span class="page">/ Governance</span></h1>
-        <nav id="view-nav">
+        <nav>
             <a href="index.html">Dashboard</a>
             <a class="active">Governance</a>
             <a href="security.html">Security</a>
             <a href="inventory.html">Inventory</a>
         </nav>
+        <nav>
+            <a href="#coverage">Coverage</a>
+            <a href="#staleness">Staleness</a>
+        </nav>
     </header>
 
     <main>
-    <section>
+    <section id="coverage">
         <h2>Framework assessment coverage</h2>
         <p class="section-intro">
             How far the regulatory assessment has progressed across the repositories that declare compliance data
@@ -48,7 +52,7 @@
         <compliance-grid></compliance-grid>
     </section>
 
-    <section>
+    <section id="staleness">
         <h2>Repositories by inactivity</h2>
         <p class="section-intro">
             Time since the last push for every live repository. Repos receiving no commits for 6+ months are likely
@@ -112,7 +116,7 @@
 
     <script type="module">
         import { Templates } from "ftl";
-        import { authenticate, projects } from "/elaine.js";
+        import { authenticate, projects, setupNavSpy } from "/elaine.js";
 
         const { config, http } = await authenticate();
 
@@ -160,6 +164,8 @@
             }))
             .sort((a, b) => b.months - a.months);
         Templates.fromSelector('#staleness-template').withOverlay(enriched).renderToSelector('staleness-grid');
+
+        setupNavSpy();
     </script>
 </body>
 

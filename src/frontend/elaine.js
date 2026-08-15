@@ -207,4 +207,18 @@ class Dialog {
     }
 }
 
-export { Spinner, InfiniteScroller, authenticate, projects, Dialog }
+/// Highlights the section nav link matching the section currently in view.
+function setupNavSpy() {
+    const navLinks = document.querySelectorAll('header > nav:nth-of-type(2) a');
+    if (navLinks.length === 0) return;
+    const sections = [...navLinks].map(a => document.querySelector(a.hash));
+    const spy = new IntersectionObserver(entries => {
+        for (const entry of entries) {
+            if (!entry.isIntersecting) continue;
+            navLinks.forEach(a => a.classList.toggle('active', a.hash === `#${entry.target.id}`));
+        }
+    }, { rootMargin: '-10% 0px -80% 0px' });
+    sections.forEach(s => s && spy.observe(s));
+}
+
+export { Spinner, InfiniteScroller, authenticate, projects, Dialog, setupNavSpy }

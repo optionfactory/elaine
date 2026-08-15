@@ -26,16 +26,22 @@
 <body>
     <header>
         <h1><svg class="brand-icon" viewBox="0 0 64 64" aria-hidden="true"><use href="favicon.svg"></use></svg>Elaine <span class="page">/ Security</span></h1>
-        <nav id="view-nav">
+        <nav>
             <a href="index.html">Dashboard</a>
             <a href="governance.html">Governance</a>
             <a class="active">Security</a>
             <a href="inventory.html">Inventory</a>
         </nav>
+        <nav>
+            <a href="#failures">Scanner failures</a>
+            <a href="#risk">Risk matrix</a>
+            <a href="#vulns">Vulnerabilities</a>
+            <a href="#outdated">Outdated</a>
+        </nav>
     </header>
 
     <main>
-    <section>
+    <section id="failures">
         <h2>Scanner failures</h2>
         <p class="section-intro">
             Repositories where a scanner could not complete (e.g. OSV unreachable, <code>npm</code>/<code>cargo</code>/<code>mvn</code>/<code>go</code>
@@ -46,7 +52,7 @@
         <failures-grid></failures-grid>
     </section>
 
-    <section>
+    <section id="risk">
         <h2>Tier &times; exposure matrix</h2>
         <p class="section-intro">
             Live repositories classified by operational criticality (tier) and network exposure (most permissive
@@ -58,7 +64,7 @@
         <risk-grid></risk-grid>
     </section>
 
-    <section>
+    <section id="vulns">
         <h2>Known vulnerabilities (top 50)</h2>
         <p class="section-intro">
             Live repositories with known vulnerabilities, sorted by count. The same advisory often hits many
@@ -68,7 +74,7 @@
         <vulns-grid></vulns-grid>
     </section>
 
-    <section>
+    <section id="outdated">
         <h2>Outdated dependencies (top 50)</h2>
         <p class="section-intro">
             Live repositories by number of outdated dependencies, plus the artifacts that are stale across the
@@ -189,7 +195,7 @@
 
     <script type="module">
         import { Templates } from "ftl";
-        import { authenticate, projects, Dialog } from "/elaine.js";
+        import { authenticate, projects, Dialog, setupNavSpy } from "/elaine.js";
 
         const { config, http } = await authenticate();
 
@@ -310,6 +316,8 @@
 
         window.addEventListener('hashchange', showLogFromHash);
         showLogFromHash();
+
+        setupNavSpy();
     </script>
 </body>
 
