@@ -37,7 +37,7 @@
     <metrics-grid></metrics-grid>
 
     <filter-controls>
-        <filter-group data-group="status">
+        <filter-group>
             <label>Status:</label>
             <state-button>
                 <state title="Any" data-value="any"><svg><use href="icons.svg#icon-any"></use></svg></state>
@@ -48,7 +48,7 @@
             </state-button>
         </filter-group>
 
-        <filter-group data-group="visibility">
+        <filter-group>
             <label>Visibility:</label>
             <state-button>
                 <state title="Any" active data-value="any"><svg><use href="icons.svg#icon-any"></use></svg></state>
@@ -58,18 +58,18 @@
         </filter-group>
 
 
-        <filter-group data-group="audit">
-            <label>Audited:</label>
+        <filter-group>
+            <label>Manifest:</label>
             <state-button>
                 <state title="Any" active data-value="any"><svg><use href="icons.svg#icon-any"></use></svg></state>
-                <state title="Audited" data-value="audited"><svg><use href="icons.svg#icon-audited"></use></svg></state>
-                <state title="Not audited" data-value="unaudited"><svg><use href="icons.svg#icon-unaudited"></use></svg></state>
+                <state title="Elaine manifest present" data-value="manifest"><svg><use href="icons.svg#icon-manifest"></use></svg></state>
+                <state title="Elaine manifest missing" data-value="nomanifest"><svg><use href="icons.svg#icon-nomanifest"></use></svg></state>
             </state-button>
         </filter-group>
 
 
 
-        <filter-group data-group="vulnerability">
+        <filter-group>
             <label>Vulnerabilities:</label>
             <state-button>
                 <state title="Any" active data-value="any"><svg><use href="icons.svg#icon-any"></use></svg></state>
@@ -78,7 +78,7 @@
             </state-button>
         </filter-group>
 
-        <filter-group data-group="outdated">
+        <filter-group>
             <label>Outdated deps:</label>
             <state-button>
                 <state title="Any" active data-value="any"><svg><use href="icons.svg#icon-any"></use></svg></state>
@@ -87,7 +87,7 @@
             </state-button>
         </filter-group>
 
-        <filter-group data-group="tiers">
+        <filter-group>
             <label>Tier:</label>
             <state-button>
                 <state title="Any" active data-value="any"><svg><use href="icons.svg#icon-any"></use></svg></state>
@@ -98,7 +98,7 @@
             </state-button>
         </filter-group>
 
-        <filter-group data-group="type">
+        <filter-group>
             <label>Project type:</label>
             <state-button>
                 <state title="Any" active data-value="any"><svg><use href="icons.svg#icon-any"></use></svg></state>
@@ -111,7 +111,7 @@
             </state-button>
         </filter-group>
 
-        <filter-group data-group="lifecycle">
+        <filter-group>
             <label>Lifecycle:</label>
             <state-button>
                 <state title="Any" active data-value="any"><svg><use href="icons.svg#icon-any"></use></svg></state>
@@ -124,7 +124,7 @@
             </state-button>
         </filter-group>
 
-        <filter-group data-group="ingress">
+        <filter-group>
             <label>Ingress:</label>
             <state-button>
                 <state title="Any" active data-value="any"><svg><use href="icons.svg#icon-any"></use></svg></state>
@@ -137,7 +137,7 @@
             </state-button>
         </filter-group>
 
-        <filter-group data-group="compliance">
+        <filter-group>
             <label>Compliance:</label>
             <state-button>
                 <state title="Any" active data-value="any"><svg><use href="icons.svg#icon-any"></use></svg></state>
@@ -150,7 +150,7 @@
 
     <search-bar>
         <form>
-            <button type="button" class="btn-roulette" data-filter="live,unaudited,roulette">
+            <button type="button" class="btn-roulette" data-filter="live,nomanifest,roulette">
                 <svg aria-hidden="true"><use href="icons.svg#icon-roulette"></use></svg>
                 <span>Audit Roulette</span>
             </button>
@@ -175,13 +175,13 @@
             <h2>Live Repositories</h2>
             {{ live }}
         </button>
-        <button class="metric-card compliant" data-filter="live,audited">
-            <h2>Audited Live Repositories</h2>
-            {{ live_audited }}
+        <button class="metric-card compliant" data-filter="live,manifest">
+            <h2>Live Repositories with manifest</h2>
+            {{ live_manifest }}
         </button>
-        <button class="metric-card noncompliant" data-filter="live,unaudited">
-            <h2>Unaudited Live Repositories</h2>
-            {{ live_unaudited }}
+        <button class="metric-card noncompliant" data-filter="live,nomanifest">
+            <h2>Live Repositories without manifest</h2>
+            {{ live_nomanifest }}
         </button>
     </template>
 
@@ -197,7 +197,7 @@
                     <badge data-tpl-if="fork" class="fork">Fork</badge>
                     <badge data-tpl-if="disabled" class="disabled">Disabled</badge>
                     <badge data-tpl-if="archived" class="archived">Archived</badge>
-                    <badge data-tpl-if="!manifest" class="unaudited">No Audit</badge>
+                    <badge data-tpl-if="!manifest" class="nomanifest">No Manifest</badge>
                     <badge data-tpl-if="manifest?.tier" class="tier">{{ manifest.tier }}</badge>
                     <badge data-tpl-if="manifest?.lifecycle" class="lifecycle">{{ manifest.lifecycle }}</badge>
                     <badge data-tpl-if="failed_checks > 0" class="failed-checks">{{ failed_checks }} check{{ failed_checks > 1 ? 's' : '' }} failed</badge>

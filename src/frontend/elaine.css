@@ -562,7 +562,7 @@ badges {
             color: #eff6ff;
         }
 
-        &.unaudited {
+        &.nomanifest {
             background: #ea580c;
             color: #fff7ed;
         }

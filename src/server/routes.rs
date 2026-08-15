@@ -122,7 +122,7 @@ pub fn create_router(app_state: Arc<AppState>, dev: bool) -> Router {
 
 fn matches_filters(p: &crate::scanners::RepoStats, filters: &[&str]) -> bool {
     let live = !p.archived;
-    let audited = p.manifest.is_some();
+    let manifest = p.manifest.is_some();
     let public = !p.private;
     let has_vulns = p.vulnerabilities.as_ref().map(|v| !v.is_empty()).unwrap_or(false);
     let has_outdated = p.outdated_dependencies.as_ref().map(|v| !v.is_empty()).unwrap_or(false);
@@ -145,10 +145,10 @@ fn matches_filters(p: &crate::scanners::RepoStats, filters: &[&str]) -> bool {
     if filters.contains(&"private") && public {
         return false;
     }
-    if filters.contains(&"audited") && !audited {
+    if filters.contains(&"manifest") && !manifest {
         return false;
     }
-    if filters.contains(&"unaudited") && audited {
+    if filters.contains(&"nomanifest") && manifest {
         return false;
     }
     if filters.contains(&"vulns") && !has_vulns {

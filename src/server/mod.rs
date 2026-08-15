@@ -11,8 +11,8 @@ use tokio::sync::RwLock;
 pub struct DashboardStats {
     pub all: usize,
     pub live: usize,
-    pub live_audited: usize,
-    pub live_unaudited: usize,
+    pub live_manifest: usize,
+    pub live_nomanifest: usize,
 }
 
 impl DashboardStats {
@@ -25,9 +25,9 @@ impl DashboardStats {
             }
             s.live += 1;
             if r.manifest.is_some() {
-                s.live_audited += 1;
+                s.live_manifest += 1;
             } else {
-                s.live_unaudited += 1;
+                s.live_nomanifest += 1;
             }
         }
         s
@@ -56,13 +56,13 @@ mod tests {
     use crate::github::GithubRepository;
     use crate::scanners::RepoStats;
 
-    fn repo(archived: bool, audited: bool) -> RepoStats {
+    fn repo(archived: bool, manifest: bool) -> RepoStats {
         let mut r = RepoStats::new_from_github(&GithubRepository {
             name: "x".into(),
             archived,
             ..Default::default()
         });
-        if audited {
+        if manifest {
             // ElaineManifest only requires `schema_version` and `name`; every other field is optional.
             r.manifest = Some(serde_json::from_str(r#"{"schema_version":1,"name":"x"}"#).unwrap());
         }
@@ -72,11 +72,11 @@ mod tests {
     #[test]
     fn empty_yields_zeros() {
         let s = DashboardStats::calculate(&[]);
-        assert_eq!((s.all, s.live, s.live_audited, s.live_unaudited), (0, 0, 0, 0));
+        assert_eq!((s.all, s.live, s.live_manifest, s.live_nomanifest), (0, 0, 0, 0));
     }
 
     #[test]
-    fn counts_live_audited_vs_unaudited() {
+    fn counts_live_manifest_vs_nomanifest() {
         let projects = vec![
             repo(false, true),
             repo(false, false),
@@ -86,15 +86,15 @@ mod tests {
         let s = DashboardStats::calculate(&projects);
         assert_eq!(s.all, 4);
         assert_eq!(s.live, 3);
-        assert_eq!(s.live_audited, 1);
-        assert_eq!(s.live_unaudited, 2);
+        assert_eq!(s.live_manifest, 1);
+        assert_eq!(s.live_nomanifest, 2);
     }
 
     #[test]
-    fn archived_does_not_count_as_live_even_when_audited() {
+    fn archived_does_not_count_as_live_even_when_manifest() {
         let s = DashboardStats::calculate(&[repo(true, true), repo(false, true)]);
         assert_eq!(s.all, 2);
         assert_eq!(s.live, 1);
-        assert_eq!(s.live_audited, 1);
+        assert_eq!(s.live_manifest, 1);
     }
 }

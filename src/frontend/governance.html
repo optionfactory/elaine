@@ -90,8 +90,8 @@
                     <th>Framework</th>
                     <th>Assessed</th>
                     <th>Pending</th>
-                    <th>Unaudited repos</th>
-                    <th>Coverage (audited repos)</th>
+                    <th>Repos without manifest</th>
+                    <th>Coverage (repos with manifest)</th>
                 </tr>
             </thead>
             <tbody>
@@ -144,10 +144,10 @@
         }
 
         const frameworks = ['dora', 'cra', 'nis2', 'ai_act', 'gdpr', 'data_residency', 'ads'];
-        const audited = all.filter(p => p.manifest?.compliance);
+        const withManifest = all.filter(p => p.manifest?.compliance);
         const rows = frameworks.map(fw => {
             let assessed = 0, pending = 0;
-            for (const p of audited) {
+            for (const p of withManifest) {
                 const value = p.manifest.compliance[fw];
                 if (String(value).startsWith('pending')) {
                     pending++;
@@ -155,12 +155,12 @@
                     assessed++;
                 }
             }
-            const coverage = audited.length ? Math.round((assessed / audited.length) * 100) : 0;
+            const coverage = withManifest.length ? Math.round((assessed / withManifest.length) * 100) : 0;
             const color = coverage >= 80 ? 'var(--success)' : coverage >= 50 ? 'var(--warning)' : 'var(--danger)';
             return {
                 framework: fw.replace('_', '-').toUpperCase(),
                 assessed, pending,
-                missing: all.length - audited.length,
+                missing: all.length - withManifest.length,
                 coverage_pct: coverage,
                 coverage_attr: ['style', `width: ${coverage}%; --fill-color: ${color}`],
             };

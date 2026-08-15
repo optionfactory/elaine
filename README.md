@@ -61,7 +61,7 @@ The tool operates in three main phases based on the local `elaine.conf.json` con
 
 ### Governance & Compliance (`elaine.yaml`)
 
-Each repository can declare an `elaine.yaml` governance manifest at its root. Elaine audits it and surfaces the metadata (service tier, lifecycle, project type, regulatory applicability) in the dashboard, where it can be used to filter projects. Repositories without a valid manifest show up as *unaudited*:
+Each repository can declare an `elaine.yaml` governance manifest at its root. Elaine audits it and surfaces the metadata (service tier, lifecycle, project type, regulatory applicability) in the dashboard, where it can be used to filter projects. Repositories without a valid manifest show up as *without manifest*:
 
 > *"Let's face it, Guybrush. You're a natural born failure."* 
 >
