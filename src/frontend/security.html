@@ -219,7 +219,7 @@
         Templates.fromSelector('#failures-template').withOverlay(failures).renderToSelector('failures-grid');
 
         const vulnsRows = all
-            .map(p => ({ ...p, vulns: p.vulnerabilities?.length ?? 0 }))
+            .map(p => ({ ...p, vulns: p.vulnerabilities?.length ?? 0, tier: p.manifest?.tier ?? null }))
             .filter(p => p.vulns > 0)
             .sort((a, b) => b.vulns - a.vulns)
             .slice(0, 50)
@@ -227,8 +227,7 @@
                 name: p.name,
                 html_url: p.html_url,
                 vulns: p.vulns,
-                worst: p.vulnerabilities[0]?.vuln_id ?? null,
-                worst_url: `https://github.com/advisories/${p.vulnerabilities[0]?.vuln_id}`,
+                tier: p.tier,
             }));
         Templates.fromSelector('#vulns-template').withOverlay(vulnsRows).renderToSelector('vulns-grid');
 
