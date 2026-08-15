@@ -62,15 +62,18 @@ impl Scanner for RustScanner {
                 let lockfile = match toml::from_str::<CargoLock>(&content) {
                     Ok(lf) => lf,
                     Err(e) => {
-                        ctx.report_error(format!("[{}] 🔥 Failed to parse Cargo.lock: {}", ctx.repo.name, e));
+                        ctx.report_failure("rust", &format!("Failed to parse Cargo.lock {}: {}", lock_path.display(), e));
                         return None;
                     }
                 };
-                let packages = lockfile.package?;
-                let deps: Vec<(&str, &str, &str)> = packages
-                    .iter()
-                    .map(|p| ("crates.io", p.name.as_str(), p.version.as_str()))
-                    .collect();
+                let packages = match lockfile.package {
+                    Some(p) => p,
+                    None => {
+                        ctx.report_failure("rust", &format!("No 'package' table in {}", lock_path.display()));
+                        return None;
+                    }
+                };
+                let deps: Vec<(&str, &str, &str)> = packages.iter().map(|p| ("crates.io", p.name.as_str(), p.version.as_str())).collect();
                 match fetch_vulnerabilities(ctx.client, &deps) {
                     Ok(vulns) => {
                         stats.add_vulnerabilities(
@@ -88,7 +91,7 @@ impl Scanner for RustScanner {
                         Some(())
                     }
                     Err(e) => {
-                        ctx.report_error(format!("[{}] 🔥 OSV check failed: {}", ctx.repo.name, e));
+                        ctx.report_failure("rust", &format!("OSV check failed for {}: {}", lock_path.display(), e));
                         None
                     }
                 }
@@ -98,44 +101,39 @@ impl Scanner for RustScanner {
 
             let per_outdated_ok = match ctx.run_logged("rust", "cargo", &["outdated", "--format", "json", "--workspace"], &run_dir) {
                 Ok(out) => {
-                    if let Ok(payload) = String::from_utf8(out.stdout) {
-                        for line in payload.lines() {
-                            if let Ok(parsed) = serde_json::from_str::<OutdatedOutput>(line) {
-                                let updates: Vec<OutdatedDependency> = parsed
-                                    .dependencies
-                                    .into_iter()
-                                    .map(|dep| OutdatedDependency {
-                                        project: ctx.repo.name.clone(),
-                                        kind: dep.kind.unwrap_or_else(|| "Normal".to_string()),
-                                        artifact: dep.name,
-                                        current: dep.project,
-                                        latest: dep.latest,
-                                    })
-                                    .collect();
-                                stats.add_outdated_dependencies(updates);
-                            }
+                    let payload = String::from_utf8_lossy(&out.stdout).into_owned();
+                    let parsed_any = payload.lines().any(|line| serde_json::from_str::<OutdatedOutput>(line).is_ok());
+                    if !parsed_any && !payload.trim().is_empty() {
+                        ctx.report_failure("rust", &format!("Failed to parse cargo outdated output for {}", lock_path.display()));
+                    }
+                    for line in payload.lines() {
+                        if let Ok(parsed) = serde_json::from_str::<OutdatedOutput>(line) {
+                            let updates: Vec<OutdatedDependency> = parsed
+                                .dependencies
+                                .into_iter()
+                                .map(|dep| OutdatedDependency {
+                                    project: ctx.repo.name.clone(),
+                                    kind: dep.kind.unwrap_or_else(|| "Normal".to_string()),
+                                    artifact: dep.name,
+                                    current: dep.project,
+                                    latest: dep.latest,
+                                })
+                                .collect();
+                            stats.add_outdated_dependencies(updates);
                         }
                     }
                     true
                 }
                 Err(e) => {
-                    ctx.report_error(format!("[{}] 🔥 Failed to execute cargo outdated: {}", ctx.repo.name, e));
+                    ctx.report_failure("rust", &format!("Failed to execute cargo outdated for {}: {}", lock_path.display(), e));
                     false
                 }
             };
             outdated_ok &= per_outdated_ok;
         }
 
-        stats.record_check(
-            ScannerKind::Rust,
-            "vulns",
-            if vulns_ok { CheckStatus::Ok } else { CheckStatus::Failed },
-        );
-        stats.record_check(
-            ScannerKind::Rust,
-            "outdated",
-            if outdated_ok { CheckStatus::Ok } else { CheckStatus::Failed },
-        );
+        stats.record_check(ScannerKind::Rust, "vulns", if vulns_ok { CheckStatus::Ok } else { CheckStatus::Failed });
+        stats.record_check(ScannerKind::Rust, "outdated", if outdated_ok { CheckStatus::Ok } else { CheckStatus::Failed });
         Ok(())
     }
 }

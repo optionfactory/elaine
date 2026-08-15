@@ -95,7 +95,7 @@
                     <td><a data-tpl-href="r.html_url" target="_blank" rel="noopener noreferrer">{{ r.name }}</a></td>
                     <td>{{ r.scanner }}</td>
                     <td>{{ r.checks.join(', ') }}</td>
-                    <td><a href="#" data-tpl-attr="r.log_attr">view</a></td>
+                    <td><a data-tpl-href="`#log/{r.name}/{r.scanner}`">logs</a></td>
                 </tr>
             </tbody>
         </table>
@@ -107,15 +107,14 @@
                 <tr>
                     <th>Repository</th>
                     <th>Vulnerabilities</th>
-                    <th>Most recent advisory</th>
+                    <th>Tier</th>
                 </tr>
             </thead>
             <tbody>
                 <tr data-tpl-each="self" data-tpl-var="r">
                     <td><a data-tpl-href="r.html_url" target="_blank" rel="noopener noreferrer">{{ r.name }}</a></td>
                     <td>{{ r.vulns }}</td>
-                    <td data-tpl-if="r.worst"><a data-tpl-href="r.worst_url" target="_blank" rel="noopener noreferrer">{{ r.worst }}</a></td>
-                    <td data-tpl-if="!r.worst"></td>
+                    <td>{{ r.tier ?? 'unspecified' }}</td>
                 </tr>
             </tbody>
         </table>
@@ -185,12 +184,12 @@
                     </tr>
                 </tbody>
             </table>
-        </section>
-    </template>
+         </section>
+     </template>
 
     <script type="module">
         import { Templates } from "ftl";
-        import { authenticate, projects } from "/elaine.js";
+        import { authenticate, projects, Dialog } from "/elaine.js";
 
         const { config, http } = await authenticate();
 
@@ -216,7 +215,6 @@
                 html_url: p.html_url,
                 scanner: s.scanner,
                 checks: s.checks,
-                log_attr: ['href', `/api/logs?repo=${encodeURIComponent(p.name)}&scanner=${encodeURIComponent(s.scanner)}`],
             })));
         Templates.fromSelector('#failures-template').withOverlay(failures).renderToSelector('failures-grid');
 
@@ -289,6 +287,30 @@
             .slice(0, 50);
 
         Templates.fromSelector('#risk-template').withOverlay({ rows, exposures, worst }).renderToSelector('risk-grid');
+
+        // Log viewer popup: #log/<repo>/<scanner>
+        const logDialog = new Dialog();
+        const clearLogHash = () => history.replaceState(null, null, window.location.pathname + window.location.search);
+        logDialog.onClose(clearLogHash);
+
+        async function showLogFromHash() {
+            const hash = decodeURIComponent(window.location.hash.slice(1));
+            const [, repo, scanner] = hash.split('/');
+            if (!repo || !scanner) return;
+            logDialog.open(`${repo} / ${scanner}`, 'Loading...');
+            try {
+                const log = await http.get('/api/logs')
+                    .param('repo', repo)
+                    .param('scanner', scanner)
+                    .fetchText();
+                logDialog.open(`${repo} / ${scanner}`, log);
+            } catch (err) {
+                logDialog.open(`${repo} / ${scanner}`, `Failed to load log: ${err}`);
+            }
+        }
+
+        window.addEventListener('hashchange', showLogFromHash);
+        showLogFromHash();
     </script>
 </body>
 

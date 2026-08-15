@@ -202,27 +202,43 @@ impl<'a> ScanContext<'a> {
         }
     }
 
-    /// Runs a command, streaming its stdout/stderr to `<logs_dir>/<scanner>.log`
-    /// while it executes, and returning the captured output for parsing.
-    /// The log is truncated on the first command of a scanner per scan and
-    /// appended to for subsequent ones. Errors only on spawn/IO failure;
-    /// a non-zero exit is reported via `CommandOutput::success`.
-    pub fn run_logged(&self, scanner: &str, program: &str, args: &[&str], current_dir: &Path) -> anyhow::Result<CommandOutput> {
-        let (mut log_file, log_enabled) = match self.logs_dir {
+    /// Opens the scanner's log file, truncating it on first use in this scan
+    /// and appending afterwards. Registers the scanner so later writes append.
+    fn open_log(&self, scanner: &str) -> anyhow::Result<Option<std::fs::File>> {
+        match self.logs_dir {
             Some(dir) => {
                 std::fs::create_dir_all(dir)?;
                 let path = dir.join(format!("{}.log", scanner));
                 let first_for_scanner = self.opened_logs.borrow_mut().insert(scanner.to_string());
-                // Truncate on the first command of the scan, then append.
                 let mut opts = std::fs::OpenOptions::new();
                 opts.create(true)
                     .append(!first_for_scanner)
                     .write(first_for_scanner)
                     .truncate(first_for_scanner);
-                let file = opts.open(&path)?;
-                (Some(file), true)
+                Ok(Some(opts.open(&path)?))
             }
-            None => (None, false),
+            None => Ok(None),
+        }
+    }
+
+    /// Reports a scanner failure: appends a `! <msg>` note to the scanner's
+    /// log file and prints `[<repo>] 🔥 <msg>` to the progress console.
+    pub fn report_failure(&self, scanner: &str, msg: impl AsRef<str>) {
+        let msg = msg.as_ref();
+        if let Ok(Some(mut f)) = self.open_log(scanner) {
+            let _ = writeln!(f, "! {}", msg);
+        }
+        self.report_error(format!("[{}] 🔥 {}", self.repo.name, msg));
+    }
+
+    /// Runs a command, streaming its stdout/stderr to `<logs_dir>/<scanner>.log`
+    /// while it executes, and returning the captured output for parsing.
+    /// Errors only on spawn/IO failure; a non-zero exit is reported via
+    /// `CommandOutput::success`.
+    pub fn run_logged(&self, scanner: &str, program: &str, args: &[&str], current_dir: &Path) -> anyhow::Result<CommandOutput> {
+        let (mut log_file, log_enabled) = match self.open_log(scanner) {
+            Ok(f) => (f, true),
+            Err(_) => (None, false),
         };
 
         if log_enabled && let Some(f) = log_file.as_mut() {
@@ -301,12 +317,7 @@ pub trait Scanner {
     fn scan(&self, ctx: &ScanContext, stats: &mut RepoStats) -> anyhow::Result<()>;
 }
 
-pub fn scan_repository(
-    repo: &GithubRepository,
-    tarball_path: &Path,
-    pb: Option<ProgressBar>,
-    logs_dir: Option<&Path>,
-) -> anyhow::Result<RepoStats> {
+pub fn scan_repository(repo: &GithubRepository, tarball_path: &Path, pb: Option<ProgressBar>, logs_dir: Option<&Path>) -> anyhow::Result<RepoStats> {
     if let Some(ref p) = pb {
         p.set_message(format!("[{}] Unpacking archive...", repo.name));
     }
@@ -390,10 +401,7 @@ mod tests {
 
         let log = std::fs::read_to_string(dir.path().join("echo-test.log")).unwrap();
         let lines: Vec<&str> = log.lines().collect();
-        assert_eq!(
-            lines[0], "> sh -c echo one",
-            "first run must start with a > header and truncate prior content"
-        );
+        assert_eq!(lines[0], "> sh -c echo one", "first run must start with a > header and truncate prior content");
         assert!(log.contains("one"));
         assert!(log.contains("> sh -c echo two"), "second run must append with its own > header");
         assert!(log.contains("two"));

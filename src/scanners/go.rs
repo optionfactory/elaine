@@ -51,7 +51,7 @@ impl Scanner for GoScanner {
             let out = match ctx.run_logged("go", "go", &["list", "-u", "-m", "-json", "all"], &run_dir) {
                 Ok(out) => out,
                 Err(e) => {
-                    ctx.report_error(format!("[{}] 🔥 Failed to execute go: {}", ctx.repo.name, e));
+                    ctx.report_failure("go", format!("Failed to execute go for {}: {}", mod_path.display(), e));
                     vulns_ok = false;
                     outdated_ok = false;
                     continue;
@@ -62,7 +62,7 @@ impl Scanner for GoScanner {
             let array_payload = format!("[{}]", fixed_payload);
 
             let Ok(parsed) = serde_json::from_str::<Vec<GoListModule>>(&array_payload) else {
-                ctx.report_error(format!("[{}] 🔥 Failed to parse go list output", ctx.repo.name));
+                ctx.report_failure("go", &format!("Failed to parse go list output for {}", mod_path.display()));
                 vulns_ok = false;
                 outdated_ok = false;
                 continue;
@@ -105,22 +105,14 @@ impl Scanner for GoScanner {
                     stats.add_vulnerabilities(vulnerabilities);
                 }
                 Err(e) => {
-                    ctx.report_error(format!("[{}] 🔥 OSV check failed: {}", ctx.repo.name, e));
+                    ctx.report_failure("go", &format!("OSV check failed for {}: {}", mod_path.display(), e));
                     vulns_ok = false;
                 }
             }
         }
 
-        stats.record_check(
-            ScannerKind::Go,
-            "vulns",
-            if vulns_ok { CheckStatus::Ok } else { CheckStatus::Failed },
-        );
-        stats.record_check(
-            ScannerKind::Go,
-            "outdated",
-            if outdated_ok { CheckStatus::Ok } else { CheckStatus::Failed },
-        );
+        stats.record_check(ScannerKind::Go, "vulns", if vulns_ok { CheckStatus::Ok } else { CheckStatus::Failed });
+        stats.record_check(ScannerKind::Go, "outdated", if outdated_ok { CheckStatus::Ok } else { CheckStatus::Failed });
         Ok(())
     }
 }

@@ -167,4 +167,44 @@ function withDerivedFields(p) {
 
 
 
-export { Spinner, InfiniteScroller, authenticate, projects }
+/// Fullscreen modal dialog with a title, close button, and content area.
+class Dialog {
+    constructor() {
+        const host = document.createElement('div');
+        host.innerHTML = `
+            <dialog>
+                <header>
+                    <h1></h1>
+                    <button type="button" aria-label="Close">&times;</button>
+                </header>
+                <div></div>
+            </dialog>
+        `;
+        const root = host.querySelector('dialog');
+        this.el = root;
+        this.titleEl = root.querySelector('header h1');
+        this.contentEl = root.querySelector('div');
+        root.querySelector('header button').addEventListener('click', () => this.close());
+        document.body.appendChild(root);
+    }
+
+    open(title, content) {
+        if (this.titleEl) this.titleEl.textContent = title ?? '';
+        if (typeof content === 'string') {
+            this.contentEl.textContent = content;
+        } else if (content instanceof Node) {
+            this.contentEl.replaceChildren(content);
+        }
+        this.el.showModal();
+    }
+
+    close() {
+        this.el.close();
+    }
+
+    onClose(callback) {
+        this.el.addEventListener('close', callback);
+    }
+}
+
+export { Spinner, InfiniteScroller, authenticate, projects, Dialog }

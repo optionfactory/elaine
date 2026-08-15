@@ -57,11 +57,20 @@ impl Scanner for NpmScanner {
                 let lockfile = match serde_json::from_str::<PackageLock>(&content) {
                     Ok(lf) => lf,
                     Err(e) => {
-                        ctx.report_error(format!("[{}] 🔥 Failed to parse package-lock.json: {}", ctx.repo.name, e));
+                        ctx.report_failure("npm", &format!("Failed to parse package-lock.json {}: {}", lock_path.display(), e));
                         return None;
                     }
                 };
-                let packages = lockfile.packages?;
+                let packages = match lockfile.packages {
+                    Some(p) => p,
+                    None => {
+                        ctx.report_failure(
+                            "npm",
+                            &format!("No 'packages' map in {} (lockfileVersion 1 is unsupported)", lock_path.display()),
+                        );
+                        return None;
+                    }
+                };
                 let mut deps = Vec::new();
                 for (path, pkg) in &packages {
                     if path.is_empty() {
@@ -89,7 +98,7 @@ impl Scanner for NpmScanner {
                         Some(())
                     }
                     Err(e) => {
-                        ctx.report_error(format!("[{}] 🔥 OSV check failed: {}", ctx.repo.name, e));
+                        ctx.report_failure("npm", &format!("OSV check failed for {}: {}", lock_path.display(), e));
                         None
                     }
                 }
@@ -100,41 +109,38 @@ impl Scanner for NpmScanner {
             let per_outdated_ok = match ctx.run_logged("npm", "npm", &["outdated", "--json"], &run_dir) {
                 Ok(out) => {
                     let payload = String::from_utf8_lossy(&out.stdout);
-                    if let Ok(parsed) = serde_json::from_str::<HashMap<String, NpmOutdatedDep>>(&payload) {
-                        let updates: Vec<OutdatedDependency> = parsed
-                            .into_iter()
-                            .filter_map(|(name, dep)| {
-                                Some(OutdatedDependency {
-                                    project: ctx.repo.name.clone(),
-                                    kind: dep.dep_type.unwrap_or_else(|| "dependency".to_string()),
-                                    artifact: name,
-                                    current: dep.current?,
-                                    latest: dep.latest?,
+                    match serde_json::from_str::<HashMap<String, NpmOutdatedDep>>(&payload) {
+                        Ok(parsed) => {
+                            let updates: Vec<OutdatedDependency> = parsed
+                                .into_iter()
+                                .filter_map(|(name, dep)| {
+                                    Some(OutdatedDependency {
+                                        project: ctx.repo.name.clone(),
+                                        kind: dep.dep_type.unwrap_or_else(|| "dependency".to_string()),
+                                        artifact: name,
+                                        current: dep.current?,
+                                        latest: dep.latest?,
+                                    })
                                 })
-                            })
-                            .collect();
-                        stats.add_outdated_dependencies(updates);
+                                .collect();
+                            stats.add_outdated_dependencies(updates);
+                        }
+                        Err(e) => {
+                            ctx.report_failure("npm", &format!("Failed to parse npm outdated output for {}: {}", lock_path.display(), e));
+                        }
                     }
                     true
                 }
                 Err(e) => {
-                    ctx.report_error(format!("[{}] 🔥 Failed to execute npm outdated: {}", ctx.repo.name, e));
+                    ctx.report_failure("npm", &format!("Failed to execute npm outdated for {}: {}", lock_path.display(), e));
                     false
                 }
             };
             outdated_ok &= per_outdated_ok;
         }
 
-        stats.record_check(
-            ScannerKind::Npm,
-            "vulns",
-            if vulns_ok { CheckStatus::Ok } else { CheckStatus::Failed },
-        );
-        stats.record_check(
-            ScannerKind::Npm,
-            "outdated",
-            if outdated_ok { CheckStatus::Ok } else { CheckStatus::Failed },
-        );
+        stats.record_check(ScannerKind::Npm, "vulns", if vulns_ok { CheckStatus::Ok } else { CheckStatus::Failed });
+        stats.record_check(ScannerKind::Npm, "outdated", if outdated_ok { CheckStatus::Ok } else { CheckStatus::Failed });
         Ok(())
     }
 }

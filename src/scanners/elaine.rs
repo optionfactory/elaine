@@ -25,7 +25,7 @@ impl Scanner for ElaineScanner {
             }
             None => {
                 stats.manifest = None;
-                ctx.report_error(format!("[{}] 🔥 Failed to parse elaine.yaml", ctx.repo.name));
+                ctx.report_failure("elaine", &"Failed to parse elaine.yaml".to_string());
                 stats.record_check(ScannerKind::Elaine, "manifest", CheckStatus::Failed);
             }
         }

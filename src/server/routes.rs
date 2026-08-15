@@ -1,6 +1,4 @@
-use crate::schema::{
-    AdsResponsibility, AiActClass, CraClass, DoraCriticality, ExposureType, GdprRole, LifecycleType, Nis2Category, ProjectType, ServiceTier,
-};
+use crate::schema::{AdsResponsibility, AiActClass, CraClass, DoraCriticality, ExposureType, GdprRole, LifecycleType, Nis2Category, ProjectType, ServiceTier};
 use axum::{Json, Router, extract::State, http::StatusCode, response::IntoResponse, routing::get};
 use axum_extra::extract::Query;
 use serde::Deserialize;
@@ -29,11 +27,7 @@ pub async fn api_stats_handler(State(state): State<Arc<AppState>>, _auth: Valida
     Json(cache.stats.clone()).into_response()
 }
 
-pub async fn api_projects_handler(
-    State(state): State<Arc<AppState>>,
-    Query(query): Query<ApiQuery>,
-    _auth: ValidatedUser,
-) -> impl IntoResponse {
+pub async fn api_projects_handler(State(state): State<Arc<AppState>>, Query(query): Query<ApiQuery>, _auth: ValidatedUser) -> impl IntoResponse {
     let cache = state.cache.read().await;
     let term = query.search.as_deref().map(|s| s.to_lowercase());
     let filter_values = query.filter.unwrap_or_default();
@@ -91,11 +85,7 @@ pub struct LogQuery {
 
 /// Serves saved scanner failure logs from <data_dir>/stats/logs/<repo>/<scanner>.log.
 /// Repo/scanner names are validated (no separators) to prevent path traversal.
-pub async fn api_logs_handler(
-    State(state): State<Arc<AppState>>,
-    Query(query): Query<LogQuery>,
-    _auth: ValidatedUser,
-) -> impl IntoResponse {
+pub async fn api_logs_handler(State(state): State<Arc<AppState>>, Query(query): Query<LogQuery>, _auth: ValidatedUser) -> impl IntoResponse {
     let is_safe = |s: &str| !s.is_empty() && !s.contains('/') && !s.contains('\\') && !s.contains("..");
     if !is_safe(&query.repo) || !is_safe(&query.scanner) {
         return (StatusCode::BAD_REQUEST, "Invalid repo or scanner").into_response();
@@ -202,21 +192,14 @@ fn matches_filters(p: &crate::scanners::RepoStats, filters: &[&str]) -> bool {
     if filters.contains(&"lifecycle-prototype") && !p.manifest.as_ref().is_some_and(|a| a.lifecycle == Some(LifecycleType::Prototype)) {
         return false;
     }
-    if filters.contains(&"lifecycle-unmaintained")
-        && !p
-            .manifest
-            .as_ref()
-            .is_some_and(|a| a.lifecycle == Some(LifecycleType::Unmaintained))
-    {
+    if filters.contains(&"lifecycle-unmaintained") && !p.manifest.as_ref().is_some_and(|a| a.lifecycle == Some(LifecycleType::Unmaintained)) {
         return false;
     }
 
     let has_ingress = |exposure: ExposureType| {
-        p.manifest.as_ref().is_some_and(|a| {
-            a.environments
-                .as_ref()
-                .is_some_and(|envs| envs.iter().any(|e| e.ingress == Some(exposure)))
-        })
+        p.manifest
+            .as_ref()
+            .is_some_and(|a| a.environments.as_ref().is_some_and(|envs| envs.iter().any(|e| e.ingress == Some(exposure))))
     };
 
     if filters.contains(&"ingress-local") && !has_ingress(ExposureType::Local) {
@@ -247,12 +230,7 @@ fn matches_filters(p: &crate::scanners::RepoStats, filters: &[&str]) -> bool {
     if filters.contains(&"tool") && !p.manifest.as_ref().is_some_and(|a| a.project_type == Some(ProjectType::Tool)) {
         return false;
     }
-    if filters.contains(&"infrastructure")
-        && !p
-            .manifest
-            .as_ref()
-            .is_some_and(|a| a.project_type == Some(ProjectType::Infrastructure))
-    {
+    if filters.contains(&"infrastructure") && !p.manifest.as_ref().is_some_and(|a| a.project_type == Some(ProjectType::Infrastructure)) {
         return false;
     }
     if filters.contains(&"playground") && !p.manifest.as_ref().is_some_and(|a| a.project_type == Some(ProjectType::Playground)) {

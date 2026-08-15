@@ -40,16 +40,12 @@ struct OsvVuln {
 /// Takes a slice of (ecosystem, name, version) and queries OSV in batches of 1000,
 /// following per-package `next_page` tokens so dependencies with >1000 vulnerabilities
 /// are not silently truncated.
-pub fn fetch_vulnerabilities(
-    client: &reqwest::Client,
-    dependencies: &[(&str, &str, &str)],
-) -> anyhow::Result<Vec<(String, String, String)>> {
+pub fn fetch_vulnerabilities(client: &reqwest::Client, dependencies: &[(&str, &str, &str)]) -> anyhow::Result<Vec<(String, String, String)>> {
     // Scanners run on a spawn_blocking thread; block_on is the intended bridge back to async HTTP.
     let found_vulns = tokio::runtime::Handle::current().block_on(async {
         let mut found_vulns = Vec::new();
         // pending entries carry an optional next_page token populated from the previous round.
-        let mut pending: Vec<(&str, &str, &str, Option<String>)> =
-            dependencies.iter().map(|(eco, name, ver)| (*eco, *name, *ver, None)).collect();
+        let mut pending: Vec<(&str, &str, &str, Option<String>)> = dependencies.iter().map(|(eco, name, ver)| (*eco, *name, *ver, None)).collect();
 
         while !pending.is_empty() {
             let mut next_round = Vec::new();

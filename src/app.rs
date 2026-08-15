@@ -21,11 +21,7 @@ impl Elaine {
         let repositories = Arc::new(RepositoryStore::new(&config.data_dir)?);
         let stats = Arc::new(StatsStore::new(&config.data_dir)?);
 
-        Ok(Self {
-            config,
-            repositories,
-            stats,
-        })
+        Ok(Self { config, repositories, stats })
     }
 
     pub async fn bootstrap(&self, dev: bool) -> Result<()> {
@@ -116,10 +112,7 @@ impl Elaine {
 
     pub async fn sync(&self, force: bool) -> Result<()> {
         let download_worker_count = get_worker_count().min(8);
-        let client = Arc::new(GithubClient::new(
-            self.config.github_token.clone(),
-            self.config.organization.clone(),
-        )?);
+        let client = Arc::new(GithubClient::new(self.config.github_token.clone(), self.config.organization.clone())?);
 
         let multiprogress = MultiProgress::new();
         let pb = multiprogress.add(ProgressBar::new(1));
@@ -145,10 +138,7 @@ impl Elaine {
             if let Some(old_name) = cached_by_id.get(&repo.id)
                 && *old_name != repo.name
             {
-                pb.println(format!(
-                    "[{}] 🔁 Repository renamed from '{}'; removing stale scan data.",
-                    repo.name, old_name
-                ));
+                pb.println(format!("[{}] 🔁 Repository renamed from '{}'; removing stale scan data.", repo.name, old_name));
                 if let Err(e) = self.stats.remove_project_scan(old_name) {
                     pb.println(format!("[{}] 🔥 Failed to remove scan for '{}': {}", repo.name, old_name, e));
                 }
@@ -237,11 +227,7 @@ impl Elaine {
             let pages: Vec<usize> = (next_page..next_page + batch_size).collect();
             next_page += batch_size;
 
-            pb.set_message(format!(
-                "Fetching pages {}-{}...",
-                pages.first().unwrap_or(&1),
-                pages.last().unwrap_or(&1)
-            ));
+            pb.set_message(format!("Fetching pages {}-{}...", pages.first().unwrap_or(&1), pages.last().unwrap_or(&1)));
 
             let results: Vec<anyhow::Result<Vec<GithubRepository>>> = stream::iter(pages)
                 .map(|page| async move { client.fetch_org_repos_page(page).await })

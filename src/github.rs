@@ -30,14 +30,9 @@ pub struct GithubClient {
 
 impl GithubClient {
     pub fn new(github_token: Option<String>, organization: String) -> Result<Self> {
-        let token =
-            Self::get_token(github_token).context("Could not retrieve GitHub token from env (GITHUB_TOKEN/GH_TOKEN) or `gh auth token`")?;
+        let token = Self::get_token(github_token).context("Could not retrieve GitHub token from env (GITHUB_TOKEN/GH_TOKEN) or `gh auth token`")?;
         let client = reqwest::Client::new();
-        Ok(Self {
-            client,
-            organization,
-            token,
-        })
+        Ok(Self { client, organization, token })
     }
 
     fn get_token(auth_token: Option<String>) -> Option<String> {
@@ -61,10 +56,7 @@ impl GithubClient {
     }
 
     pub async fn fetch_org_repos_page(&self, page: usize) -> Result<Vec<GithubRepository>> {
-        let url = format!(
-            "https://api.github.com/orgs/{}/repos?per_page=100&page={}&type=all",
-            self.organization, page
-        );
+        let url = format!("https://api.github.com/orgs/{}/repos?per_page=100&page={}&type=all", self.organization, page);
         let resp = self
             .client
             .get(&url)

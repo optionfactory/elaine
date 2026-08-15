@@ -27,7 +27,7 @@ impl Scanner for PinchScanner {
             }
             None => {
                 stats.checked_for_containers();
-                ctx.report_error(format!("[{}] 🔥 Failed to parse pinch.yaml", ctx.repo.name));
+                ctx.report_failure("pinch", &"Failed to parse pinch.yaml".to_string());
                 stats.record_check(ScannerKind::Pinch, "containers", CheckStatus::Failed);
             }
         }
@@ -114,17 +114,14 @@ mod tests {
 
     #[test]
     fn extracts_docker_images_and_ignores_others() {
-        let p = pinch(
-            "processes:\n  - name: db\n    run:\n      type: docker\n      image: postgres:16\n  - name: web\n    run: npm run dev\n",
-        );
+        let p = pinch("processes:\n  - name: db\n    run:\n      type: docker\n      image: postgres:16\n  - name: web\n    run: npm run dev\n");
         assert_eq!(expand_images(p), vec!["postgres:16".to_string()]);
     }
 
     #[test]
     fn expands_vars_in_image_names() {
-        let p = pinch(
-            "vars:\n  registry: registry.example.com\nprocesses:\n  - name: db\n    run:\n      type: docker\n      image: '{{registry}}/postgres:16'\n",
-        );
+        let p =
+            pinch("vars:\n  registry: registry.example.com\nprocesses:\n  - name: db\n    run:\n      type: docker\n      image: '{{registry}}/postgres:16'\n");
         assert_eq!(expand_images(p), vec!["registry.example.com/postgres:16".to_string()]);
     }
 

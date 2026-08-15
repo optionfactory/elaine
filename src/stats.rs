@@ -16,11 +16,7 @@ impl StatsStore {
         fs::create_dir_all(&stats_dir)?;
         let logs_dir = base_dir.join("stats").join("logs");
         fs::create_dir_all(&logs_dir)?;
-        Ok(Self {
-            base_dir,
-            stats_dir,
-            logs_dir,
-        })
+        Ok(Self { base_dir, stats_dir, logs_dir })
     }
 
     pub fn project_file_path(&self, repo_name: &str) -> PathBuf {

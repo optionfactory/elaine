@@ -130,8 +130,7 @@ where
             hd: Option<String>,
         }
 
-        let token_data =
-            jsonwebtoken::decode::<Claims>(token, &decoding_key, &validation).map_err(|e| AuthError(format!("Invalid token: {}", e)))?;
+        let token_data = jsonwebtoken::decode::<Claims>(token, &decoding_key, &validation).map_err(|e| AuthError(format!("Invalid token: {}", e)))?;
 
         if let Some(expected_hd) = &google_auth.hosted_domain
             && token_data.claims.hd.as_deref() != Some(expected_hd.as_str())

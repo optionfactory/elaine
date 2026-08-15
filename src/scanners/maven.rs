@@ -60,43 +60,57 @@ impl Scanner for MavenScanner {
                     match fs::read_to_string(&vulns_path) {
                         Ok(payload) => match serde_json::from_str::<Vec<Vulnerability>>(&payload) {
                             Ok(parsed_vulns) => stats.add_vulnerabilities(parsed_vulns),
-                            Err(_) => vulns_ok = false,
+                            Err(e) => {
+                                ctx.report_failure("maven", &format!("Failed to parse {}: {}", vulns_path.display(), e));
+                                vulns_ok = false;
+                            }
                         },
-                        Err(_) => vulns_ok = false,
+                        Err(e) => {
+                            ctx.report_failure("maven", &format!("Missing or unreadable {}: {}", vulns_path.display(), e));
+                            vulns_ok = false;
+                        }
                     }
 
                     let updates_path = run_dir.join("target").join("anarchitect-outdated-dependencies.json");
                     match fs::read_to_string(&updates_path) {
                         Ok(payload) => match serde_json::from_str::<Vec<OutdatedDependency>>(&payload) {
                             Ok(parsed_updates) => stats.add_outdated_dependencies(parsed_updates),
-                            Err(_) => outdated_ok = false,
+                            Err(e) => {
+                                ctx.report_failure("maven", &format!("Failed to parse {}: {}", updates_path.display(), e));
+                                outdated_ok = false;
+                            }
                         },
-                        Err(_) => outdated_ok = false,
+                        Err(e) => {
+                            ctx.report_failure("maven", &format!("Missing or unreadable {}: {}", updates_path.display(), e));
+                            outdated_ok = false;
+                        }
                     }
                 }
                 Ok(_out) => {
                     vulns_ok = false;
                     outdated_ok = false;
-                    ctx.report_error(format!("[{}] 🔥 Maven failed", ctx.repo.name));
+                    let dir_label = if dir.as_os_str().is_empty() {
+                        ".".to_string()
+                    } else {
+                        dir.display().to_string()
+                    };
+                    ctx.report_failure("maven", &format!("Maven failed for {}", dir_label));
                 }
                 Err(e) => {
                     vulns_ok = false;
                     outdated_ok = false;
-                    ctx.report_error(format!("[{}] 🔥 Failed to execute Maven: {}", ctx.repo.name, e));
+                    let dir_label = if dir.as_os_str().is_empty() {
+                        ".".to_string()
+                    } else {
+                        dir.display().to_string()
+                    };
+                    ctx.report_failure("maven", &format!("Failed to execute Maven for {}: {}", dir_label, e));
                 }
             }
         }
 
-        stats.record_check(
-            ScannerKind::Maven,
-            "vulns",
-            if vulns_ok { CheckStatus::Ok } else { CheckStatus::Failed },
-        );
-        stats.record_check(
-            ScannerKind::Maven,
-            "outdated",
-            if outdated_ok { CheckStatus::Ok } else { CheckStatus::Failed },
-        );
+        stats.record_check(ScannerKind::Maven, "vulns", if vulns_ok { CheckStatus::Ok } else { CheckStatus::Failed });
+        stats.record_check(ScannerKind::Maven, "outdated", if outdated_ok { CheckStatus::Ok } else { CheckStatus::Failed });
         Ok(())
     }
 }
