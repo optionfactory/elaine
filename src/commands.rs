@@ -46,14 +46,11 @@ impl Elaine {
 
         let jwks = if self.config.google_auth.is_some() {
             eprintln!("Fetching Google public keys...");
-            let keys = reqwest::get("https://www.googleapis.com/oauth2/v3/certs")
+            let keys = crate::server::fetch_jwks(&reqwest::Client::new())
                 .await
-                .context("Failed to reach Google JWKS endpoint")?
-                .json::<jsonwebtoken::jwk::JwkSet>()
-                .await
-                .context("Failed to parse Google JWKS")?;
+                .context("Failed to fetch Google JWKS")?;
             eprintln!("Successfully loaded Google keys.");
-            Some(keys)
+            Some(Arc::new(crate::server::JwksCache::new(keys)))
         } else {
             None
         };
@@ -97,6 +94,7 @@ impl Elaine {
 
         let app_state = Arc::new(AppState {
             config: self.config.clone(),
+            http_client: reqwest::Client::new(),
             jwks,
             cache: projects_cache,
         });

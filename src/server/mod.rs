@@ -60,8 +60,71 @@ pub struct CacheData {
 
 pub struct AppState {
     pub config: Config,
-    pub jwks: Option<jsonwebtoken::jwk::JwkSet>,
+    pub http_client: reqwest::Client,
+    pub jwks: Option<Arc<JwksCache>>,
     pub cache: Arc<RwLock<CacheData>>,
+}
+
+/// Google JWKS cache with on-miss refresh, rate-limited so bogus 'kid's
+/// cannot turn the endpoint into a fetch amplifier.
+pub struct JwksCache {
+    keys: Arc<RwLock<JwksCacheInner>>,
+}
+
+struct JwksCacheInner {
+    keys: jsonwebtoken::jwk::JwkSet,
+    last_refresh: std::time::Instant,
+}
+
+const JWKS_REFRESH_MIN_INTERVAL: std::time::Duration = std::time::Duration::from_secs(60);
+
+impl JwksCache {
+    pub fn new(keys: jsonwebtoken::jwk::JwkSet) -> Self {
+        Self {
+            keys: Arc::new(RwLock::new(JwksCacheInner {
+                keys,
+                last_refresh: std::time::Instant::now(),
+            })),
+        }
+    }
+
+    pub async fn find(&self, kid: &str) -> Option<jsonwebtoken::jwk::Jwk> {
+        self.keys.read().await.find(kid).cloned()
+    }
+
+    /// Refetches the JWKS on an unknown 'kid' unless a refresh happened
+    /// very recently. Returns the (possibly updated) key for `kid`.
+    pub async fn refresh_and_find(&self, client: &reqwest::Client, kid: &str) -> Option<jsonwebtoken::jwk::Jwk> {
+        let mut guard = self.keys.write().await;
+        // Double-check: another request may have refreshed while we waited on the lock.
+        if let Some(jwk) = guard.find(kid) {
+            return Some(jwk.clone());
+        }
+        if guard.last_refresh.elapsed() < JWKS_REFRESH_MIN_INTERVAL {
+            return None;
+        }
+        let keys = fetch_jwks(client).await.ok()?;
+        guard.keys = keys;
+        guard.last_refresh = std::time::Instant::now();
+        guard.find(kid).cloned()
+    }
+}
+
+impl JwksCacheInner {
+    fn find(&self, kid: &str) -> Option<&jsonwebtoken::jwk::Jwk> {
+        self.keys.find(kid)
+    }
+}
+
+pub async fn fetch_jwks(client: &reqwest::Client) -> anyhow::Result<jsonwebtoken::jwk::JwkSet> {
+    client
+        .get("https://www.googleapis.com/oauth2/v3/certs")
+        .send()
+        .await?
+        .error_for_status()?
+        .json()
+        .await
+        .map_err(Into::into)
 }
 
 #[derive(RustEmbed)]
@@ -103,14 +166,21 @@ where
             return Err(AuthError("Missing Bearer token".into()));
         };
 
-        let Some(jwks) = app_state.jwks.as_ref() else {
+        let Some(jwks_cache) = app_state.jwks.as_ref() else {
             return Err(AuthError("Google JWKS not loaded on server".into()));
         };
 
         let header = jsonwebtoken::decode_header(token).map_err(|_| AuthError("Invalid token header".into()))?;
         let kid = header.kid.ok_or_else(|| AuthError("Missing 'kid' in token header".into()))?;
-        let jwk = jwks.find(&kid).ok_or_else(|| AuthError("Unknown 'kid'".into()))?;
-        let decoding_key = jsonwebtoken::DecodingKey::from_jwk(jwk).map_err(|_| AuthError("Invalid JWK formatting".into()))?;
+        let jwk = match jwks_cache.find(&kid).await {
+            Some(jwk) => jwk,
+            // Key rotation: refetch once and retry before rejecting.
+            None => jwks_cache
+                .refresh_and_find(&app_state.http_client, &kid)
+                .await
+                .ok_or_else(|| AuthError("Unknown 'kid'".into()))?,
+        };
+        let decoding_key = jsonwebtoken::DecodingKey::from_jwk(&jwk).map_err(|_| AuthError("Invalid JWK formatting".into()))?;
         let mut validation = jsonwebtoken::Validation::new(header.alg);
         validation.set_audience(&[&google_auth.client_id]);
         validation.set_issuer(&["https://accounts.google.com", "accounts.google.com"]);
