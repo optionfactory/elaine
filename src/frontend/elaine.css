@@ -681,7 +681,7 @@ table {
     th {
         min-width: 0;
         padding: 0.75rem 1rem;
-        background: var(--bg);
+        background: color-mix(in srgb, black 35%, var(--bg));
         color: var(--text-muted);
         font-weight: 600;
         font-size: 0.75rem;
@@ -697,6 +697,7 @@ table {
         padding: 0.875rem 1rem;
         text-align: left;
         align-content: center;
+        background: color-mix(in srgb, var(--card-bg) 35%, transparent);
         border-bottom: 1px solid var(--table-border);
         overflow-wrap: break-word;
     }
@@ -804,6 +805,44 @@ loading-spinner {
 @keyframes spin {
     to {
         transform: rotate(360deg);
+    }
+}
+
+/* Skeleton placeholders shown while tables load */
+skeleton-row {
+    display: block;
+    height: 2.2rem;
+    margin-bottom: 0.5rem;
+    border-radius: 6px;
+    background: linear-gradient(90deg,
+            var(--card-bg) 25%,
+            color-mix(in srgb, var(--card-bg) 60%, var(--text-muted)) 50%,
+            var(--card-bg) 75%);
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 4.5s ease-in-out infinite;
+
+    &:nth-child(2) { animation-delay: -0.9s; }
+    &:nth-child(3) { animation-delay: -1.8s; }
+    &:nth-child(4) { animation-delay: -2.7s; }
+    &:nth-child(5) { animation-delay: -3.6s; }
+    &:nth-child(6) { animation-delay: -4.5s; }
+    &:nth-child(7) { animation-delay: -5.4s; }
+    &:nth-child(8) { animation-delay: -6.3s; }
+    &:nth-child(9) { animation-delay: -7.2s; }
+    &:nth-child(10) { animation-delay: -8.1s; }
+
+    &:last-child {
+        margin-bottom: 0;
+    }
+}
+
+@keyframes skeleton-shimmer {
+    from {
+        background-position: 200% 0;
+    }
+
+    to {
+        background-position: -200% 0;
     }
 }
 

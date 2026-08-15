@@ -33,25 +33,14 @@
             <a href="inventory.html">Inventory</a>
         </nav>
         <nav>
-            <a href="#failures">Scanner failures</a>
             <a href="#risk">Risk matrix</a>
+            <a href="#failures">Scanner failures</a>
             <a href="#vulns">Vulnerabilities</a>
             <a href="#outdated">Outdated</a>
         </nav>
     </header>
 
     <main>
-    <section id="failures">
-        <h2>Scanner failures</h2>
-        <p class="section-intro">
-            Repositories where a scanner could not complete (e.g. OSV unreachable, <code>npm</code>/<code>cargo</code>/<code>mvn</code>/<code>go</code>
-            not available or failing, unparseable lockfiles). Their vulnerability and outdated-dependency counts below are
-            <em>unknown</em>, not zero: treat these numbers as missing until the check succeeds again.
-        </p>
-
-        <failures-grid></failures-grid>
-    </section>
-
     <section id="risk">
         <h2>Tier &times; exposure matrix</h2>
         <p class="section-intro">
@@ -61,7 +50,27 @@
             Cell intensity reflects the combined tier &times; exposure weight.
         </p>
 
-        <risk-grid></risk-grid>
+        <risk-grid>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+        </risk-grid>
+    </section>
+
+    <section id="failures">
+        <h2>Scanner failures</h2>
+        <p class="section-intro">
+            Repositories where a scanner could not complete (e.g. OSV unreachable, <code>npm</code>/<code>cargo</code>/<code>mvn</code>/<code>go</code>
+            not available or failing, unparseable lockfiles). Their vulnerability and outdated-dependency counts are
+            <em>unknown</em>, not zero: treat these numbers as missing until the check succeeds again.
+        </p>
+
+        <failures-grid>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+        </failures-grid>
     </section>
 
     <section id="vulns">
@@ -71,7 +80,13 @@
             repositories at once, so fixing a shared dependency once can clear multiple rows.
         </p>
 
-        <vulns-grid></vulns-grid>
+        <vulns-grid>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+        </vulns-grid>
     </section>
 
     <section id="outdated">
@@ -81,7 +96,13 @@
             organization. An artifact lagging everywhere is one upgrade campaign, not one ticket per repo.
         </p>
 
-        <outdated-grid></outdated-grid>
+        <outdated-grid>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+        </outdated-grid>
     </section>
     </main>
 
