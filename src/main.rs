@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
 use clap::Parser;
+use elaine::app::Elaine;
 use elaine::cli::{Cli, Commands};
-use elaine::commands::Elaine;
-use elaine::server::Config;
+use elaine::config::Config;
 use std::fs;
 
 #[tokio::main]

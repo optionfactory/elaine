@@ -1,7 +1,8 @@
+pub mod app;
 pub mod cli;
-pub mod commands;
+pub mod config;
 pub mod github;
-pub mod repositories;
+pub mod repo_cache;
 pub mod sandbox;
 pub mod scanners;
 pub mod schema;

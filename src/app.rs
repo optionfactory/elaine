@@ -1,6 +1,7 @@
+use crate::config::Config;
 use crate::github::{GithubClient, GithubRepository};
-use crate::repositories::RepositoryStore;
-use crate::server::{AppState, CacheData, Config, DashboardStats};
+use crate::repo_cache::RepositoryStore;
+use crate::server::{AppState, CacheData, DashboardStats};
 use crate::stats::StatsStore;
 use anyhow::{Context, Result};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
@@ -46,11 +47,11 @@ impl Elaine {
 
         let jwks = if self.config.google_auth.is_some() {
             eprintln!("Fetching Google public keys...");
-            let keys = crate::server::fetch_jwks(&reqwest::Client::new())
+            let keys = crate::server::auth::fetch_jwks(&reqwest::Client::new())
                 .await
                 .context("Failed to fetch Google JWKS")?;
             eprintln!("Successfully loaded Google keys.");
-            Some(Arc::new(crate::server::JwksCache::new(keys)))
+            Some(Arc::new(crate::server::auth::JwksCache::new(keys)))
         } else {
             None
         };

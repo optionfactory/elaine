@@ -6,7 +6,8 @@ use axum_extra::extract::Query;
 use serde::Deserialize;
 use std::sync::Arc;
 
-use super::{AppState, FrontendAssets, ValidatedUser};
+use super::auth::ValidatedUser;
+use super::{AppState, FrontendAssets};
 
 #[derive(Deserialize)]
 pub struct ApiQuery {
