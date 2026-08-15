@@ -55,7 +55,7 @@ impl RepositoryStore {
 
         let resp = client.download_tarball(&repo.name, &repo.default_branch).await?;
         let target_tar = self.tarball_path(&repo.name);
-        let tmp_tar = target_tar.with_extension("tar.gz.tmp");
+        let tmp_tar = target_tar.with_extension("tmp");
 
         let mut file = File::create(&tmp_tar).await.context("Failed to create temporary tarball file")?;
 
@@ -70,7 +70,7 @@ impl RepositoryStore {
         fs::rename(&tmp_tar, &target_tar)?;
 
         let target_meta = self.metadata_path(&repo.name);
-        let tmp_meta = target_meta.with_extension("json.tmp");
+        let tmp_meta = target_meta.with_extension("tmp");
         let pretty_json = serde_json::to_string_pretty(repo)?;
 
         fs::write(&tmp_meta, pretty_json)?;
