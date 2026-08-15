@@ -101,6 +101,10 @@ impl StatsStore {
         if self.stats_dir.exists() {
             std::fs::remove_dir_all(&self.stats_dir)?;
         }
+        let aggregate = self.aggregate_file_path();
+        if aggregate.exists() {
+            std::fs::remove_file(&aggregate)?;
+        }
         Ok(())
     }
 }
