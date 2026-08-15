@@ -103,6 +103,12 @@ impl RepositoryStore {
             let Some(file_name) = path.file_name().and_then(|n| n.to_str()) else {
                 continue;
             };
+            // Leftover partial downloads from interrupted syncs.
+            if file_name.ends_with(".tmp") {
+                eprintln!("  Removing leftover temporary file: {}", file_name);
+                let _ = std::fs::remove_file(&path);
+                continue;
+            }
             let Some(repo_name) = file_name.strip_suffix(".json").or_else(|| file_name.strip_suffix(".tar.gz")) else {
                 continue;
             };

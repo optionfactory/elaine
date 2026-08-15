@@ -1,14 +1,9 @@
 use crate::schema::{
     AdsResponsibility, AiActClass, CraClass, DoraCriticality, ExposureType, GdprRole, LifecycleType, Nis2Category, ProjectType, ServiceTier,
 };
-use axum::{
-    Json, Router,
-    extract::State,
-    http::StatusCode,
-    response::IntoResponse,
-    routing::get,
-};
-use axum_extra::extract::Query;use serde::Deserialize;
+use axum::{Json, Router, extract::State, http::StatusCode, response::IntoResponse, routing::get};
+use axum_extra::extract::Query;
+use serde::Deserialize;
 use std::sync::Arc;
 
 use super::{AppState, FrontendAssets, ValidatedUser};
@@ -160,33 +155,26 @@ fn matches_filters(p: &crate::scanners::RepoStats, filters: &[&str]) -> bool {
         return false;
     }
 
-    if filters.contains(&"lifecycle-active")
-        && !p.manifest.as_ref().is_some_and(|a| a.lifecycle == Some(LifecycleType::Active))
-    {
+    if filters.contains(&"lifecycle-active") && !p.manifest.as_ref().is_some_and(|a| a.lifecycle == Some(LifecycleType::Active)) {
         return false;
     }
-    if filters.contains(&"lifecycle-deprecated")
-        && !p.manifest.as_ref().is_some_and(|a| a.lifecycle == Some(LifecycleType::Deprecated))
-    {
+    if filters.contains(&"lifecycle-deprecated") && !p.manifest.as_ref().is_some_and(|a| a.lifecycle == Some(LifecycleType::Deprecated)) {
         return false;
     }
-    if filters.contains(&"lifecycle-end-of-life")
-        && !p.manifest.as_ref().is_some_and(|a| a.lifecycle == Some(LifecycleType::EndOfLife))
-    {
+    if filters.contains(&"lifecycle-end-of-life") && !p.manifest.as_ref().is_some_and(|a| a.lifecycle == Some(LifecycleType::EndOfLife)) {
         return false;
     }
-    if filters.contains(&"lifecycle-maintenance")
-        && !p.manifest.as_ref().is_some_and(|a| a.lifecycle == Some(LifecycleType::Maintenance))
-    {
+    if filters.contains(&"lifecycle-maintenance") && !p.manifest.as_ref().is_some_and(|a| a.lifecycle == Some(LifecycleType::Maintenance)) {
         return false;
     }
-    if filters.contains(&"lifecycle-prototype")
-        && !p.manifest.as_ref().is_some_and(|a| a.lifecycle == Some(LifecycleType::Prototype))
-    {
+    if filters.contains(&"lifecycle-prototype") && !p.manifest.as_ref().is_some_and(|a| a.lifecycle == Some(LifecycleType::Prototype)) {
         return false;
     }
     if filters.contains(&"lifecycle-unmaintained")
-        && !p.manifest.as_ref().is_some_and(|a| a.lifecycle == Some(LifecycleType::Unmaintained))
+        && !p
+            .manifest
+            .as_ref()
+            .is_some_and(|a| a.lifecycle == Some(LifecycleType::Unmaintained))
     {
         return false;
     }
@@ -227,33 +215,27 @@ fn matches_filters(p: &crate::scanners::RepoStats, filters: &[&str]) -> bool {
     if filters.contains(&"tool") && !p.manifest.as_ref().is_some_and(|a| a.project_type == Some(ProjectType::Tool)) {
         return false;
     }
-            if filters.contains(&"infrastructure")
-                && !p
-                    .manifest
-                    .as_ref()
-                    .is_some_and(|a| a.project_type == Some(ProjectType::Infrastructure))
-            {
-                return false;
-            }
-            if filters.contains(&"playground")
-                && !p.manifest.as_ref().is_some_and(|a| a.project_type == Some(ProjectType::Playground))
-            {
-                return false;
-            }
+    if filters.contains(&"infrastructure")
+        && !p
+            .manifest
+            .as_ref()
+            .is_some_and(|a| a.project_type == Some(ProjectType::Infrastructure))
+    {
+        return false;
+    }
+    if filters.contains(&"playground") && !p.manifest.as_ref().is_some_and(|a| a.project_type == Some(ProjectType::Playground)) {
+        return false;
+    }
 
-    let compliant = p
-        .manifest
-        .as_ref()
-        .and_then(|a| a.compliance.as_ref())
-        .map(|c| {
-            c.ads != AdsResponsibility::PendingAssessment
-                && c.ads != AdsResponsibility::PendingNomination
-                && c.ai_act != AiActClass::PendingAssessment
-                && c.cra != CraClass::PendingAssessment
-                && c.dora != DoraCriticality::PendingAssessment
-                && c.gdpr != GdprRole::PendingAssessment
-                && c.nis2 != Nis2Category::PendingAssessment
-        });
+    let compliant = p.manifest.as_ref().and_then(|a| a.compliance.as_ref()).map(|c| {
+        c.ads != AdsResponsibility::PendingAssessment
+            && c.ads != AdsResponsibility::PendingNomination
+            && c.ai_act != AiActClass::PendingAssessment
+            && c.cra != CraClass::PendingAssessment
+            && c.dora != DoraCriticality::PendingAssessment
+            && c.gdpr != GdprRole::PendingAssessment
+            && c.nis2 != Nis2Category::PendingAssessment
+    });
 
     if filters.contains(&"compliant") && compliant.is_none_or(|c| !c) {
         return false;
@@ -284,9 +266,9 @@ mod tests {
 
     #[test]
     fn ingress_filters_match_any_environment_ingress() {
-        let exposed = repo(
-            Some(r#"{ "schema_version": 1, "name": "x", "environments": [ { "name": "prod", "type": "production", "ingress": "internet" } ] }"#),
-        );
+        let exposed = repo(Some(
+            r#"{ "schema_version": 1, "name": "x", "environments": [ { "name": "prod", "type": "production", "ingress": "internet" } ] }"#,
+        ));
         assert!(matches_filters(&exposed, &["ingress-internet"]));
         assert!(!matches_filters(&exposed, &["ingress-local"]));
     }

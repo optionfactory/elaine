@@ -6,11 +6,11 @@ use std::io::Write;
 
 use schemars::generate::SchemaSettings;
 
-#[path = "src/schema/schema.rs"]
+#[path = "src/schema/manifest.rs"]
 mod schema;
 
 fn main() {
-    println!("cargo:rerun-if-changed=src/schema/schema.rs");
+    println!("cargo:rerun-if-changed=src/schema/manifest.rs");
     println!("cargo:rerun-if-changed=Cargo.toml");
 
     let full_version = env::var("CARGO_PKG_VERSION").unwrap_or_else(|_| "1.0.0".to_string());

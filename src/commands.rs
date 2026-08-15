@@ -238,7 +238,11 @@ impl Elaine {
             let pages: Vec<usize> = (next_page..next_page + batch_size).collect();
             next_page += batch_size;
 
-            pb.set_message(format!("Fetching pages {}-{}...", pages.first().unwrap_or(&1), pages.last().unwrap_or(&1)));
+            pb.set_message(format!(
+                "Fetching pages {}-{}...",
+                pages.first().unwrap_or(&1),
+                pages.last().unwrap_or(&1)
+            ));
 
             let results: Vec<anyhow::Result<Vec<GithubRepository>>> = stream::iter(pages)
                 .map(|page| async move { client.fetch_org_repos_page(page).await })

@@ -1,6 +1,6 @@
-mod schema;
+mod manifest;
 
-pub use schema::*;
+pub use manifest::*;
 
 #[cfg(test)]
 mod tests {
