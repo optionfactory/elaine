@@ -122,11 +122,11 @@
         }
 
         const frameworks = ['dora', 'cra', 'nis2', 'ai_act', 'gdpr', 'data_residency', 'ads'];
-        const audited = all.filter(p => p.audit?.compliance);
+        const audited = all.filter(p => p.manifest?.compliance);
         const rows = frameworks.map(fw => {
             let assessed = 0, pending = 0;
             for (const p of audited) {
-                const value = p.audit.compliance[fw];
+                const value = p.manifest.compliance[fw];
                 if (String(value).startsWith('pending')) {
                     pending++;
                 } else {
@@ -152,7 +152,7 @@
             .map(p => ({
                 ...p,
                 months: Math.floor((now - new Date(p.pushed_at).getTime()) / (1000 * 60 * 60 * 24 * 30.44)),
-                lifecycle: p.audit?.lifecycle ?? null,
+                lifecycle: p.manifest?.lifecycle ?? null,
             }))
             .map(p => ({
                 ...p,

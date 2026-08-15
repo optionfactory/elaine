@@ -20,11 +20,11 @@ impl Scanner for ElaineScanner {
             .and_then(|f| serde_saphyr::from_reader::<_, ElaineManifest>(BufReader::new(f)).ok());
         match manifest {
             Some(manifest) => {
-                stats.audit = Some(manifest);
+                stats.manifest = Some(manifest);
                 stats.record_check(ScannerKind::Elaine, "manifest", CheckStatus::Ok);
             }
             None => {
-                stats.audit = None;
+                stats.manifest = None;
                 ctx.report_error(format!("[{}] 🔥 Failed to parse elaine.yaml", ctx.repo.name));
                 stats.record_check(ScannerKind::Elaine, "manifest", CheckStatus::Failed);
             }

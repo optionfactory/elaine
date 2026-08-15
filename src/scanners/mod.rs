@@ -59,7 +59,8 @@ pub struct RepoStats {
     pub has_unique_commits: bool,
     pub description: String,
     //
-    pub audit: Option<crate::schema::ElaineManifest>,
+    #[serde(alias = "audit")]
+    pub manifest: Option<crate::schema::ElaineManifest>,
     //
     pub health: BTreeMap<ScannerKind, BTreeMap<String, CheckStatus>>,
     pub containers: Option<Vec<String>>,
@@ -104,7 +105,7 @@ impl RepoStats {
             private: repo.private,
             has_unique_commits: !repo.fork,
             description: repo.description.clone().unwrap_or_default(),
-            audit: None,
+            manifest: None,
             health: BTreeMap::new(),
             containers: None,
             ansible_confs: Vec::new(),
@@ -171,10 +172,10 @@ impl RepoStats {
         }
     }
 
-    pub fn add_containers(&mut self, mut upgrades: Vec<String>) {
+    pub fn add_containers(&mut self, mut containers: Vec<String>) {
         self.checked_for_containers();
         if let Some(ref mut d) = self.containers {
-            d.append(&mut upgrades);
+            d.append(&mut containers);
         }
     }
 }

@@ -282,7 +282,7 @@ pub enum GdprRole {
     SubProcessor,
     #[doc = "No personal data processed."]
     None,
-    #[doc = "Not in scope of GRPR requirements."]
+    #[doc = "Not in scope of GDPR requirements."]
     OutOfScope,
     #[doc = "Applicability has not yet been assessed."]
     PendingAssessment,

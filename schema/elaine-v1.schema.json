@@ -619,7 +619,7 @@
           "const": "none"
         },
         {
-          "description": "Not in scope of GRPR requirements.",
+          "description": "Not in scope of GDPR requirements.",
           "type": "string",
           "const": "out-of-scope"
         },

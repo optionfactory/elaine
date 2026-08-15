@@ -43,7 +43,7 @@ impl DashboardStats {
                 continue;
             }
             s.live += 1;
-            if r.audit.is_some() {
+            if r.manifest.is_some() {
                 s.live_audited += 1;
             } else {
                 s.live_unaudited += 1;
@@ -147,7 +147,7 @@ mod tests {
         });
         if audited {
             // ElaineManifest only requires `schema_version` and `name`; every other field is optional.
-            r.audit = Some(serde_json::from_str(r#"{"schema_version":1,"name":"x"}"#).unwrap());
+            r.manifest = Some(serde_json::from_str(r#"{"schema_version":1,"name":"x"}"#).unwrap());
         }
         r
     }

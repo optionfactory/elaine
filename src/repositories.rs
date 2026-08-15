@@ -7,12 +7,6 @@ use std::path::{Path, PathBuf};
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 
-#[derive(Debug, PartialEq, Eq)]
-pub enum SyncStatus {
-    Cached,
-    Downloaded,
-}
-
 pub struct RepositoryStore {
     pub dir: PathBuf,
 }
@@ -54,9 +48,9 @@ impl RepositoryStore {
         local_meta.updated_at == expected_updated_at && local_meta.pushed_at == expected_pushed_at
     }
 
-    pub async fn sync_repo(&self, client: &GithubClient, repo: &GithubRepository, force: bool) -> Result<SyncStatus> {
+    pub async fn sync_repo(&self, client: &GithubClient, repo: &GithubRepository, force: bool) -> Result<()> {
         if !force && self.is_cache_valid(&repo.name, &repo.updated_at, &repo.pushed_at) {
-            return Ok(SyncStatus::Cached);
+            return Ok(());
         }
 
         let resp = client.download_tarball(&repo.name, &repo.default_branch).await?;
@@ -82,7 +76,7 @@ impl RepositoryStore {
         fs::write(&tmp_meta, pretty_json)?;
         fs::rename(&tmp_meta, &target_meta)?;
 
-        Ok(SyncStatus::Downloaded)
+        Ok(())
     }
 
     pub fn load_all_metadata(&self) -> Result<BTreeMap<String, GithubRepository>> {

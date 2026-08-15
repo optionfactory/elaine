@@ -34,10 +34,10 @@ pub enum Commands {
     },
     #[command(about = "Audit cached organization repositories for DevSecOps metadata & SBOMs")]
     Scan,
-    #[command(about = "Remove the stats archives for a specific organization or wipe the entire data directory")]
+    #[command(about = "Remove cached per-repository scan data and the aggregated stats file")]
     CleanStats,
 
-    #[command(about = "Remove cached archives for a specific organization or wipe the entire cache")]
+    #[command(about = "Remove cached repository metadata and .tar.gz archives")]
     CleanRepositories,
 
     #[command(about = "Create a stub elaine.yaml manifest in the current folder if it does not exist")]

@@ -105,7 +105,7 @@ pub fn create_router(app_state: Arc<AppState>, dev: bool) -> Router {
 
 fn matches_filters(p: &crate::scanners::RepoStats, filters: &[&str]) -> bool {
     let live = !p.archived;
-    let audited = p.audit.is_some();
+    let audited = p.manifest.is_some();
     let public = !p.private;
     let has_vulns = p.vulnerabilities.as_ref().map(|v| !v.is_empty()).unwrap_or(false);
     let has_outdated = p.outdated_dependencies.as_ref().map(|v| !v.is_empty()).unwrap_or(false);
@@ -147,52 +147,52 @@ fn matches_filters(p: &crate::scanners::RepoStats, filters: &[&str]) -> bool {
         return false;
     }
 
-    if filters.contains(&"tier1") && !p.audit.as_ref().is_some_and(|a| a.tier == Some(ServiceTier::Tier1)) {
+    if filters.contains(&"tier1") && !p.manifest.as_ref().is_some_and(|a| a.tier == Some(ServiceTier::Tier1)) {
         return false;
     }
-    if filters.contains(&"tier2") && !p.audit.as_ref().is_some_and(|a| a.tier == Some(ServiceTier::Tier2)) {
+    if filters.contains(&"tier2") && !p.manifest.as_ref().is_some_and(|a| a.tier == Some(ServiceTier::Tier2)) {
         return false;
     }
-    if filters.contains(&"tier3") && !p.audit.as_ref().is_some_and(|a| a.tier == Some(ServiceTier::Tier3)) {
+    if filters.contains(&"tier3") && !p.manifest.as_ref().is_some_and(|a| a.tier == Some(ServiceTier::Tier3)) {
         return false;
     }
-    if filters.contains(&"tier4") && !p.audit.as_ref().is_some_and(|a| a.tier == Some(ServiceTier::Tier4)) {
+    if filters.contains(&"tier4") && !p.manifest.as_ref().is_some_and(|a| a.tier == Some(ServiceTier::Tier4)) {
         return false;
     }
 
     if filters.contains(&"lifecycle-active")
-        && !p.audit.as_ref().is_some_and(|a| a.lifecycle == Some(LifecycleType::Active))
+        && !p.manifest.as_ref().is_some_and(|a| a.lifecycle == Some(LifecycleType::Active))
     {
         return false;
     }
     if filters.contains(&"lifecycle-deprecated")
-        && !p.audit.as_ref().is_some_and(|a| a.lifecycle == Some(LifecycleType::Deprecated))
+        && !p.manifest.as_ref().is_some_and(|a| a.lifecycle == Some(LifecycleType::Deprecated))
     {
         return false;
     }
     if filters.contains(&"lifecycle-end-of-life")
-        && !p.audit.as_ref().is_some_and(|a| a.lifecycle == Some(LifecycleType::EndOfLife))
+        && !p.manifest.as_ref().is_some_and(|a| a.lifecycle == Some(LifecycleType::EndOfLife))
     {
         return false;
     }
     if filters.contains(&"lifecycle-maintenance")
-        && !p.audit.as_ref().is_some_and(|a| a.lifecycle == Some(LifecycleType::Maintenance))
+        && !p.manifest.as_ref().is_some_and(|a| a.lifecycle == Some(LifecycleType::Maintenance))
     {
         return false;
     }
     if filters.contains(&"lifecycle-prototype")
-        && !p.audit.as_ref().is_some_and(|a| a.lifecycle == Some(LifecycleType::Prototype))
+        && !p.manifest.as_ref().is_some_and(|a| a.lifecycle == Some(LifecycleType::Prototype))
     {
         return false;
     }
     if filters.contains(&"lifecycle-unmaintained")
-        && !p.audit.as_ref().is_some_and(|a| a.lifecycle == Some(LifecycleType::Unmaintained))
+        && !p.manifest.as_ref().is_some_and(|a| a.lifecycle == Some(LifecycleType::Unmaintained))
     {
         return false;
     }
 
     let has_ingress = |exposure: ExposureType| {
-        p.audit.as_ref().is_some_and(|a| {
+        p.manifest.as_ref().is_some_and(|a| {
             a.environments
                 .as_ref()
                 .is_some_and(|envs| envs.iter().any(|e| e.ingress == Some(exposure)))
@@ -218,31 +218,31 @@ fn matches_filters(p: &crate::scanners::RepoStats, filters: &[&str]) -> bool {
         return false;
     }
 
-    if filters.contains(&"service") && !p.audit.as_ref().is_some_and(|a| a.project_type == Some(ProjectType::Service)) {
+    if filters.contains(&"service") && !p.manifest.as_ref().is_some_and(|a| a.project_type == Some(ProjectType::Service)) {
         return false;
     }
-    if filters.contains(&"library") && !p.audit.as_ref().is_some_and(|a| a.project_type == Some(ProjectType::Library)) {
+    if filters.contains(&"library") && !p.manifest.as_ref().is_some_and(|a| a.project_type == Some(ProjectType::Library)) {
         return false;
     }
-    if filters.contains(&"tool") && !p.audit.as_ref().is_some_and(|a| a.project_type == Some(ProjectType::Tool)) {
+    if filters.contains(&"tool") && !p.manifest.as_ref().is_some_and(|a| a.project_type == Some(ProjectType::Tool)) {
         return false;
     }
             if filters.contains(&"infrastructure")
                 && !p
-                    .audit
+                    .manifest
                     .as_ref()
                     .is_some_and(|a| a.project_type == Some(ProjectType::Infrastructure))
             {
                 return false;
             }
             if filters.contains(&"playground")
-                && !p.audit.as_ref().is_some_and(|a| a.project_type == Some(ProjectType::Playground))
+                && !p.manifest.as_ref().is_some_and(|a| a.project_type == Some(ProjectType::Playground))
             {
                 return false;
             }
 
     let compliant = p
-        .audit
+        .manifest
         .as_ref()
         .and_then(|a| a.compliance.as_ref())
         .map(|c| {
@@ -277,7 +277,7 @@ mod tests {
             ..Default::default()
         });
         if let Some(json) = audit_json {
-            r.audit = Some(serde_json::from_str(json).unwrap());
+            r.manifest = Some(serde_json::from_str(json).unwrap());
         }
         r
     }

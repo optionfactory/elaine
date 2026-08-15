@@ -9,7 +9,7 @@ A CLI tool for aggregating and inspecting metadata, governance manifests, SBOMs,
 ## Prerequisites
 
 * A GitHub personal access token with read permissions for the target organization. This can be provided via the `GITHUB_TOKEN` or `GH_TOKEN` environment variables, or by having an active `gh auth token` session.
-* An `elaine.json` configuration file in the working directory.
+* An `elaine.conf.json` configuration file in the working directory.
 
 ## Installation
 
@@ -21,7 +21,7 @@ curl -sSL https://github.com/optionfactory/elaine/releases/latest/download/elain
 
 ## Configuration
 
-Create an `elaine.json` file in the directory where you run the tool:
+Create an `elaine.conf.json` file in the directory where you run the tool:
 
 ```json
 {
@@ -36,7 +36,7 @@ Create an `elaine.json` file in the directory where you run the tool:
 
 ## Usage
 
-The tool operates in three main phases based on the local `elaine.json` configuration:
+The tool operates in three main phases based on the local `elaine.conf.json` configuration:
 
 1. **Sync:** Fetch repository metadata from the GitHub API and cache source archives (`.tar.gz`) locally.
    ```bash
@@ -71,8 +71,8 @@ Each repository can declare an `elaine.yaml` governance manifest at its root. El
 # yaml-language-server: $schema=https://raw.githubusercontent.com/optionfactory/elaine/refs/heads/master/schema/elaine-v1.schema.json
 schema_version: 1
 name: "my-service"
-type: service                # library | service | tool | infrastructure | documentation
-lifecycle: active            # active | maintenance | deprecated | end-of-life | prototype
+type: service                # library | service | tool | infrastructure | documentation | playground
+lifecycle: active            # active | maintenance | unmaintained | deprecated | end-of-life | prototype
 tier: tier2                  # tier1 (24/7 SLA) -> tier4 (experimental)
 stewards:
   - "mario.rossi@example.com"
@@ -97,7 +97,7 @@ environments:
       - api.example.com
 ```
 
-Only `schema_version` and `name` are required; every other field is optional. Compliance fields left as `pending-assessment` count as non-compliant in the dashboard filters:
+Only `schema_version` and `name` are required; every other field is optional. Compliance fields left as `pending-assessment` (or ads `pending-nomination`) count as non-compliant in the dashboard filters:
 
 > *"Guybrush, this is important. Are you listening to me? This is IMPORTANT!"*
 >

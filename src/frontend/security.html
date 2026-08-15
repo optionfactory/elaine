@@ -181,7 +181,7 @@
         Templates.fromSelector('#vulns-template').withOverlay(vulnsRows).renderToSelector('vulns-grid');
 
         const byOutdated = all
-            .map(p => ({ ...p, outdated: p.outdated_dependencies?.length ?? 0, tier: p.audit?.tier ?? 'unknown' }))
+            .map(p => ({ ...p, outdated: p.outdated_dependencies?.length ?? 0, tier: p.manifest?.tier ?? 'unknown' }))
             .filter(p => p.outdated > 0)
             .sort((a, b) => b.outdated - a.outdated)
             .slice(0, 50);
@@ -198,7 +198,7 @@
         const exposures = ['internet', 'restricted-vpn', 'restricted-ip', 'restricted-pam', 'local', 'none', 'unknown'];
 
         function repoExposure(p) {
-            const envs = p.audit?.environments;
+            const envs = p.manifest?.environments;
             if (!envs?.length) return 'unknown';
             const priorities = { 'internet': 0, 'restricted-vpn': 1, 'restricted-ip': 2, 'restricted-pam': 3, 'local': 4, 'none': 5 };
             return envs.map(e => e.ingress).filter(Boolean).sort((a, b) => priorities[a] - priorities[b])[0] ?? 'unknown';
@@ -211,7 +211,7 @@
         }
 
         const classified = all.map(p => {
-            const tier = p.audit?.tier ?? 'tier4';
+            const tier = p.manifest?.tier ?? 'tier4';
             const exposure = repoExposure(p);
             const vulns = p.vulnerabilities?.length ?? 0;
             const outdated = p.outdated_dependencies?.length ?? 0;
