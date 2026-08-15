@@ -11,6 +11,13 @@
     --danger: #f87171;
     --info: #3b82f6;
     --neutral: #64748b;
+
+    /* blended tints, derived from the base palette */
+    --surface-hover: color-mix(in srgb, white 3%, var(--card-bg));
+    --surface-selected: color-mix(in srgb, var(--primary) 10%, var(--card-bg));
+    --nav-pill-active: color-mix(in srgb, var(--primary) 10%, var(--bg));
+    --table-border: color-mix(in srgb, var(--border) 50%, var(--bg));
+
 }
 
 /* Reset */
@@ -92,7 +99,7 @@ header {
     align-items: center;
     gap: 1rem 1.5rem;
     flex-wrap: wrap;
-    background: rgba(15, 23, 42, 0.92);
+    background: color-mix(in srgb, var(--bg) 92%, transparent);
     backdrop-filter: blur(8px);
     border-bottom: 1px solid var(--border);
 
@@ -137,14 +144,14 @@ header {
 
             &:hover {
                 color: var(--text);
-                background: rgba(255, 255, 255, 0.03);
-                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                background: var(--surface-hover);
+                box-shadow: 0 4px 12px rgb(from black r g b / 30%);
             }
 
             &.active {
                 color: var(--text);
-                background: rgba(56, 189, 248, 0.1);
-                box-shadow: 0 4px 12px rgba(56, 189, 248, 0.2);
+                background: var(--surface-selected);
+                box-shadow: 0 4px 12px rgb(from var(--primary) r g b / 20%);
             }
         }
     }
@@ -176,7 +183,7 @@ header > nav:nth-of-type(2) {
 
         &.active {
             color: var(--primary);
-            background: rgba(56, 189, 248, 0.1);
+            background: var(--nav-pill-active);
         }
     }
 }
@@ -239,13 +246,13 @@ metrics-grid {
         }
 
         &:hover {
-            background: rgba(255, 255, 255, 0.03);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            background: var(--surface-hover);
+            box-shadow: 0 4px 12px rgb(from black r g b / 30%);
         }
 
         &.active {
-            background: rgba(56, 189, 248, 0.1);
-            box-shadow: 0 4px 12px rgba(56, 189, 248, 0.2);
+            background: var(--surface-selected);
+            box-shadow: 0 4px 12px rgb(from var(--primary) r g b / 20%);
         }
 
         &:focus-visible {
@@ -315,7 +322,7 @@ filter-controls {
 
                 &:hover {
                     color: var(--text);
-                    background: rgba(255, 255, 255, 0.05);
+                    background: var(--surface-hover);
                 }
 
                 &[active] {
@@ -358,7 +365,7 @@ search-bar {
         gap: 0.5rem;
         padding: 0.5rem 1rem;
         background: #7c3aed;
-        color: #ffffff;
+        color: var(--text);
         border: none;
         border-radius: 6px;
         font-size: 0.875rem;
@@ -572,7 +579,7 @@ badges {
 
         &.archived {
             background: #475569;
-            color: #f8fafc;
+            color: var(--text);
         }
 
         &.disabled {
@@ -588,7 +595,7 @@ table {
     grid-template-columns: 1fr auto auto auto auto;
     width: 100%;
     font-size: 0.875rem;
-    border: 1px solid rgba(51, 65, 85, 0.5);
+    border: 1px solid var(--table-border);
     border-radius: 6px;
     overflow: hidden;
     font-family: monospace;
@@ -654,7 +661,7 @@ table {
         grid-column: 1 / -1;
         grid-template-columns: 1fr;
         margin-bottom: 10px;
-        background: rgba(15, 23, 42, 0.3);
+        background: var(--bg);
         border-left: 4px solid var(--primary);
         border-radius: 4px 0 0 4px;
 
@@ -663,7 +670,7 @@ table {
             margin-bottom: 0;
             border-left: none;
             border-radius: 0;
-            border-bottom: 1px solid rgba(51, 65, 85, 0.5);
+            border-bottom: 1px solid var(--table-border);
         }
 
         &:last-child {
@@ -674,7 +681,7 @@ table {
     th {
         min-width: 0;
         padding: 0.75rem 1rem;
-        background: rgba(0, 0, 0, 0.35);
+        background: var(--bg);
         color: var(--text-muted);
         font-weight: 600;
         font-size: 0.75rem;
@@ -690,14 +697,14 @@ table {
         padding: 0.875rem 1rem;
         text-align: left;
         align-content: center;
-        border-bottom: 1px solid rgba(51, 65, 85, 0.5);
+        border-bottom: 1px solid var(--table-border);
         overflow-wrap: break-word;
     }
 
     a {
         display: inline-block;
         padding: 0.15rem 0.4rem;
-        background: rgba(248, 113, 113, 0.15);
+        background: color-mix(in srgb, var(--danger) 15%, var(--card-bg));
         color: var(--danger);
         border-radius: 4px;
         font-family: monospace;
@@ -707,7 +714,7 @@ table {
 
         &:hover {
             background: var(--danger);
-            color: #fff;
+            color: var(--text);
         }
     }
 }
@@ -725,8 +732,8 @@ tag-list {
 
 tag {
     padding: 0.15rem 0.5rem;
-    background: #334155;
-    color: #f8fafc;
+    background: var(--border);
+    color: var(--text);
     border-radius: 4px;
     font-size: 0.8rem;
     font-family: monospace;
@@ -752,12 +759,12 @@ tag {
     }
 
     &.current {
-        background: rgba(251, 191, 36, 0.15);
+        background: color-mix(in srgb, var(--warning) 15%, var(--card-bg));
         color: var(--warning);
     }
 
     &.latest {
-        background: rgba(52, 211, 153, 0.15);
+        background: color-mix(in srgb, var(--success) 15%, var(--card-bg));
         color: var(--success);
     }
 
@@ -819,7 +826,7 @@ tooltip-trigger {
         background: var(--bg);
         border: 1px solid var(--border);
         border-radius: 8px;
-        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+        box-shadow: 0 10px 15px -3px rgb(from black r g b / 50%);
         transition: opacity 0.2s ease, visibility 0.2s ease;
 
         div {
@@ -1011,22 +1018,22 @@ risk-grid {
         font-weight: 600;
 
         &.critical {
-            background: rgba(248, 113, 113, 0.2);
+            background: color-mix(in srgb, var(--danger) 20%, var(--bg));
             color: var(--danger);
         }
 
         &.high {
-            background: rgba(251, 146, 60, 0.18);
+            background: color-mix(in srgb, #fb923c 18%, var(--bg));
             color: #fb923c;
         }
 
         &.medium {
-            background: rgba(251, 191, 36, 0.15);
+            background: color-mix(in srgb, var(--warning) 15%, var(--bg));
             color: var(--warning);
         }
 
         &.low {
-            background: rgba(52, 211, 153, 0.12);
+            background: color-mix(in srgb, var(--success) 12%, var(--bg));
             color: var(--success);
         }
 
