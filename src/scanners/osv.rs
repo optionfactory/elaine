@@ -10,7 +10,7 @@ struct OsvQuery<'a> {
     version: &'a str,
     package: OsvPackage<'a>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    next_page: Option<&'a str>,
+    page_token: Option<&'a str>,
 }
 
 #[derive(Serialize)]
@@ -29,7 +29,7 @@ struct OsvResult {
     #[serde(default)]
     vulns: Vec<OsvVuln>,
     #[serde(default)]
-    next_page: Option<String>,
+    next_page_token: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -60,7 +60,7 @@ pub fn fetch_vulnerabilities(
                     .map(|(eco, name, ver, token)| OsvQuery {
                         version: ver,
                         package: OsvPackage { name, ecosystem: eco },
-                        next_page: token.as_deref(),
+                        page_token: token.as_deref(),
                     })
                     .collect();
 
@@ -78,7 +78,7 @@ pub fn fetch_vulnerabilities(
                     for vuln in result.vulns {
                         found_vulns.push((dep.1.to_string(), dep.2.to_string(), vuln.id));
                     }
-                    if let Some(token) = result.next_page {
+                    if let Some(token) = result.next_page_token {
                         next_round.push((dep.0, dep.1, dep.2, Some(token)));
                     }
                 }
