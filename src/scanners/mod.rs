@@ -59,7 +59,6 @@ pub struct RepoStats {
     pub has_unique_commits: bool,
     pub description: String,
     //
-    #[serde(alias = "audit")]
     pub manifest: Option<crate::schema::ElaineManifest>,
     //
     pub health: BTreeMap<ScannerKind, BTreeMap<String, CheckStatus>>,
