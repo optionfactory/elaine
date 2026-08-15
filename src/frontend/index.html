@@ -200,6 +200,7 @@
                     <badge data-tpl-if="!manifest" class="unaudited">No Audit</badge>
                     <badge data-tpl-if="manifest?.tier" class="tier">{{ manifest.tier }}</badge>
                     <badge data-tpl-if="manifest?.lifecycle" class="lifecycle">{{ manifest.lifecycle }}</badge>
+                    <badge data-tpl-if="failed_checks > 0" class="failed-checks">{{ failed_checks }} check{{ failed_checks > 1 ? 's' : '' }} failed</badge>
                 </badges>
                 <time>
                     <div>Created: {{ created_at }}</div>

@@ -36,6 +36,17 @@
 
     <main>
     <section>
+        <h2>Scanner failures</h2>
+        <p class="section-intro">
+            Repositories where a scanner could not complete (e.g. OSV unreachable, <code>npm</code>/<code>cargo</code>/<code>mvn</code>/<code>go</code>
+            not available or failing, unparseable lockfiles). Their vulnerability and outdated-dependency counts below are
+            <em>unknown</em>, not zero: treat these numbers as missing until the check succeeds again.
+        </p>
+
+        <failures-grid></failures-grid>
+    </section>
+
+    <section>
         <h2>Tier &times; exposure matrix</h2>
         <p class="section-intro">
             Live repositories classified by operational criticality (tier) and network exposure (most permissive
@@ -67,6 +78,26 @@
         <outdated-grid></outdated-grid>
     </section>
     </main>
+
+    <template id="failures-template">
+        <p data-tpl-if="self.length == 0">All applicable checks passed.</p>
+        <table class="failures" data-tpl-if="self.length > 0">
+            <thead>
+                <tr>
+                    <th>Repository</th>
+                    <th>Scanner</th>
+                    <th>Failed checks</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr data-tpl-each="self" data-tpl-var="r">
+                    <td><a data-tpl-href="r.html_url" target="_blank" rel="noopener noreferrer">{{ r.name }}</a></td>
+                    <td>{{ r.scanner }}</td>
+                    <td>{{ r.checks.join(', ') }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </template>
 
     <template id="vulns-template">
         <table class="vulns-board">
@@ -165,6 +196,21 @@
         for await (const p of projects(http, ['live'], null)) {
             all.push(p);
         }
+
+        const failures = all
+            .map(p => ({ name: p.name, html_url: p.html_url, health: p.health ?? {} }))
+            .map(p => ({
+                name: p.name,
+                html_url: p.html_url,
+                per_scanner: Object.entries(p.health).map(([scanner, checks]) => ({
+                    scanner,
+                    checks: Object.entries(checks).filter(([, status]) => status === 'failed').map(([check]) => check),
+                })).filter(s => s.checks.length > 0),
+            }))
+            .filter(p => p.per_scanner.length > 0)
+            .sort((a, b) => b.per_scanner.length - a.per_scanner.length || a.name.localeCompare(b.name))
+            .flatMap(p => p.per_scanner.map(s => ({ name: p.name, html_url: p.html_url, scanner: s.scanner, checks: s.checks })));
+        Templates.fromSelector('#failures-template').withOverlay(failures).renderToSelector('failures-grid');
 
         const vulnsRows = all
             .map(p => ({ ...p, vulns: p.vulnerabilities?.length ?? 0 }))

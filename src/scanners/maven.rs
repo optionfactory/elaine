@@ -55,22 +55,22 @@ impl Scanner for MavenScanner {
                     stats.checked_for_vulnerabilities();
                     stats.checked_for_outdated_dependencies();
 
-                    let vulns_path = run_dir.join("target").join("anarchitect-vulns.json");
-                    if let Ok(payload) = fs::read_to_string(&vulns_path)
-                        && let Ok(parsed_vulns) = serde_json::from_str::<Vec<Vulnerability>>(&payload)
-                    {
-                        stats.add_vulnerabilities(parsed_vulns);
-                    } else {
-                        vulns_ok = false;
+                    let vulns_path = run_dir.join("target").join("anarchitect-vulnerabilities.json");
+                    match fs::read_to_string(&vulns_path) {
+                        Ok(payload) => match serde_json::from_str::<Vec<Vulnerability>>(&payload) {
+                            Ok(parsed_vulns) => stats.add_vulnerabilities(parsed_vulns),
+                            Err(_) => vulns_ok = false,
+                        },
+                        Err(_) => vulns_ok = false,
                     }
 
-                    let updates_path = run_dir.join("target").join("anarchitect-dependency-upgrades.json");
-                    if let Ok(payload) = fs::read_to_string(&updates_path)
-                        && let Ok(parsed_updates) = serde_json::from_str::<Vec<OutdatedDependency>>(&payload)
-                    {
-                        stats.add_outdated_dependencies(parsed_updates);
-                    } else {
-                        outdated_ok = false;
+                    let updates_path = run_dir.join("target").join("anarchitect-outdated-dependencies.json");
+                    match fs::read_to_string(&updates_path) {
+                        Ok(payload) => match serde_json::from_str::<Vec<OutdatedDependency>>(&payload) {
+                            Ok(parsed_updates) => stats.add_outdated_dependencies(parsed_updates),
+                            Err(_) => outdated_ok = false,
+                        },
+                        Err(_) => outdated_ok = false,
                     }
                 }
                 Ok(_out) => {

@@ -525,6 +525,11 @@ badges {
             color: #fff7ed;
         }
 
+        &.failed-checks {
+            background: #b91c1c;
+            color: #fef2f2;
+        }
+
         &.fork {
             background: #7c3aed;
             color: #f5f3ff;
@@ -581,6 +586,10 @@ table {
 
     &.outdated-board {
         grid-template-columns: 1fr auto auto;
+    }
+
+    &.failures {
+        grid-template-columns: 1fr auto 1fr;
     }
 
     &.risk-matrix {

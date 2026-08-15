@@ -147,7 +147,7 @@ async function* projects(http, filters, search) {
             .param("limit", limit)
             .fetchJson();
         for (const item of data) {
-            yield item;
+            yield withDerivedFields(item);
         }
 
         if (data.length < limit) {
@@ -156,6 +156,13 @@ async function* projects(http, filters, search) {
 
         offset += limit;
     }
+}
+
+/// Adds convenience fields computed from the raw API payload.
+function withDerivedFields(p) {
+    const failed_checks = Object.values(p.health ?? {})
+        .reduce((sum, checks) => sum + Object.values(checks).filter(s => s === 'failed').length, 0);
+    return { ...p, failed_checks };
 }
 
 
