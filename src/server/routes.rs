@@ -233,6 +233,10 @@ fn matches_filters(p: &crate::scanners::RepoStats, filters: &[&str]) -> bool {
     if filters.contains(&"infrastructure") && !p.manifest.as_ref().is_some_and(|a| a.project_type == Some(ProjectType::Infrastructure)) {
         return false;
     }
+    if filters.contains(&"documentation") && !p.manifest.as_ref().is_some_and(|a| a.project_type == Some(ProjectType::Documentation)) {
+        return false;
+    }
+
     if filters.contains(&"playground") && !p.manifest.as_ref().is_some_and(|a| a.project_type == Some(ProjectType::Playground)) {
         return false;
     }
