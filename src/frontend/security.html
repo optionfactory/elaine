@@ -104,7 +104,7 @@
         <h2>Outdated dependencies (top 50)</h2>
         <p class="section-intro">
             Live repositories by number of outdated dependencies, plus the artifacts that are stale across the
-            organization. An artifact lagging everywhere is one upgrade campaign, not one ticket per repo.
+            organization: an artifact lagging in many repositories is usually worth a coordinated upgrade.
         </p>
 
         <outdated-grid>
@@ -175,6 +175,31 @@
                 </tr>
             </tbody>
         </table>
+        <section>
+            <h2>Artifacts stale across the organization</h2>
+            <p class="section-intro">
+                The same dependency aggregated across all live repositories, sorted by how many repositories
+                it lags in. Entries near the top affect many projects at once and are usually worth a
+                coordinated upgrade; multiple versions in the <em>Latest</em> column mean the repositories
+                are pinned to different majors.
+            </p>
+            <table class="outdated-artifacts">
+                <thead>
+                    <tr>
+                        <th>Artifact</th>
+                        <th>Repos affected</th>
+                        <th>Latest</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr data-tpl-each="artifacts" data-tpl-var="a">
+                        <td><strong>{{ a.artifact }}</strong></td>
+                        <td>{{ a.repos }}</td>
+                        <td>{{ a.latest }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
     </template>
 
     <template id="risk-template">
@@ -274,6 +299,21 @@
             .filter(p => p.outdated > 0)
             .sort((a, b) => b.outdated - a.outdated)
             .slice(0, 50);
+
+        const artifactAgg = new Map();
+        for (const p of all) {
+            for (const dep of p.outdated_dependencies ?? []) {
+                const entry = artifactAgg.get(dep.artifact) ?? { repos: new Set(), latest: new Set() };
+                entry.repos.add(p.name);
+                entry.latest.add(dep.latest);
+                artifactAgg.set(dep.artifact, entry);
+            }
+        }
+        const artifacts = [...artifactAgg.entries()]
+            .map(([artifact, e]) => ({ artifact, repos: e.repos.size, latest: [...e.latest].sort().join(', ') }))
+            .sort((a, b) => b.repos - a.repos || a.artifact.localeCompare(b.artifact))
+            .slice(0, 50);
+
         Templates.fromSelector('#outdated-template').withOverlay({
             repos: byOutdated.map(p => ({
                 name: p.name,
@@ -281,6 +321,7 @@
                 outdated: p.outdated,
                 tier: p.tier,
             })),
+            artifacts,
         }).renderToSelector('outdated-grid');
 
         const tiers = ['tier1', 'tier2', 'tier3', 'tier4'];

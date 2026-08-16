@@ -659,6 +659,10 @@ table {
         grid-template-columns: 1fr auto auto;
     }
 
+    &.outdated-artifacts {
+        grid-template-columns: 1fr auto auto;
+    }
+
     &.failures {
         grid-template-columns: 1fr auto auto auto;
     }

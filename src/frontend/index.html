@@ -190,7 +190,7 @@
         <project-card data-tpl-each="self">
             <project-header>
                 <h2><a data-tpl-href="html_url" target="_blank" rel="noopener noreferrer">{{ name }}</a></h2>
-                <p>{{ description ?? 'no descrption' }}</p>
+                <p>{{ description ?? 'no description' }}</p>
                 <badges>
                     <badge data-tpl-if="private" class="private">Private</badge>
                     <badge data-tpl-if="!private" class="public">Public</badge>

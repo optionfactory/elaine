@@ -59,7 +59,7 @@ pub struct RepoStats {
     pub fork: bool,
     pub disabled: bool,
     pub private: bool,
-    pub description: String,
+    pub description: Option<String>,
     //
     pub manifest: Option<crate::schema::ElaineManifest>,
     //
@@ -104,7 +104,7 @@ impl RepoStats {
             fork: repo.fork,
             disabled: repo.disabled,
             private: repo.private,
-            description: repo.description.clone().unwrap_or_default(),
+            description: repo.description.clone(),
             manifest: None,
             health: BTreeMap::new(),
             containers: None,

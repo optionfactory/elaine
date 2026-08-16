@@ -39,7 +39,7 @@ pub async fn api_projects_handler(State(state): State<Arc<AppState>>, Query(quer
         .filter(|p| {
             if let Some(t) = &term
                 && !p.name.to_lowercase().contains(t)
-                && !p.description.to_lowercase().contains(t)
+                && !p.description.as_deref().is_some_and(|d| d.to_lowercase().contains(t))
             {
                 return false;
             }
