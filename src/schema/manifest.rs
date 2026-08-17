@@ -480,6 +480,8 @@ pub enum ExposureType {
     RestrictedVpn,
     #[doc = "Reachable only from an allowlisted set of IP addresses."]
     RestrictedIp,
+    #[doc = "Reachability restricted using geo ip location."]
+    RestrictedGeoIp,
     #[doc = "Reachable only through a Privileged Access Management (PAM) bastion."]
     RestrictedPam,
     #[doc = "Publicly reachable from the Internet."]
