@@ -279,7 +279,7 @@
       "type": "object",
       "properties": {
         "ads": {
-          "description": "Italian Garante Privacy 'Amministratore di Sistema' (AdS) compliance block.\nApplicable to projects falling under the Italian Provvedimento Garante AdS for tracking privileged IT and database administrators.",
+          "description": "Italian Garante Privacy 'Amministratore di Sistema' (AdS).\nApplicable to projects falling under the Italian Provvedimento Garante AdS for tracking privileged IT and database administrators.",
           "$ref": "#/$defs/AdsResponsibility"
         },
         "ai_act": {

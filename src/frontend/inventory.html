@@ -216,27 +216,17 @@
 
     <script type="module">
         import { Templates } from "ftl";
-        import { authenticate, allProjects, setupNavSpy } from "/elaine.js";
+        import { authenticate, setupNavSpy } from "/elaine.js";
 
         const { config, http } = await authenticate();
-        const all = await allProjects(http, ['live']);
 
-        const assignments = all
-            .flatMap(p => (p.manifest?.stewards ?? [])
-                .filter(Boolean)
-                .map(steward => ({
-                    steward,
-                    name: p.name,
-                    html_url: p.html_url,
-                    type: p.manifest?.type ?? null,
-                    tier: p.manifest?.tier ?? null,
-                    lifecycle: p.manifest?.lifecycle ?? null,
-                    attrs: [['data-steward', steward.toLowerCase()], ['data-name', p.name.toLowerCase()]],
-                })))
-            .sort((a, b) => a.steward.localeCompare(b.steward)
-                || (a.tier ?? 'zz').localeCompare(b.tier ?? 'zz')
-                || a.name.localeCompare(b.name));
+        const agg = await http.get('/api/aggregates').fetchJson();
+        const inv = agg.inventory;
 
+        const assignments = inv.assignments.map(a => ({
+            ...a,
+            attrs: [['data-steward', a.steward.toLowerCase()], ['data-name', a.name.toLowerCase()]],
+        }));
         const emptyMessage = () => assignments.length === 0
             ? 'No repository declares stewards in its manifest.'
             : 'No repository matches the current filter.';
@@ -265,54 +255,15 @@
         document.querySelector('#steward-filter-form').addEventListener('submit', e => e.preventDefault());
         document.querySelector('#steward-filter').addEventListener('input', e => filterStewardRepos(e.target.value));
 
-        const domains = all
-            .flatMap(p => (p.manifest?.environments ?? [])
-                .filter(e => e.domains?.length)
-                .flatMap(e => e.domains.map(domain => ({
-                    domain,
-                    repo: p.name,
-                    html_url: p.html_url,
-                    type: e.type ?? null,
-                    ingress: e.ingress ?? null,
-                    certs: e.certificates ?? null,
-                }))))
-            .sort((a, b) => a.domain.localeCompare(b.domain));
-        Templates.fromSelector('#domains-template').withOverlay(domains).renderToSelector('domains-grid');
+        Templates.fromSelector('#domains-template').withOverlay(inv.domains).renderToSelector('domains-grid');
 
-        const toolchainsAgg = new Map();
-        for (const p of all) {
-            for (const toolchain of Object.keys(p.health ?? {})) {
-                if (toolchain === 'elaine' || toolchain === 'pinch') continue;
-                toolchainsAgg.set(toolchain, (toolchainsAgg.get(toolchain) ?? 0) + 1);
-            }
-        }
-        const toolchainsRows = [...toolchainsAgg.entries()]
-            .map(([toolchain, repos]) => {
-                const pct = all.length ? Math.round((repos / all.length) * 100) : 0;
-                const color = pct >= 40 ? 'var(--primary)' : pct >= 15 ? 'var(--info)' : 'var(--neutral)';
-                return {
-                    toolchain,
-                    repos,
-                    pct,
-                    attr: ['style', `width: ${pct}%; --fill-color: ${color}`],
-                };
-            })
-            .sort((a, b) => b.repos - a.repos);
-        Templates.fromSelector('#toolchains-template').withOverlay(toolchainsRows).renderToSelector('toolchains-grid');
+        const toolchainRows = inv.toolchains.map(t => ({
+            ...t,
+            attr: ['style', `width: ${t.pct}%; --fill-color: ${t.pct >= 40 ? 'var(--primary)' : t.pct >= 15 ? 'var(--info)' : 'var(--neutral)'}`],
+        }));
+        Templates.fromSelector('#toolchains-template').withOverlay(toolchainRows).renderToSelector('toolchains-grid');
 
-        const tierOrder = ['tier1', 'tier2', 'tier3', 'tier4'];
-        const tiersRows = all
-            .filter(p => p.manifest?.tier)
-            .map(p => ({
-                name: p.name,
-                html_url: p.html_url,
-                type: p.manifest?.type ?? null,
-                tier: p.manifest.tier,
-                lifecycle: p.manifest?.lifecycle ?? null,
-            }))
-            .sort((a, b) => tierOrder.indexOf(a.tier) - tierOrder.indexOf(b.tier)
-                || a.name.localeCompare(b.name));
-        Templates.fromSelector('#tiers-template').withOverlay(tiersRows).renderToSelector('tiers-grid');
+        Templates.fromSelector('#tiers-template').withOverlay(inv.tiers).renderToSelector('tiers-grid');
 
         setupNavSpy();
     </script>

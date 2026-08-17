@@ -27,6 +27,62 @@ pub async fn api_stats_handler(State(state): State<Arc<AppState>>, _auth: Valida
     Json(cache.stats.clone()).into_response()
 }
 
+/// Precalculated analytics for the governance/security/inventory pages.
+/// Computed once per stats cache refresh (see Aggregates::calculate), not per request.
+pub async fn api_aggregates_handler(State(state): State<Arc<AppState>>, _auth: ValidatedUser) -> impl IntoResponse {
+    let cache = state.cache.read().await;
+    Json(cache.aggregates.clone()).into_response()
+}
+
+#[derive(serde::Serialize)]
+struct StalenessRow {
+    name: String,
+    html_url: String,
+    pushed_at: String,
+    months: i64,
+    #[serde(rename = "type")]
+    project_type: Option<ProjectType>,
+    tier: Option<ServiceTier>,
+    lifecycle: Option<LifecycleType>,
+}
+
+/// Months since the last push for live repositories. Depends on the current time,
+/// so it is computed per request instead of being cached with the aggregates.
+pub async fn api_staleness_handler(State(state): State<Arc<AppState>>, _auth: ValidatedUser) -> impl IntoResponse {
+    const MONTH_SECONDS: f64 = 30.44 * 24.0 * 3600.0;
+    let cache = state.cache.read().await;
+    let now = chrono::Utc::now();
+    let mut rows: Vec<StalenessRow> = cache
+        .projects
+        .iter()
+        .filter(|p| !p.archived && !p.pushed_at.is_empty())
+        .filter_map(|p| {
+            let pushed = chrono::DateTime::parse_from_rfc3339(&p.pushed_at).ok()?;
+            let months = ((now - pushed.with_timezone(&chrono::Utc)).num_seconds() as f64 / MONTH_SECONDS).floor() as i64;
+            Some(StalenessRow {
+                name: p.name.clone(),
+                html_url: p.html_url.clone(),
+                pushed_at: p.pushed_at.clone(),
+                months,
+                project_type: p.manifest.as_ref().and_then(|m| m.project_type),
+                tier: p.manifest.as_ref().and_then(|m| m.tier),
+                lifecycle: p.manifest.as_ref().and_then(|m| m.lifecycle),
+            })
+        })
+        .collect();
+    rows.sort_by(|a, b| b.months.cmp(&a.months));
+    Json(rows).into_response()
+}
+
+/// The generated JSON schema (schema/elaine-v1.schema.json, produced by build.rs from
+/// the #[doc] comments in src/schema/manifest.rs). Compile-time static content.
+pub async fn api_schema_handler(_auth: ValidatedUser) -> impl IntoResponse {
+    (
+        [(axum::http::header::CONTENT_TYPE, "application/json")],
+        include_str!("../../schema/elaine-v1.schema.json"),
+    )
+}
+
 pub async fn api_projects_handler(State(state): State<Arc<AppState>>, Query(query): Query<ApiQuery>, _auth: ValidatedUser) -> impl IntoResponse {
     let cache = state.cache.read().await;
     let term = query.search.as_deref().map(|s| s.to_lowercase());
@@ -107,6 +163,9 @@ pub fn create_router(app_state: Arc<AppState>, dev: bool) -> Router {
     let mut app = Router::new()
         .route("/api/config", get(api_config_handler))
         .route("/api/stats", get(api_stats_handler))
+        .route("/api/aggregates", get(api_aggregates_handler))
+        .route("/api/staleness", get(api_staleness_handler))
+        .route("/api/schema", get(api_schema_handler))
         .route("/api/projects", get(api_projects_handler))
         .route("/api/logs", get(api_logs_handler))
         .with_state(app_state);

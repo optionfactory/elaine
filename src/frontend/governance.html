@@ -194,80 +194,41 @@
 
     <script type="module">
         import { Templates } from "ftl";
-        import { authenticate, allProjects, setupNavSpy } from "/elaine.js";
+        import { authenticate, setupNavSpy } from "/elaine.js";
 
         const { config, http } = await authenticate();
 
-        const all = await allProjects(http, ['live']);
+        const agg = await http.get('/api/aggregates').fetchJson();
+        const g = agg.governance;
 
-        const frameworks = ['dora', 'cra', 'nis2', 'ai_act', 'gdpr', 'data_residency', 'ads'];
-        // applicability texts mirrored from the #[doc] comments on ComplianceManifest in src/schema/manifest.rs
-        const frameworkDocs = {
-            dora: "DORA (Digital Operational Resilience Act) criticality tag. Applicable if your project serves the EU financial sector or acts as an ICT third-party provider to financial entities.",
-            cra: "EU Cyber Resilience Act (CRA) product classification tier. Applicable if your software product contains digital elements and is sold or distributed within the EU.",
-            nis2: "EU NIS2 Directive criticality classification. Applicable to non-financial critical and important infrastructure operating in the EU (e.g., energy, health, SaaS, MSPs).",
-            ai_act: "EU AI Act risk classification tier. Applicable to systems integrating AI/ML models, LLMs, or automated inference.",
-            gdpr: "GDPR data protection role. Applicable to any project that processes, stores, or transmits EU/EEA personal data.",
-            data_residency: "Whether personal data is processed or stored strictly within the EU/EEA.",
-            ads: "Italian Garante Privacy 'Amministratore di Sistema' (AdS) compliance block. Applicable to projects falling under the Italian Provvedimento Garante AdS for tracking privileged IT and database administrators.",
-        };
-        const withManifest = all.filter(p => p.manifest?.compliance);
-        const rows = frameworks.map(fw => {
-            let assessed = 0, pending = 0;
-            for (const p of withManifest) {
-                const value = p.manifest.compliance[fw];
-                if (String(value).startsWith('pending')) {
-                    pending++;
-                } else {
-                    assessed++;
-                }
-            }
-            const coverage = withManifest.length ? Math.round((assessed / withManifest.length) * 100) : 0;
-            const color = coverage >= 80 ? 'var(--success)' : coverage >= 50 ? 'var(--warning)' : 'var(--danger)';
+        // applicability texts come straight from the generated JSON schema
+        // (built from the #[doc] comments on ComplianceManifest in src/schema/manifest.rs)
+        const schema = await http.get('/api/schema').fetchJson();
+        const docs = schema.$defs.ComplianceManifest.properties;
+        const rows = g.coverage.map(r => {
+            const color = r.coverage_pct >= 80 ? 'var(--success)' : r.coverage_pct >= 50 ? 'var(--warning)' : 'var(--danger)';
             return {
-                framework: fw.replace('_', '-').toUpperCase(),
-                applicability: frameworkDocs[fw],
-                assessed, pending,
-                missing: all.length - withManifest.length,
-                coverage_pct: coverage,
-                coverage_attr: ['style', `width: ${coverage}%; --fill-color: ${color}`],
+                framework: r.framework.replace('_', '-').toUpperCase(),
+                applicability: docs[r.framework]?.description ?? '',
+                assessed: r.assessed,
+                pending: r.pending,
+                missing: g.missing,
+                coverage_pct: r.coverage_pct,
+                coverage_attr: ['style', `width: ${r.coverage_pct}%; --fill-color: ${color}`],
             };
         });
         rows.sort((a, b) => a.coverage_pct - b.coverage_pct);
         Templates.fromSelector('#compliance-template').withOverlay(rows).renderToSelector('compliance-grid');
 
-        const bySteward = new Map();
-        for (const p of all) {
-            for (const steward of p.manifest?.stewards ?? []) {
-                if (!steward) continue;
-                if (!bySteward.has(steward)) bySteward.set(steward, { critical: 0, active: 0, projects: 0 });
-                const counts = bySteward.get(steward);
-                counts.projects++;
-                if (p.manifest?.tier === 'tier1' || p.manifest?.tier === 'tier2') counts.critical++;
-                if (p.manifest?.lifecycle === 'active') counts.active++;
-            }
-        }
-        const recapRows = [...bySteward.entries()]
-            .map(([steward, counts]) => ({ steward, ...counts }))
-            .sort((a, b) => b.active - a.active || a.steward.localeCompare(b.steward));
-        Templates.fromSelector('#stewards-recap-template').withOverlay(recapRows).renderToSelector('stewards-recap-grid');
+        Templates.fromSelector('#stewards-recap-template').withOverlay(g.stewards_recap).renderToSelector('stewards-recap-grid');
 
-        const now = Date.now();
-        const enriched = all
-            .filter(p => p.pushed_at)
-            .map(p => ({
-                ...p,
-                months: Math.floor((now - new Date(p.pushed_at).getTime()) / (1000 * 60 * 60 * 24 * 30.44)),
-                type: p.manifest?.type ?? null,
-                tier: p.manifest?.tier ?? null,
-                lifecycle: p.manifest?.lifecycle ?? null,
-            }))
+        const staleness = await http.get('/api/staleness').fetchJson();
+        const enriched = staleness
             .filter(p => p.months >= 2)
             .map(p => ({
                 ...p,
                 bucket: p.months > 24 ? 'ancient' : p.months > 12 ? 'stale' : p.months > 6 ? 'aging' : 'fresh',
-            }))
-            .sort((a, b) => b.months - a.months);
+            }));
         Templates.fromSelector('#staleness-template').withOverlay(enriched).renderToSelector('staleness-grid');
 
         setupNavSpy();

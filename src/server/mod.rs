@@ -1,3 +1,4 @@
+pub mod aggregates;
 pub mod auth;
 pub mod routes;
 
@@ -37,6 +38,8 @@ impl DashboardStats {
 pub struct CacheData {
     pub projects: Vec<crate::scanners::RepoStats>,
     pub stats: DashboardStats,
+    /// Precalculated analytics; recomputed together with stats whenever the scan data changes.
+    pub aggregates: aggregates::Aggregates,
 }
 
 pub struct AppState {

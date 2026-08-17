@@ -209,7 +209,7 @@ pub struct ComplianceManifest {
     #[doc = "Whether personal data is processed or stored strictly within the EU/EEA."]
     pub data_residency: DataResidency,
 
-    #[doc = "Italian Garante Privacy 'Amministratore di Sistema' (AdS) compliance block."]
+    #[doc = "Italian Garante Privacy 'Amministratore di Sistema' (AdS)."]
     #[doc = "Applicable to projects falling under the Italian Provvedimento Garante AdS for tracking privileged IT and database administrators."]
     pub ads: AdsResponsibility,
 }

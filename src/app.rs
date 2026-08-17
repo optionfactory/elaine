@@ -1,6 +1,7 @@
 use crate::config::Config;
 use crate::github::{GithubClient, GithubRepository};
 use crate::repo_cache::RepositoryStore;
+use crate::server::aggregates::Aggregates;
 use crate::server::{AppState, CacheData, DashboardStats};
 use crate::stats::StatsStore;
 use anyhow::{Context, Result};
@@ -55,10 +56,12 @@ impl Elaine {
         let initial_data = fs::read_to_string(&stats_file).unwrap_or_else(|_| "[]".to_string());
         let initial_projects: Vec<crate::scanners::RepoStats> = serde_json::from_str(&initial_data).unwrap_or_default();
         let initial_stats = DashboardStats::calculate(&initial_projects);
+        let initial_aggregates = Aggregates::calculate(&initial_projects);
 
         let projects_cache = Arc::new(RwLock::new(CacheData {
             projects: initial_projects,
             stats: initial_stats,
+            aggregates: initial_aggregates,
         }));
 
         let bg_projects_cache = Arc::clone(&projects_cache);
@@ -80,11 +83,13 @@ impl Elaine {
                     && let Ok(parsed) = serde_json::from_str::<Vec<crate::scanners::RepoStats>>(&data)
                 {
                     let new_stats = DashboardStats::calculate(&parsed);
+                    let new_aggregates = Aggregates::calculate(&parsed);
                     let mut w = bg_projects_cache.write().await;
                     w.projects = parsed;
                     w.stats = new_stats;
+                    w.aggregates = new_aggregates;
                     last_mtime = mtime;
-                    eprintln!("[Background] Detected stats.json change. Recalculated stats and reloaded memory.");
+                    eprintln!("[Background] Detected stats.json change. Recalculated stats and aggregates, reloaded memory.");
                 }
             }
         });

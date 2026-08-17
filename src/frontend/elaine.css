@@ -686,7 +686,7 @@ table {
     }
 
     &.risk-matrix {
-        grid-template-columns: auto repeat(7, 1fr);
+        grid-template-columns: auto repeat(8, 1fr);
 
         th {
             text-align: center;

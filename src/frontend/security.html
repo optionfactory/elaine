@@ -288,139 +288,19 @@
 
     <script type="module">
         import { Templates } from "ftl";
-        import { authenticate, allProjects, Dialog, setupNavSpy } from "/elaine.js";
+        import { authenticate, Dialog, setupNavSpy } from "/elaine.js";
 
         const { config, http } = await authenticate();
 
-        const all = await allProjects(http, ['live']);
+        const agg = await http.get('/api/aggregates').fetchJson();
+        const s = agg.security;
 
-        const failures = all
-            .map(p => ({
-                name: p.name,
-                html_url: p.html_url,
-                tier: p.manifest?.tier ?? null,
-                per_scanner: Object.entries(p.health ?? {}).map(([scanner, checks]) => ({
-                    scanner,
-                    checks: Object.entries(checks).filter(([, status]) => status === 'failed').map(([check]) => check),
-                })).filter(s => s.checks.length > 0),
-            }))
-            .filter(p => p.per_scanner.length > 0)
-            .sort((a, b) => b.per_scanner.length - a.per_scanner.length || a.name.localeCompare(b.name))
-            .flatMap(p => p.per_scanner.map(s => ({
-                name: p.name,
-                html_url: p.html_url,
-                tier: p.tier,
-                scanner: s.scanner,
-                checks: s.checks,
-            })));
-        Templates.fromSelector('#failures-template').withOverlay(failures).renderToSelector('failures-grid');
-
-        const vulnsRows = all
-            .map(p => ({
-                ...p,
-                vulns: p.vulnerabilities?.length ?? 0,
-                type: p.manifest?.type ?? null,
-                tier: p.manifest?.tier ?? null,
-                lifecycle: p.manifest?.lifecycle ?? null,
-            }))
-            .filter(p => p.vulns > 0)
-            .sort((a, b) => b.vulns - a.vulns)
-            .slice(0, 50)
-            .map(p => ({
-                name: p.name,
-                html_url: p.html_url,
-                vulns: p.vulns,
-                type: p.type,
-                tier: p.tier,
-                lifecycle: p.lifecycle,
-            }));
-        Templates.fromSelector('#vulns-template').withOverlay(vulnsRows).renderToSelector('vulns-grid');
-
-        const byOutdated = all
-            .map(p => ({
-                ...p,
-                outdated: p.outdated_dependencies?.length ?? 0,
-                type: p.manifest?.type ?? null,
-                tier: p.manifest?.tier ?? null,
-                lifecycle: p.manifest?.lifecycle ?? null,
-            }))
-            .filter(p => p.outdated > 0)
-            .sort((a, b) => b.outdated - a.outdated)
-            .slice(0, 50);
-
-        const artifactAgg = new Map();
-        for (const p of all) {
-            for (const dep of p.outdated_dependencies ?? []) {
-                const entry = artifactAgg.get(dep.artifact) ?? { repos: new Set(), latest: new Set() };
-                entry.repos.add(p.name);
-                entry.latest.add(dep.latest);
-                artifactAgg.set(dep.artifact, entry);
-            }
-        }
-        const artifacts = [...artifactAgg.entries()]
-            .map(([artifact, e]) => ({ artifact, repos: e.repos.size, latest: [...e.latest].sort().join(', ') }))
-            .sort((a, b) => b.repos - a.repos || a.artifact.localeCompare(b.artifact))
-            .slice(0, 50);
-
-        Templates.fromSelector('#outdated-template')
-            .withOverlay(byOutdated.map(p => ({
-                name: p.name,
-                html_url: p.html_url,
-                outdated: p.outdated,
-                type: p.type,
-                tier: p.tier,
-                lifecycle: p.lifecycle,
-            })))
-            .renderToSelector('outdated-grid');
-        Templates.fromSelector('#artifacts-template').withOverlay(artifacts).renderToSelector('artifacts-grid');
-
-        const tiers = ['tier1', 'tier2', 'tier3', 'tier4'];
-        const exposures = ['internet', 'restricted-vpn', 'restricted-ip', 'restricted-pam', 'local', 'none', 'unknown'];
-
-        function repoExposure(p) {
-            const envs = p.manifest?.environments;
-            if (!envs?.length) return 'unknown';
-            const priorities = { 'internet': 0, 'restricted-vpn': 1, 'restricted-ip': 2, 'restricted-pam': 3, 'local': 4, 'none': 5 };
-            return envs.map(e => e.ingress).filter(Boolean).sort((a, b) => priorities[a] - priorities[b])[0] ?? 'unknown';
-        }
-
-        function riskScore(tier, exposure) {
-            const tierWeight = { 'tier1': 4, 'tier2': 3, 'tier3': 2, 'tier4': 1 };
-            const expWeight = { 'internet': 4, 'restricted-vpn': 3, 'restricted-ip': 3, 'restricted-pam': 2, 'local': 1, 'none': 0, 'unknown': 2 };
-            return (tierWeight[tier] ?? 0) * (expWeight[exposure] ?? 0);
-        }
-
-        const classified = all.map(p => {
-            const tier = p.manifest?.tier ?? 'tier4';
-            const exposure = repoExposure(p);
-            const vulns = p.vulnerabilities?.length ?? 0;
-            const outdated = p.outdated_dependencies?.length ?? 0;
-            return { ...p, tier, exposure, vulns, outdated, base: riskScore(tier, exposure) };
-        });
-
-        const rows = tiers.map(tier => ({
-            tier,
-            cells: exposures.map(exposure => {
-                const repos = classified.filter(r => r.tier === tier && r.exposure === exposure);
-                const vulns = repos.reduce((sum, r) => sum + r.vulns, 0);
-                const score = riskScore(tier, exposure);
-                const level = score >= 12 ? 'critical' : score >= 6 ? 'high' : score >= 2 ? 'medium' : 'low';
-                return { repos: repos.length, vulns, level };
-            }),
-        }));
-
-        const worst = classified
-            .filter(r => r.base > 0)
-            .sort((a, b) => b.base - a.base || b.vulns - a.vulns || b.outdated - a.outdated)
-            .slice(0, 50)
-            .map(r => ({
-                ...r,
-                type: r.manifest?.type ?? null,
-                lifecycle: r.manifest?.lifecycle ?? null,
-            }));
-
-        Templates.fromSelector('#risk-template').withOverlay({ rows, exposures }).renderToSelector('risk-grid');
-        Templates.fromSelector('#risk-repos-template').withOverlay(worst).renderToSelector('risk-repos-grid');
+        Templates.fromSelector('#failures-template').withOverlay(s.failures).renderToSelector('failures-grid');
+        Templates.fromSelector('#vulns-template').withOverlay(s.vulns.slice(0, 50)).renderToSelector('vulns-grid');
+        Templates.fromSelector('#outdated-template').withOverlay(s.outdated.slice(0, 50)).renderToSelector('outdated-grid');
+        Templates.fromSelector('#artifacts-template').withOverlay(s.artifacts.slice(0, 50)).renderToSelector('artifacts-grid');
+        Templates.fromSelector('#risk-template').withOverlay({ rows: s.risk.rows, exposures: s.risk.exposures }).renderToSelector('risk-grid');
+        Templates.fromSelector('#risk-repos-template').withOverlay(s.risk.worst.slice(0, 50)).renderToSelector('risk-repos-grid');
 
         // Log viewer popup: #log/<repo>/<scanner>
         const logDialog = new Dialog();
