@@ -60,6 +60,21 @@
             <skeleton-row></skeleton-row>
             <skeleton-row></skeleton-row>
         </risk-grid>
+
+        <h2>Highest risk repositories (top 50)</h2>
+        <p class="section-intro">
+            Ranked by tier &times; exposure score, then by known vulnerabilities and outdated dependencies as tie-breakers.
+        </p>
+
+        <risk-repos-grid>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+        </risk-repos-grid>
     </section>
 
     <section id="failures">
@@ -114,11 +129,27 @@
             <skeleton-row></skeleton-row>
             <skeleton-row></skeleton-row>
         </outdated-grid>
+
+        <h2>Artifacts stale across the organization</h2>
+        <p class="section-intro">
+            The same dependency aggregated across all live repositories, sorted by how many repositories
+            it lags in. Entries near the top affect many projects at once and are usually worth a
+            coordinated upgrade; multiple versions in the <em>Latest</em> column mean the repositories
+            are pinned to different majors.
+        </p>
+
+        <artifacts-grid>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+        </artifacts-grid>
     </section>
     </main>
 
     <template id="failures-template">
-        <p data-tpl-if="self.length == 0">All applicable checks passed. 🎉</p>
+        <p data-tpl-if="self.length == 0">All applicable checks passed.</p>
         <table class="failures" data-tpl-if="self.length > 0">
             <thead>
                 <tr>
@@ -176,7 +207,7 @@
                 </tr>
             </thead>
             <tbody>
-                <tr data-tpl-each="repos" data-tpl-var="r">
+                <tr data-tpl-each="self" data-tpl-var="r">
                     <td><a data-tpl-href="r.html_url" target="_blank" rel="noopener noreferrer">{{ r.name }}</a></td>
                     <td>{{ r.outdated }}</td>
                     <td>{{ r.type ?? 'unspecified' }}</td>
@@ -185,31 +216,25 @@
                 </tr>
             </tbody>
         </table>
-        <section>
-            <h2>Artifacts stale across the organization</h2>
-            <p class="section-intro">
-                The same dependency aggregated across all live repositories, sorted by how many repositories
-                it lags in. Entries near the top affect many projects at once and are usually worth a
-                coordinated upgrade; multiple versions in the <em>Latest</em> column mean the repositories
-                are pinned to different majors.
-            </p>
-            <table class="outdated-artifacts">
-                <thead>
-                    <tr>
-                        <th>Artifact</th>
-                        <th>Repos affected</th>
-                        <th>Latest</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr data-tpl-each="artifacts" data-tpl-var="a">
-                        <td><strong>{{ a.artifact }}</strong></td>
-                        <td>{{ a.repos }}</td>
-                        <td>{{ a.latest }}</td>
-                    </tr>
-                </tbody>
-            </table>
-        </section>
+    </template>
+
+    <template id="artifacts-template">
+        <table class="outdated-artifacts">
+            <thead>
+                <tr>
+                    <th>Artifact</th>
+                    <th>Repos affected</th>
+                    <th>Latest</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr data-tpl-each="self" data-tpl-var="a">
+                    <td><strong>{{ a.artifact }}</strong></td>
+                    <td>{{ a.repos }}</td>
+                    <td>{{ a.latest }}</td>
+                </tr>
+            </tbody>
+        </table>
     </template>
 
     <template id="risk-template">
@@ -232,25 +257,23 @@
                 </tr>
             </tbody>
         </table>
-        <section>
-            <h2>Highest risk repositories (top 50)</h2>
-            <p class="section-intro">
-                Ranked by tier &times; exposure score, then by known vulnerabilities and outdated dependencies as tie-breakers.
-            </p>
-            <table class="risk-repos">
-                <thead>
-                    <tr>
-                        <th>Repository</th>
-                        <th>Tier</th>
-                        <th>Exposure</th>
-                        <th>Type</th>
-                        <th>Lifecycle</th>
-                        <th>Vulns</th>
-                        <th>Outdated</th>
-                    </tr>
+    </template>
+
+    <template id="risk-repos-template">
+        <table class="risk-repos">
+            <thead>
+                <tr>
+                    <th>Repository</th>
+                    <th>Tier</th>
+                    <th>Exposure</th>
+                    <th>Type</th>
+                    <th>Lifecycle</th>
+                    <th>Vulns</th>
+                    <th>Outdated</th>
+                </tr>
             </thead>
             <tbody>
-                <tr data-tpl-each="worst" data-tpl-var="r">
+                <tr data-tpl-each="self" data-tpl-var="r">
                     <td><a data-tpl-href="r.html_url" target="_blank" rel="noopener noreferrer">{{ r.name }}</a></td>
                     <td>{{ r.tier }}</td>
                     <td>{{ r.exposure }}</td>
@@ -259,10 +282,9 @@
                     <td>{{ r.vulns }}</td>
                     <td>{{ r.outdated }}</td>
                 </tr>
-                </tbody>
-            </table>
-         </section>
-     </template>
+            </tbody>
+        </table>
+    </template>
 
     <script type="module">
         import { Templates } from "ftl";
@@ -340,17 +362,17 @@
             .sort((a, b) => b.repos - a.repos || a.artifact.localeCompare(b.artifact))
             .slice(0, 50);
 
-        Templates.fromSelector('#outdated-template').withOverlay({
-            repos: byOutdated.map(p => ({
+        Templates.fromSelector('#outdated-template')
+            .withOverlay(byOutdated.map(p => ({
                 name: p.name,
                 html_url: p.html_url,
                 outdated: p.outdated,
                 type: p.type,
                 tier: p.tier,
                 lifecycle: p.lifecycle,
-            })),
-            artifacts,
-        }).renderToSelector('outdated-grid');
+            })))
+            .renderToSelector('outdated-grid');
+        Templates.fromSelector('#artifacts-template').withOverlay(artifacts).renderToSelector('artifacts-grid');
 
         const tiers = ['tier1', 'tier2', 'tier3', 'tier4'];
         const exposures = ['internet', 'restricted-vpn', 'restricted-ip', 'restricted-pam', 'local', 'none', 'unknown'];
@@ -397,7 +419,8 @@
                 lifecycle: r.manifest?.lifecycle ?? null,
             }));
 
-        Templates.fromSelector('#risk-template').withOverlay({ rows, exposures, worst }).renderToSelector('risk-grid');
+        Templates.fromSelector('#risk-template').withOverlay({ rows, exposures }).renderToSelector('risk-grid');
+        Templates.fromSelector('#risk-repos-template').withOverlay(worst).renderToSelector('risk-repos-grid');
 
         // Log viewer popup: #log/<repo>/<scanner>
         const logDialog = new Dialog();

@@ -1067,14 +1067,8 @@ main>section+section {
     margin-top: 3rem;
 }
 
-compliance-grid,
-risk-grid,
-vulns-grid,
-outdated-grid {
-
-    section {
-        margin-top: 2rem;
-    }
+section>h2:not(:first-of-type) {
+    margin-top: 2rem;
 }
 
 dialog {
