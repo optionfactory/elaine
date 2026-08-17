@@ -625,8 +625,6 @@ table {
     width: 100%;
     font-size: 0.875rem;
     border: 1px solid var(--table-border);
-    border-radius: 6px;
-    overflow: hidden;
     font-family: monospace;
 
     &.environments {
