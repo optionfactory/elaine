@@ -642,6 +642,26 @@ table {
     }
 
     &.staleness {
+        grid-template-columns: 1fr auto auto auto auto auto;
+    }
+
+    &.stewards-recap {
+        grid-template-columns: 1fr auto auto auto;
+    }
+
+    &.stewards {
+        grid-template-columns: max-content 1fr auto auto auto;
+    }
+
+    &.domains {
+        grid-template-columns: 1fr 1fr auto auto auto;
+    }
+
+    &.toolchains {
+        grid-template-columns: max-content auto 1fr;
+    }
+
+    &.tiers {
         grid-template-columns: 1fr auto auto auto;
     }
 
@@ -650,11 +670,11 @@ table {
     }
 
     &.vulns-board {
-        grid-template-columns: 1fr auto auto;
+        grid-template-columns: 1fr auto auto auto auto;
     }
 
     &.outdated-board {
-        grid-template-columns: 1fr auto auto;
+        grid-template-columns: 1fr auto auto auto auto;
     }
 
     &.outdated-artifacts {
@@ -662,7 +682,7 @@ table {
     }
 
     &.failures {
-        grid-template-columns: 1fr auto auto auto;
+        grid-template-columns: 1fr auto auto auto auto;
     }
 
     &.risk-matrix {
@@ -674,7 +694,7 @@ table {
     }
 
     &.risk-repos {
-        grid-template-columns: 1fr auto auto auto auto;
+        grid-template-columns: 1fr auto auto auto auto auto auto;
     }
 
     thead {
@@ -723,6 +743,19 @@ table {
         text-align: left;
         border-bottom: 2px solid var(--border);
         align-content: center;
+
+        &.sorted-desc {
+            color: var(--primary);
+
+            .sort-indicator {
+                width: 1em;
+                height: 1em;
+                vertical-align: -0.15em;
+                margin-left: 0.25rem;
+                fill: none;
+                stroke: currentColor;
+            }
+        }
     }
 
     td {
@@ -738,13 +771,23 @@ table {
     a {
         display: inline-block;
         padding: 0.15rem 0.4rem;
-        background: color-mix(in srgb, var(--danger) 15%, var(--card-bg));
-        color: var(--danger);
+        background: color-mix(in srgb, var(--primary) 15%, var(--card-bg));
+        color: var(--primary);
         border-radius: 4px;
         font-family: monospace;
         text-decoration: none;
         white-space: nowrap;
         transition: background-color 0.2s ease, color 0.2s ease;
+
+        &:hover {
+            background: var(--primary);
+            color: var(--bg);
+        }
+    }
+
+    a.danger {
+        background: color-mix(in srgb, var(--danger) 15%, var(--card-bg));
+        color: var(--danger);
 
         &:hover {
             background: var(--danger);
@@ -905,12 +948,13 @@ skeleton-row {
     }
 }
 
-/* Vulnerability trail tooltips */
-tooltip-trigger {
+/* Tooltips: hover or focus (via a tabindex-ed trigger inside) */
+tooltip {
     position: relative;
     display: inline-block;
 
-    tooltip-content {
+    p,
+    pre {
         visibility: hidden;
         opacity: 0;
         position: absolute;
@@ -926,24 +970,59 @@ tooltip-trigger {
         border-radius: 8px;
         box-shadow: 0 10px 15px -3px rgb(from black r g b / 50%);
         transition: opacity 0.2s ease, visibility 0.2s ease;
-
-        div {
-            font-family: monospace;
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            line-height: 1.5;
-            word-break: break-all;
-
-            &:not(:last-child) {
-                margin-bottom: 0.4rem;
-            }
-        }
+        color: var(--text);
+        font-size: 0.8rem;
+        line-height: 1.5;
+        pointer-events: none;
     }
 
-    &:hover tooltip-content {
+    p {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        white-space: normal;
+    }
+
+    pre {
+        font-family: monospace;
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        white-space: pre-line;
+        word-break: break-all;
+    }
+
+    /* opens below the trigger, anchored to its left edge, for markers near the viewport's top-left */
+    &.start p,
+    &.start pre {
+        left: 0;
+        right: auto;
+        top: 100%;
+        bottom: auto;
+        margin: 0.375rem 0 0;
+    }
+
+    &:hover p,
+    &:hover pre,
+    &:focus-within p,
+    &:focus-within pre {
         visibility: visible;
         opacity: 1;
     }
+}
+
+/* The "?" marker for info tooltips */
+info {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.1em;
+    height: 1.1em;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    background: var(--card-bg);
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: help;
+    user-select: none;
 }
 
 /* Analytics pages */
@@ -1077,7 +1156,8 @@ staleness-grid badge {
     }
 }
 
-compliance-grid {
+compliance-grid,
+toolchains-grid {
     .coverage-bar {
         position: relative;
         height: 1.25rem;

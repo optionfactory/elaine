@@ -125,6 +125,7 @@
                     <th>Repository</th>
                     <th>Scanner</th>
                     <th>Failed checks</th>
+                    <th>Tier</th>
                     <th>Log</th>
                 </tr>
             </thead>
@@ -133,6 +134,7 @@
                     <td><a data-tpl-href="r.html_url" target="_blank" rel="noopener noreferrer">{{ r.name }}</a></td>
                     <td>{{ r.scanner }}</td>
                     <td>{{ r.checks.join(', ') }}</td>
+                    <td>{{ r.tier ?? 'unspecified' }}</td>
                     <td><a data-tpl-href="`#log/{r.name}/{r.scanner}`">logs</a></td>
                 </tr>
             </tbody>
@@ -145,14 +147,18 @@
                 <tr>
                     <th>Repository</th>
                     <th>Vulnerabilities</th>
+                    <th>Type</th>
                     <th>Tier</th>
+                    <th>Lifecycle</th>
                 </tr>
             </thead>
             <tbody>
                 <tr data-tpl-each="self" data-tpl-var="r">
                     <td><a data-tpl-href="r.html_url" target="_blank" rel="noopener noreferrer">{{ r.name }}</a></td>
                     <td>{{ r.vulns }}</td>
+                    <td>{{ r.type ?? 'unspecified' }}</td>
                     <td>{{ r.tier ?? 'unspecified' }}</td>
+                    <td>{{ r.lifecycle ?? 'unspecified' }}</td>
                 </tr>
             </tbody>
         </table>
@@ -164,14 +170,18 @@
                 <tr>
                     <th>Repository</th>
                     <th>Outdated deps</th>
+                    <th>Type</th>
                     <th>Tier</th>
+                    <th>Lifecycle</th>
                 </tr>
             </thead>
             <tbody>
                 <tr data-tpl-each="repos" data-tpl-var="r">
                     <td><a data-tpl-href="r.html_url" target="_blank" rel="noopener noreferrer">{{ r.name }}</a></td>
                     <td>{{ r.outdated }}</td>
+                    <td>{{ r.type ?? 'unspecified' }}</td>
                     <td>{{ r.tier ?? 'unspecified' }}</td>
+                    <td>{{ r.lifecycle ?? 'unspecified' }}</td>
                 </tr>
             </tbody>
         </table>
@@ -233,18 +243,22 @@
                         <th>Repository</th>
                         <th>Tier</th>
                         <th>Exposure</th>
+                        <th>Type</th>
+                        <th>Lifecycle</th>
                         <th>Vulns</th>
                         <th>Outdated</th>
                     </tr>
-                </thead>
-                <tbody>
-                    <tr data-tpl-each="worst" data-tpl-var="r">
-                        <td><a data-tpl-href="r.html_url" target="_blank" rel="noopener noreferrer">{{ r.name }}</a></td>
-                        <td>{{ r.tier }}</td>
-                        <td>{{ r.exposure }}</td>
-                        <td>{{ r.vulns }}</td>
-                        <td>{{ r.outdated }}</td>
-                    </tr>
+            </thead>
+            <tbody>
+                <tr data-tpl-each="worst" data-tpl-var="r">
+                    <td><a data-tpl-href="r.html_url" target="_blank" rel="noopener noreferrer">{{ r.name }}</a></td>
+                    <td>{{ r.tier }}</td>
+                    <td>{{ r.exposure }}</td>
+                    <td>{{ r.type ?? 'unspecified' }}</td>
+                    <td>{{ r.lifecycle ?? 'unspecified' }}</td>
+                    <td>{{ r.vulns }}</td>
+                    <td>{{ r.outdated }}</td>
+                </tr>
                 </tbody>
             </table>
          </section>
@@ -252,21 +266,18 @@
 
     <script type="module">
         import { Templates } from "ftl";
-        import { authenticate, projects, Dialog, setupNavSpy } from "/elaine.js";
+        import { authenticate, allProjects, Dialog, setupNavSpy } from "/elaine.js";
 
         const { config, http } = await authenticate();
 
-        const all = [];
-        for await (const p of projects(http, ['live'], null)) {
-            all.push(p);
-        }
+        const all = await allProjects(http, ['live']);
 
         const failures = all
-            .map(p => ({ name: p.name, html_url: p.html_url, health: p.health ?? {} }))
             .map(p => ({
                 name: p.name,
                 html_url: p.html_url,
-                per_scanner: Object.entries(p.health).map(([scanner, checks]) => ({
+                tier: p.manifest?.tier ?? null,
+                per_scanner: Object.entries(p.health ?? {}).map(([scanner, checks]) => ({
                     scanner,
                     checks: Object.entries(checks).filter(([, status]) => status === 'failed').map(([check]) => check),
                 })).filter(s => s.checks.length > 0),
@@ -276,13 +287,20 @@
             .flatMap(p => p.per_scanner.map(s => ({
                 name: p.name,
                 html_url: p.html_url,
+                tier: p.tier,
                 scanner: s.scanner,
                 checks: s.checks,
             })));
         Templates.fromSelector('#failures-template').withOverlay(failures).renderToSelector('failures-grid');
 
         const vulnsRows = all
-            .map(p => ({ ...p, vulns: p.vulnerabilities?.length ?? 0, tier: p.manifest?.tier ?? null }))
+            .map(p => ({
+                ...p,
+                vulns: p.vulnerabilities?.length ?? 0,
+                type: p.manifest?.type ?? null,
+                tier: p.manifest?.tier ?? null,
+                lifecycle: p.manifest?.lifecycle ?? null,
+            }))
             .filter(p => p.vulns > 0)
             .sort((a, b) => b.vulns - a.vulns)
             .slice(0, 50)
@@ -290,12 +308,20 @@
                 name: p.name,
                 html_url: p.html_url,
                 vulns: p.vulns,
+                type: p.type,
                 tier: p.tier,
+                lifecycle: p.lifecycle,
             }));
         Templates.fromSelector('#vulns-template').withOverlay(vulnsRows).renderToSelector('vulns-grid');
 
         const byOutdated = all
-            .map(p => ({ ...p, outdated: p.outdated_dependencies?.length ?? 0, tier: p.manifest?.tier ?? 'unknown' }))
+            .map(p => ({
+                ...p,
+                outdated: p.outdated_dependencies?.length ?? 0,
+                type: p.manifest?.type ?? null,
+                tier: p.manifest?.tier ?? null,
+                lifecycle: p.manifest?.lifecycle ?? null,
+            }))
             .filter(p => p.outdated > 0)
             .sort((a, b) => b.outdated - a.outdated)
             .slice(0, 50);
@@ -319,7 +345,9 @@
                 name: p.name,
                 html_url: p.html_url,
                 outdated: p.outdated,
+                type: p.type,
                 tier: p.tier,
+                lifecycle: p.lifecycle,
             })),
             artifacts,
         }).renderToSelector('outdated-grid');
@@ -362,7 +390,12 @@
         const worst = classified
             .filter(r => r.base > 0)
             .sort((a, b) => b.base - a.base || b.vulns - a.vulns || b.outdated - a.outdated)
-            .slice(0, 50);
+            .slice(0, 50)
+            .map(r => ({
+                ...r,
+                type: r.manifest?.type ?? null,
+                lifecycle: r.manifest?.lifecycle ?? null,
+            }));
 
         Templates.fromSelector('#risk-template').withOverlay({ rows, exposures, worst }).renderToSelector('risk-grid');
 

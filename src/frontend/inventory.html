@@ -32,16 +32,290 @@
             <a href="security.html">Security</a>
             <a class="active">Inventory</a>
         </nav>
+        <nav>
+            <a href="#domains">Domains</a>
+            <a href="#toolchains">Toolchains</a>
+            <a href="#tiers">Tiers</a>
+            <a href="#stewards">Stewards</a>
+        </nav>
     </header>
 
     <main>
-    <section>
-        <h2>Coming soon</h2>
+    <section id="domains">
+        <h2>Declared domains and exposure</h2>
         <p class="section-intro">
-            Domain and exposure inventory, certificate management overview, and stack composition.
+            One row per domain declared in the <code>environments</code> section of a repository's
+            <code>elaine.yaml</code>, with the ingress exposure and certificate management style of the
+            environment serving it. Only repositories with a manifest declaring environments appear here:
+            as manifest coverage grows, this becomes the organization-wide domain inventory.
         </p>
+
+        <domains-grid>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+        </domains-grid>
+    </section>
+
+    <section id="toolchains">
+        <h2>Toolchains</h2>
+        <p class="section-intro">
+            Toolchains detected by the scanners across live repositories. A repository appears once per
+            toolchain it ships code for, so polyglot repositories count multiple times; the total is the
+            number of toolchain-repository pairs, not repositories. Repositories whose scanners failed
+            are not counted: their toolchains are unknown, not absent.
+        </p>
+
+        <toolchains-grid>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+        </toolchains-grid>
+    </section>
+
+    <section id="tiers">
+        <h2>Repositories by tier</h2>
+        <p class="section-intro">
+            Live repositories that declare an operational tier in their <code>elaine.yaml</code>, sorted by
+            tier then name. Deciding that a project is tier4 (experimental) is itself an assessment, so
+            repositories with no declared tier are not listed: classify them first, then look for your
+            project here.
+        </p>
+
+        <tiers-grid>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+        </tiers-grid>
+    </section>
+
+    <section id="stewards">
+        <h2>Repositories by steward</h2>
+        <p class="section-intro">
+            One row per stewardship assignment across the live repositories, sorted by steward name. Use the
+            filter to narrow the table down to rows matching a steward or a repository name. The aggregated
+            recap by steward lives on the Governance page.
+        </p>
+
+        <search-bar>
+            <form id="steward-filter-form">
+                <input type="text" id="steward-filter" name="search" placeholder="Filter by steward or repository name..." autocomplete="off">
+            </form>
+        </search-bar>
+
+        <stewards-grid>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+        </stewards-grid>
     </section>
     </main>
+
+    <template id="tiers-template">
+        <table class="tiers">
+            <thead>
+                <tr>
+                    <th>Repository</th>
+                    <th>Type</th>
+                    <th>Tier</th>
+                    <th>Lifecycle</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr data-tpl-each="self" data-tpl-var="r">
+                    <td><a data-tpl-href="r.html_url" target="_blank" rel="noopener noreferrer">{{ r.name }}</a></td>
+                    <td>{{ r.type ?? 'unspecified' }}</td>
+                    <td>{{ r.tier ?? 'unspecified' }}</td>
+                    <td>{{ r.lifecycle ?? 'unspecified' }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </template>
+
+    <template id="stewards-template">
+        <error-box data-tpl-text="empty_message"></error-box>
+        <table class="stewards" data-tpl-if="projects.length > 0">
+            <thead>
+                <tr>
+                    <th>Steward</th>
+                    <th>Repository</th>
+                    <th>Type</th>
+                    <th>Tier</th>
+                    <th>Lifecycle</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr data-tpl-each="projects" data-tpl-var="row" data-tpl-attr-append="row.attrs">
+                    <td>{{ row.steward }}</td>
+                    <td><a data-tpl-href="row.html_url" target="_blank" rel="noopener noreferrer">{{ row.name }}</a></td>
+                    <td>{{ row.type ?? 'unspecified' }}</td>
+                    <td>{{ row.tier ?? 'unspecified' }}</td>
+                    <td>{{ row.lifecycle ?? 'unspecified' }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </template>
+
+    <template id="domains-template">
+        <error-box data-tpl-if="self.length == 0">No repository declares environments with domains in its manifest.</error-box>
+        <table class="domains" data-tpl-if="self.length > 0">
+            <thead>
+                <tr>
+                    <th>Domain</th>
+                    <th>Repository</th>
+                    <th>Type</th>
+                    <th>Ingress</th>
+                    <th>Certificates</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr data-tpl-each="self" data-tpl-var="d">
+                    <td><strong>{{ d.domain }}</strong></td>
+                    <td><a data-tpl-href="d.html_url" target="_blank" rel="noopener noreferrer">{{ d.repo }}</a></td>
+                    <td>{{ d.type ?? 'unspecified' }}</td>
+                    <td>{{ d.ingress ?? 'unspecified' }}</td>
+                    <td>{{ d.certs ?? 'unspecified' }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </template>
+
+    <template id="toolchains-template">
+        <table class="toolchains">
+            <thead>
+                <tr>
+                    <th>Toolchain</th>
+                    <th>Repositories</th>
+                    <th>Share of live repos</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr data-tpl-each="self" data-tpl-var="s">
+                    <td><strong>{{ s.toolchain }}</strong></td>
+                    <td>{{ s.repos }}</td>
+                    <td>
+                        <div class="coverage-bar">
+                            <div class="coverage-fill" data-tpl-attr-append="s.attr"></div>
+                            <span>{{ s.pct }}%</span>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </template>
+
+    <script type="module">
+        import { Templates } from "ftl";
+        import { authenticate, allProjects, setupNavSpy } from "/elaine.js";
+
+        const { config, http } = await authenticate();
+        const all = await allProjects(http, ['live']);
+
+        const assignments = all
+            .flatMap(p => (p.manifest?.stewards ?? [])
+                .filter(Boolean)
+                .map(steward => ({
+                    steward,
+                    name: p.name,
+                    html_url: p.html_url,
+                    type: p.manifest?.type ?? null,
+                    tier: p.manifest?.tier ?? null,
+                    lifecycle: p.manifest?.lifecycle ?? null,
+                    attrs: [['data-steward', steward.toLowerCase()], ['data-name', p.name.toLowerCase()]],
+                })))
+            .sort((a, b) => a.steward.localeCompare(b.steward)
+                || (a.tier ?? 'zz').localeCompare(b.tier ?? 'zz')
+                || a.name.localeCompare(b.name));
+
+        const emptyMessage = () => assignments.length === 0
+            ? 'No repository declares stewards in its manifest.'
+            : 'No repository matches the current filter.';
+        Templates.fromSelector('#stewards-template')
+            .withOverlay({ projects: assignments, empty_message: emptyMessage() })
+            .renderToSelector('stewards-grid');
+        const grid = document.querySelector('stewards-grid');
+        const emptyBox = grid.querySelector('error-box');
+        if (emptyBox && assignments.length > 0) {
+            emptyBox.hidden = true;
+        }
+        const filterStewardRepos = filter => {
+            const q = filter.trim().toLowerCase();
+            let visible = 0;
+            for (const tr of grid.querySelectorAll('tbody tr')) {
+                const match = !q || tr.dataset.steward.includes(q) || tr.dataset.name.includes(q);
+                tr.hidden = !match;
+                if (match) visible++;
+            }
+            const table = grid.querySelector('table.stewards');
+            if (!table) return;
+            table.hidden = visible === 0;
+            emptyBox.hidden = visible > 0;
+            if (visible === 0) emptyBox.textContent = emptyMessage();
+        };
+        document.querySelector('#steward-filter-form').addEventListener('submit', e => e.preventDefault());
+        document.querySelector('#steward-filter').addEventListener('input', e => filterStewardRepos(e.target.value));
+
+        const domains = all
+            .flatMap(p => (p.manifest?.environments ?? [])
+                .filter(e => e.domains?.length)
+                .flatMap(e => e.domains.map(domain => ({
+                    domain,
+                    repo: p.name,
+                    html_url: p.html_url,
+                    type: e.type ?? null,
+                    ingress: e.ingress ?? null,
+                    certs: e.certificates ?? null,
+                }))))
+            .sort((a, b) => a.domain.localeCompare(b.domain));
+        Templates.fromSelector('#domains-template').withOverlay(domains).renderToSelector('domains-grid');
+
+        const toolchainsAgg = new Map();
+        for (const p of all) {
+            for (const toolchain of Object.keys(p.health ?? {})) {
+                if (toolchain === 'elaine' || toolchain === 'pinch') continue;
+                toolchainsAgg.set(toolchain, (toolchainsAgg.get(toolchain) ?? 0) + 1);
+            }
+        }
+        const toolchainsRows = [...toolchainsAgg.entries()]
+            .map(([toolchain, repos]) => {
+                const pct = all.length ? Math.round((repos / all.length) * 100) : 0;
+                const color = pct >= 40 ? 'var(--primary)' : pct >= 15 ? 'var(--info)' : 'var(--neutral)';
+                return {
+                    toolchain,
+                    repos,
+                    pct,
+                    attr: ['style', `width: ${pct}%; --fill-color: ${color}`],
+                };
+            })
+            .sort((a, b) => b.repos - a.repos);
+        Templates.fromSelector('#toolchains-template').withOverlay(toolchainsRows).renderToSelector('toolchains-grid');
+
+        const tierOrder = ['tier1', 'tier2', 'tier3', 'tier4'];
+        const tiersRows = all
+            .filter(p => p.manifest?.tier)
+            .map(p => ({
+                name: p.name,
+                html_url: p.html_url,
+                type: p.manifest?.type ?? null,
+                tier: p.manifest.tier,
+                lifecycle: p.manifest?.lifecycle ?? null,
+            }))
+            .sort((a, b) => tierOrder.indexOf(a.tier) - tierOrder.indexOf(b.tier)
+                || a.name.localeCompare(b.name));
+        Templates.fromSelector('#tiers-template').withOverlay(tiersRows).renderToSelector('tiers-grid');
+
+        setupNavSpy();
+    </script>
 </body>
 
 </html>

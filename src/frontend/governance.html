@@ -34,6 +34,7 @@
         </nav>
         <nav>
             <a href="#coverage">Coverage</a>
+            <a href="#stewards">Stewards</a>
             <a href="#staleness">Staleness</a>
         </nav>
     </header>
@@ -61,13 +62,37 @@
         </compliance-grid>
     </section>
 
+    <section id="stewards">
+        <h2>Stewardship recap</h2>
+        <p class="section-intro">
+            Stewardship load across the live repositories that declare stewards in their <code>elaine.yaml</code>.
+            Repositories looked after by several stewards count once under each of them, so <em>Projects</em>
+            measures assignments rather than unique repositories. <em>Tier 1/2</em> counts the projects carrying
+            an SLA and <em>Active</em> the ones with an <em>active</em> lifecycle: together they hint at how much
+            operational weight sits on each person. Rows are sorted by active project count, descending.
+            Repositories declaring no steward are not listed &mdash; an unowned project is nobody's problem,
+            which is exactly the problem.
+        </p>
+
+        <stewards-recap-grid>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+        </stewards-recap-grid>
+    </section>
+
     <section id="staleness">
         <h2>Repositories by inactivity</h2>
         <p class="section-intro">
-            Time since the last push for every live repository. Repos receiving no commits for 6+ months are likely
-            neglected: dependencies stop receiving updates, knowledge evaporates, and nobody notices when something breaks.
-            Compare the age with the declared lifecycle: an <em>active</em> project that is a year stale is a red flag,
-            while an <em>end-of-life</em> or <em>unmaintained</em> one being stale is expected.
+            Time since the last push for live repositories with no activity in the last 60 days. Repos receiving
+            no commits for 6+ months are likely neglected: dependencies stop receiving updates, knowledge
+            evaporates, and nobody notices when something breaks. Compare the age with the declared lifecycle:
+            an <em>active</em> project that is a year stale is a red flag, while an <em>end-of-life</em> or
+            <em>unmaintained</em> one being stale is expected.
         </p>
 
         <staleness-grid>
@@ -96,7 +121,13 @@
             </thead>
             <tbody>
                 <tr data-tpl-each="self">
-                    <td><strong>{{ framework }}</strong></td>
+                    <td>
+                        <strong>{{ framework }}</strong>
+                        <tooltip class="start">
+                            <info role="button" tabindex="0" aria-label="Applicability">?</info>
+                            <p>{{ applicability }}</p>
+                        </tooltip>
+                    </td>
                     <td>{{ assessed }}</td>
                     <td>{{ pending }}</td>
                     <td>{{ missing }}</td>
@@ -111,6 +142,31 @@
         </table>
     </template>
 
+    <template id="stewards-recap-template">
+        <error-box data-tpl-if="self.length == 0">No repository declares stewards in its manifest.</error-box>
+        <table class="stewards-recap" data-tpl-if="self.length > 0">
+            <thead>
+                <tr>
+                    <th>Steward</th>
+                    <th>Projects</th>
+                    <th>Tier 1/2</th>
+                    <th class="sorted-desc">
+                        Active
+                        <svg class="sort-indicator" aria-hidden="true"><use href="icons.svg#icon-sort-desc"></use></svg>
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr data-tpl-each="self" data-tpl-var="s">
+                    <td>{{ s.steward }}</td>
+                    <td>{{ s.projects }}</td>
+                    <td>{{ s.critical }}</td>
+                    <td>{{ s.active }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </template>
+
     <template id="staleness-template">
         <table class="staleness">
             <thead>
@@ -118,6 +174,8 @@
                     <th>Repository</th>
                     <th>Last push</th>
                     <th>Stale for</th>
+                    <th>Type</th>
+                    <th>Tier</th>
                     <th>Lifecycle</th>
                 </tr>
             </thead>
@@ -126,7 +184,9 @@
                     <td><a data-tpl-href="html_url" target="_blank" rel="noopener noreferrer">{{ name }}</a></td>
                     <td>{{ pushed_at }}</td>
                     <td><badge class="stale-{{ bucket }}">{{ months }} months</badge></td>
-                    <td>{{ lifecycle ?? 'unknown' }}</td>
+                    <td>{{ type ?? 'unspecified' }}</td>
+                    <td>{{ tier ?? 'unspecified' }}</td>
+                    <td>{{ lifecycle ?? 'unspecified' }}</td>
                 </tr>
             </tbody>
         </table>
@@ -134,16 +194,23 @@
 
     <script type="module">
         import { Templates } from "ftl";
-        import { authenticate, projects, setupNavSpy } from "/elaine.js";
+        import { authenticate, allProjects, setupNavSpy } from "/elaine.js";
 
         const { config, http } = await authenticate();
 
-        const all = [];
-        for await (const p of projects(http, ['live'], null)) {
-            all.push(p);
-        }
+        const all = await allProjects(http, ['live']);
 
         const frameworks = ['dora', 'cra', 'nis2', 'ai_act', 'gdpr', 'data_residency', 'ads'];
+        // applicability texts mirrored from the #[doc] comments on ComplianceManifest in src/schema/manifest.rs
+        const frameworkDocs = {
+            dora: "DORA (Digital Operational Resilience Act) criticality tag. Applicable if your project serves the EU financial sector or acts as an ICT third-party provider to financial entities.",
+            cra: "EU Cyber Resilience Act (CRA) product classification tier. Applicable if your software product contains digital elements and is sold or distributed within the EU.",
+            nis2: "EU NIS2 Directive criticality classification. Applicable to non-financial critical and important infrastructure operating in the EU (e.g., energy, health, SaaS, MSPs).",
+            ai_act: "EU AI Act risk classification tier. Applicable to systems integrating AI/ML models, LLMs, or automated inference.",
+            gdpr: "GDPR data protection role. Applicable to any project that processes, stores, or transmits EU/EEA personal data.",
+            data_residency: "Whether personal data is processed or stored strictly within the EU/EEA.",
+            ads: "Italian Garante Privacy 'Amministratore di Sistema' (AdS) compliance block. Applicable to projects falling under the Italian Provvedimento Garante AdS for tracking privileged IT and database administrators.",
+        };
         const withManifest = all.filter(p => p.manifest?.compliance);
         const rows = frameworks.map(fw => {
             let assessed = 0, pending = 0;
@@ -159,6 +226,7 @@
             const color = coverage >= 80 ? 'var(--success)' : coverage >= 50 ? 'var(--warning)' : 'var(--danger)';
             return {
                 framework: fw.replace('_', '-').toUpperCase(),
+                applicability: frameworkDocs[fw],
                 assessed, pending,
                 missing: all.length - withManifest.length,
                 coverage_pct: coverage,
@@ -168,14 +236,33 @@
         rows.sort((a, b) => a.coverage_pct - b.coverage_pct);
         Templates.fromSelector('#compliance-template').withOverlay(rows).renderToSelector('compliance-grid');
 
+        const bySteward = new Map();
+        for (const p of all) {
+            for (const steward of p.manifest?.stewards ?? []) {
+                if (!steward) continue;
+                if (!bySteward.has(steward)) bySteward.set(steward, { critical: 0, active: 0, projects: 0 });
+                const counts = bySteward.get(steward);
+                counts.projects++;
+                if (p.manifest?.tier === 'tier1' || p.manifest?.tier === 'tier2') counts.critical++;
+                if (p.manifest?.lifecycle === 'active') counts.active++;
+            }
+        }
+        const recapRows = [...bySteward.entries()]
+            .map(([steward, counts]) => ({ steward, ...counts }))
+            .sort((a, b) => b.active - a.active || a.steward.localeCompare(b.steward));
+        Templates.fromSelector('#stewards-recap-template').withOverlay(recapRows).renderToSelector('stewards-recap-grid');
+
         const now = Date.now();
         const enriched = all
             .filter(p => p.pushed_at)
             .map(p => ({
                 ...p,
                 months: Math.floor((now - new Date(p.pushed_at).getTime()) / (1000 * 60 * 60 * 24 * 30.44)),
+                type: p.manifest?.type ?? null,
+                tier: p.manifest?.tier ?? null,
                 lifecycle: p.manifest?.lifecycle ?? null,
             }))
+            .filter(p => p.months >= 2)
             .map(p => ({
                 ...p,
                 bucket: p.months > 24 ? 'ancient' : p.months > 12 ? 'stale' : p.months > 6 ? 'aging' : 'fresh',

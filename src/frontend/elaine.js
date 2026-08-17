@@ -158,6 +158,15 @@ async function* projects(http, filters, search) {
     }
 }
 
+/// Drains the projects iterator into an array, for pages that aggregate over the full dataset.
+async function allProjects(http, filters) {
+    const all = [];
+    for await (const p of projects(http, filters, null)) {
+        all.push(p);
+    }
+    return all;
+}
+
 /// Adds convenience fields computed from the raw API payload.
 function withDerivedFields(p) {
     const failed_checks = Object.values(p.health ?? {})
@@ -221,4 +230,4 @@ function setupNavSpy() {
     sections.forEach(s => s && spy.observe(s));
 }
 
-export { Spinner, InfiniteScroller, authenticate, projects, Dialog, setupNavSpy }
+export { Spinner, InfiniteScroller, authenticate, projects, allProjects, Dialog, setupNavSpy }
