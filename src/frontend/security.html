@@ -249,7 +249,7 @@
                 <tr data-tpl-each="rows" data-tpl-var="row">
                     <th>{{ row.tier }}</th>
                     <td data-tpl-each="row.cells" data-tpl-var="cell">
-                        <div class="risk-cell {{ cell.level }}">
+                        <div class="risk-cell" data-tpl-class-append="cell.level">
                             <span class="risk-count">{{ cell.repos }}</span>
                             <span class="risk-detail"> {{ cell.vulns }} vulns</span>
                         </div>

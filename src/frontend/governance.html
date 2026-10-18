@@ -183,7 +183,7 @@
                 <tr data-tpl-each="self">
                     <td><a data-tpl-href="html_url" target="_blank" rel="noopener noreferrer">{{ name }}</a></td>
                     <td>{{ pushed_at }}</td>
-                    <td><badge class="stale-{{ bucket }}">{{ months }} months</badge></td>
+                    <td><badge data-tpl-class-append="`stale-{bucket}`">{{ months }} months</badge></td>
                     <td>{{ type ?? 'unspecified' }}</td>
                     <td>{{ tier ?? 'unspecified' }}</td>
                     <td>{{ lifecycle ?? 'unspecified' }}</td>
