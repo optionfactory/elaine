@@ -14,7 +14,7 @@ path = "src/main.rs"
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-serde-saphyr = "1.0.0"
+serde-saphyr = "2.0.0"
 schemars = { version = "1.2", features = ["derive"] }
 chrono = { version = "0.4", features = ["serde"] }
 walkdir = "2.5"
@@ -33,7 +33,7 @@ tempfile = "3.27"
 tar = "0.4"
 flate2 = "1.1"
 regex = "1.13"
-toml = "0.8"
+toml = "1.1"
 axum-extra = { version = "0.12", features = ["query"] }
 
 [build-dependencies]
