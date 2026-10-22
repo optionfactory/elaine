@@ -82,7 +82,6 @@ impl IntoResponse for AuthError {
 
 pub struct ValidatedUser;
 
-#[axum::async_trait]
 impl<S> FromRequestParts<S> for ValidatedUser
 where
     S: Send + Sync,

@@ -24,8 +24,8 @@ indicatif = "0.18"
 tokio = { version = "1.53", features = ["full"] }
 reqwest = { version = "0.13", features = ["json", "stream"] }
 futures = "0.3"
-axum = "0.7"
-tower-http = { version = "0.5", features = ["fs"] }
+axum = "0.8"
+tower-http = { version = "0.7", features = ["fs"] }
 jsonwebtoken = "9.3"
 rust-embed = "8.0"
 mime_guess = "2.0"
@@ -34,7 +34,7 @@ tar = "0.4"
 flate2 = "1.1"
 regex = "1.13"
 toml = "0.8"
-axum-extra = { version = "0.9", features = ["query"] }
+axum-extra = { version = "0.12", features = ["query"] }
 
 [build-dependencies]
 schemars = { version = "1.2", features = ["derive"] }
