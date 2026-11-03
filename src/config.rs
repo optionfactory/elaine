@@ -12,6 +12,22 @@ pub struct Config {
     pub organization: String,
     pub address: Option<String>,
     pub port: Option<u16>,
+    #[serde(default = "default_data_dir")]
     pub data_dir: std::path::PathBuf,
     pub google_auth: Option<GoogleAuthConfig>,
+}
+
+fn default_data_dir() -> std::path::PathBuf {
+    "data".into()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn data_dir_defaults_to_data() {
+        let config: Config = serde_json::from_str(r#"{ "organization": "acme" }"#).unwrap();
+        assert_eq!(config.data_dir, std::path::PathBuf::from("data"));
+    }
 }
