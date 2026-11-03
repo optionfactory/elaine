@@ -111,22 +111,7 @@ impl Scanner for NpmScanner {
                     let payload = String::from_utf8_lossy(&out.stdout);
                     match serde_json::from_str::<HashMap<String, NpmOutdatedDep>>(&payload) {
                         Ok(parsed) => {
-                            let updates: Vec<OutdatedDependency> = parsed
-                                .into_iter()
-                                .filter_map(|(name, dep)| {
-                                    // Without node_modules npm leaves `current` out; the locked version is what would be installed.
-                                    let current = dep
-                                        .current
-                                        .or_else(|| packages.as_ref()?.get(&format!("node_modules/{}", name))?.version.clone())?;
-                                    Some(OutdatedDependency {
-                                        project: ctx.repo.name.clone(),
-                                        kind: dep.dep_type.unwrap_or_else(|| "dependency".to_string()),
-                                        artifact: name,
-                                        current,
-                                        latest: dep.latest?,
-                                    })
-                                })
-                                .collect();
+                            let updates = outdated_dependencies(&ctx.repo.name, parsed, packages.as_ref());
                             stats.add_outdated_dependencies(updates);
                             true
                         }
@@ -147,5 +132,50 @@ impl Scanner for NpmScanner {
         stats.record_check(ScannerKind::Npm, "vulns", if vulns_ok { CheckStatus::Ok } else { CheckStatus::Failed });
         stats.record_check(ScannerKind::Npm, "outdated", if outdated_ok { CheckStatus::Ok } else { CheckStatus::Failed });
         Ok(())
+    }
+}
+
+/// Turns `npm outdated --json` output into outdated dependencies.
+/// Without node_modules npm leaves `current` out and lists every direct dependency,
+/// so the locked version stands in for `current` and up-to-date entries are dropped.
+fn outdated_dependencies(project: &str, outdated: HashMap<String, NpmOutdatedDep>, packages: Option<&HashMap<String, NpmPackage>>) -> Vec<OutdatedDependency> {
+    outdated
+        .into_iter()
+        .filter_map(|(name, dep)| {
+            let current = dep.current.or_else(|| packages?.get(&format!("node_modules/{}", name))?.version.clone())?;
+            let latest = dep.latest?;
+            (current != latest).then(|| OutdatedDependency {
+                project: project.to_string(),
+                kind: dep.dep_type.unwrap_or_else(|| "dependency".to_string()),
+                artifact: name,
+                current,
+                latest,
+            })
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn outdated_without_node_modules_uses_locked_version_and_skips_up_to_date() {
+        let outdated = serde_json::from_str(
+            r#"{
+                "is-number": { "wanted": "7.0.0", "latest": "7.0.0", "dependent": "t" },
+                "left-pad": { "wanted": "1.0.0", "latest": "1.3.0", "dependent": "t" }
+            }"#,
+        )
+        .unwrap();
+        let lock: PackageLock = serde_json::from_str(
+            r#"{ "packages": { "": {}, "node_modules/is-number": { "version": "7.0.0" }, "node_modules/left-pad": { "version": "1.0.0" } } }"#,
+        )
+        .unwrap();
+
+        let deps = outdated_dependencies("acme", outdated, lock.packages.as_ref());
+
+        let found: Vec<(&str, &str, &str)> = deps.iter().map(|d| (d.artifact.as_str(), d.current.as_str(), d.latest.as_str())).collect();
+        assert_eq!(found, vec![("left-pad", "1.0.0", "1.3.0")]);
     }
 }
