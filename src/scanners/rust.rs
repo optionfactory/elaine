@@ -56,9 +56,14 @@ impl Scanner for RustScanner {
         for lock_path in lock_paths {
             ctx.set_message(format!("[{}] Running Rust checks...", ctx.repo.name));
             let run_dir = ctx.root.join(lock_path).parent().unwrap().to_path_buf();
-            let content = fs::read_to_string(ctx.root.join(lock_path))?;
-
             let per_vulns_ok = (|| -> Option<()> {
+                let content = match fs::read_to_string(ctx.root.join(lock_path)) {
+                    Ok(content) => content,
+                    Err(e) => {
+                        ctx.report_failure("rust", format!("Failed to read Cargo.lock {}: {}", lock_path.display(), e));
+                        return None;
+                    }
+                };
                 let lockfile = match toml::from_str::<CargoLock>(&content) {
                     Ok(lf) => lf,
                     Err(e) => {

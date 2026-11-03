@@ -51,9 +51,10 @@ impl Scanner for NpmScanner {
         for lock_path in lock_paths {
             ctx.set_message(format!("[{}] Running npm checks...", ctx.repo.name));
             let run_dir = ctx.root.join(lock_path).parent().unwrap().to_path_buf();
-            let content = fs::read_to_string(ctx.root.join(lock_path))?;
-
-            let packages = match serde_json::from_str::<PackageLock>(&content) {
+            let lockfile = fs::read_to_string(ctx.root.join(lock_path))
+                .map_err(anyhow::Error::from)
+                .and_then(|content| Ok(serde_json::from_str::<PackageLock>(&content)?));
+            let packages = match lockfile {
                 Ok(PackageLock { packages: Some(packages) }) => Some(packages),
                 Ok(PackageLock { packages: None }) => {
                     ctx.report_failure(
@@ -63,7 +64,7 @@ impl Scanner for NpmScanner {
                     None
                 }
                 Err(e) => {
-                    ctx.report_failure("npm", format!("Failed to parse package-lock.json {}: {}", lock_path.display(), e));
+                    ctx.report_failure("npm", format!("Failed to read package-lock.json {}: {}", lock_path.display(), e));
                     None
                 }
             };
