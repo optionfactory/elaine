@@ -1,4 +1,4 @@
-use crate::schema::{AdsResponsibility, AiActClass, CraClass, DoraCriticality, ExposureType, GdprRole, LifecycleType, Nis2Category, ProjectType, ServiceTier};
+use crate::schema::{ExposureType, LifecycleType, ProjectType, ServiceTier};
 use axum::{Json, Router, extract::State, http::StatusCode, response::IntoResponse, routing::get};
 use axum_extra::extract::Query;
 use serde::Deserialize;
@@ -270,6 +270,9 @@ fn matches_filters(p: &crate::scanners::RepoStats, filters: &[&str]) -> bool {
     if filters.contains(&"ingress-restricted-ip") && !has_ingress(ExposureType::RestrictedIp) {
         return false;
     }
+    if filters.contains(&"ingress-restricted-geo-ip") && !has_ingress(ExposureType::RestrictedGeoIp) {
+        return false;
+    }
     if filters.contains(&"ingress-restricted-pam") && !has_ingress(ExposureType::RestrictedPam) {
         return false;
     }
@@ -300,15 +303,11 @@ fn matches_filters(p: &crate::scanners::RepoStats, filters: &[&str]) -> bool {
         return false;
     }
 
-    let compliant = p.manifest.as_ref().and_then(|a| a.compliance.as_ref()).map(|c| {
-        c.ads != AdsResponsibility::PendingAssessment
-            && c.ads != AdsResponsibility::PendingNomination
-            && c.ai_act != AiActClass::PendingAssessment
-            && c.cra != CraClass::PendingAssessment
-            && c.dora != DoraCriticality::PendingAssessment
-            && c.gdpr != GdprRole::PendingAssessment
-            && c.nis2 != Nis2Category::PendingAssessment
-    });
+    let compliant = p
+        .manifest
+        .as_ref()
+        .and_then(|a| a.compliance.as_ref())
+        .map(|c| !super::aggregates::FRAMEWORKS.iter().any(|(_, is_pending)| is_pending(c)));
 
     if filters.contains(&"compliant") && compliant.is_none_or(|c| !c) {
         return false;
@@ -344,5 +343,26 @@ mod tests {
         ));
         assert!(matches_filters(&exposed, &["ingress-internet"]));
         assert!(!matches_filters(&exposed, &["ingress-local"]));
+    }
+
+    #[test]
+    fn ingress_filter_matches_restricted_geo_ip() {
+        let geo = repo(Some(
+            r#"{ "schema_version": 1, "name": "x", "environments": [ { "name": "prod", "type": "production", "ingress": "restricted-geo-ip" } ] }"#,
+        ));
+        let internet = repo(Some(
+            r#"{ "schema_version": 1, "name": "x", "environments": [ { "name": "prod", "type": "production", "ingress": "internet" } ] }"#,
+        ));
+        assert!(matches_filters(&geo, &["ingress-restricted-geo-ip"]));
+        assert!(!matches_filters(&internet, &["ingress-restricted-geo-ip"]));
+    }
+
+    #[test]
+    fn pending_data_residency_is_non_compliant() {
+        let pending = repo(Some(
+            r#"{ "schema_version": 1, "name": "x", "compliance": { "dora": "non-critical", "cra": "default", "nis2": "out-of-scope", "ai_act": "out-of-scope", "gdpr": "controller", "data_residency": "pending-assessment", "ads": "internal" } }"#,
+        ));
+        assert!(matches_filters(&pending, &["non-compliant"]));
+        assert!(!matches_filters(&pending, &["compliant"]));
     }
 }

@@ -40,7 +40,7 @@ type IsPending = fn(&ComplianceManifest) -> bool;
 /// The keys are the JSON field names of ComplianceManifest; each predicate is a
 /// typed match, so a framework forgotten here is absent from the output rather
 /// than silently counted as assessed.
-const FRAMEWORKS: [(&str, IsPending); 7] = [
+pub(crate) const FRAMEWORKS: [(&str, IsPending); 7] = [
     ("dora", |c| matches!(c.dora, DoraCriticality::PendingAssessment)),
     ("cra", |c| matches!(c.cra, CraClass::PendingAssessment)),
     ("nis2", |c| matches!(c.nis2, Nis2Category::PendingAssessment)),

@@ -2,6 +2,7 @@ mod governance;
 mod inventory;
 mod security;
 
+pub(crate) use governance::FRAMEWORKS;
 pub use governance::Governance;
 pub use inventory::Inventory;
 pub use security::Security;
