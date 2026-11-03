@@ -53,26 +53,25 @@ impl Scanner for NpmScanner {
             let run_dir = ctx.root.join(lock_path).parent().unwrap().to_path_buf();
             let content = fs::read_to_string(ctx.root.join(lock_path))?;
 
+            let packages = match serde_json::from_str::<PackageLock>(&content) {
+                Ok(PackageLock { packages: Some(packages) }) => Some(packages),
+                Ok(PackageLock { packages: None }) => {
+                    ctx.report_failure(
+                        "npm",
+                        format!("No 'packages' map in {} (lockfileVersion 1 is unsupported)", lock_path.display()),
+                    );
+                    None
+                }
+                Err(e) => {
+                    ctx.report_failure("npm", format!("Failed to parse package-lock.json {}: {}", lock_path.display(), e));
+                    None
+                }
+            };
+
             let per_vulns_ok = (|| -> Option<()> {
-                let lockfile = match serde_json::from_str::<PackageLock>(&content) {
-                    Ok(lf) => lf,
-                    Err(e) => {
-                        ctx.report_failure("npm", format!("Failed to parse package-lock.json {}: {}", lock_path.display(), e));
-                        return None;
-                    }
-                };
-                let packages = match lockfile.packages {
-                    Some(p) => p,
-                    None => {
-                        ctx.report_failure(
-                            "npm",
-                            format!("No 'packages' map in {} (lockfileVersion 1 is unsupported)", lock_path.display()),
-                        );
-                        return None;
-                    }
-                };
+                let packages = packages.as_ref()?;
                 let mut deps = Vec::new();
-                for (path, pkg) in &packages {
+                for (path, pkg) in packages {
                     if path.is_empty() {
                         continue;
                     }
@@ -114,11 +113,15 @@ impl Scanner for NpmScanner {
                             let updates: Vec<OutdatedDependency> = parsed
                                 .into_iter()
                                 .filter_map(|(name, dep)| {
+                                    // Without node_modules npm leaves `current` out; the locked version is what would be installed.
+                                    let current = dep
+                                        .current
+                                        .or_else(|| packages.as_ref()?.get(&format!("node_modules/{}", name))?.version.clone())?;
                                     Some(OutdatedDependency {
                                         project: ctx.repo.name.clone(),
                                         kind: dep.dep_type.unwrap_or_else(|| "dependency".to_string()),
                                         artifact: name,
-                                        current: dep.current?,
+                                        current,
                                         latest: dep.latest?,
                                     })
                                 })
