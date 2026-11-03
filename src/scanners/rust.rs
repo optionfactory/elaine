@@ -100,29 +100,32 @@ impl Scanner for RustScanner {
             vulns_ok &= per_vulns_ok;
 
             let per_outdated_ok = match ctx.run_logged("rust", "cargo", &["outdated", "--format", "json", "--workspace"], &run_dir) {
+                Ok(out) if !out.success => {
+                    ctx.report_failure("rust", format!("cargo outdated failed for {}", lock_path.display()));
+                    false
+                }
                 Ok(out) => {
-                    let payload = String::from_utf8_lossy(&out.stdout).into_owned();
-                    let parsed_any = payload.lines().any(|line| serde_json::from_str::<OutdatedOutput>(line).is_ok());
-                    if !parsed_any && !payload.trim().is_empty() {
-                        ctx.report_failure("rust", format!("Failed to parse cargo outdated output for {}", lock_path.display()));
-                    }
-                    for line in payload.lines() {
-                        if let Ok(parsed) = serde_json::from_str::<OutdatedOutput>(line) {
-                            let updates: Vec<OutdatedDependency> = parsed
+                    let payload = String::from_utf8_lossy(&out.stdout);
+                    let outputs: Vec<OutdatedOutput> = payload.lines().filter_map(|line| serde_json::from_str(line).ok()).collect();
+                    for output in &outputs {
+                        stats.add_outdated_dependencies(
+                            output
                                 .dependencies
-                                .into_iter()
+                                .iter()
                                 .map(|dep| OutdatedDependency {
                                     project: ctx.repo.name.clone(),
-                                    kind: dep.kind.unwrap_or_else(|| "Normal".to_string()),
-                                    artifact: dep.name,
-                                    current: dep.project,
-                                    latest: dep.latest,
+                                    kind: dep.kind.clone().unwrap_or_else(|| "Normal".to_string()),
+                                    artifact: dep.name.clone(),
+                                    current: dep.project.clone(),
+                                    latest: dep.latest.clone(),
                                 })
-                                .collect();
-                            stats.add_outdated_dependencies(updates);
-                        }
+                                .collect(),
+                        );
                     }
-                    true
+                    if outputs.is_empty() {
+                        ctx.report_failure("rust", format!("Failed to parse cargo outdated output for {}", lock_path.display()));
+                    }
+                    !outputs.is_empty()
                 }
                 Err(e) => {
                     ctx.report_failure("rust", format!("Failed to execute cargo outdated for {}: {}", lock_path.display(), e));

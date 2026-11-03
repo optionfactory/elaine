@@ -124,12 +124,13 @@ impl Scanner for NpmScanner {
                                 })
                                 .collect();
                             stats.add_outdated_dependencies(updates);
+                            true
                         }
                         Err(e) => {
                             ctx.report_failure("npm", format!("Failed to parse npm outdated output for {}: {}", lock_path.display(), e));
+                            false
                         }
                     }
-                    true
                 }
                 Err(e) => {
                     ctx.report_failure("npm", format!("Failed to execute npm outdated for {}: {}", lock_path.display(), e));
