@@ -62,7 +62,7 @@ impl Scanner for GoScanner {
             let array_payload = format!("[{}]", fixed_payload);
 
             let Ok(parsed) = serde_json::from_str::<Vec<GoListModule>>(&array_payload) else {
-                ctx.report_failure("go", &format!("Failed to parse go list output for {}", mod_path.display()));
+                ctx.report_failure("go", format!("Failed to parse go list output for {}", mod_path.display()));
                 vulns_ok = false;
                 outdated_ok = false;
                 continue;
@@ -105,7 +105,7 @@ impl Scanner for GoScanner {
                     stats.add_vulnerabilities(vulnerabilities);
                 }
                 Err(e) => {
-                    ctx.report_failure("go", &format!("OSV check failed for {}: {}", mod_path.display(), e));
+                    ctx.report_failure("go", format!("OSV check failed for {}: {}", mod_path.display(), e));
                     vulns_ok = false;
                 }
             }

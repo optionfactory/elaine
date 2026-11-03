@@ -236,7 +236,7 @@ impl Security {
                 })
             })
             .collect();
-        vulns.sort_by(|a, b| b.vulns.cmp(&a.vulns));
+        vulns.sort_by_key(|r| std::cmp::Reverse(r.vulns));
 
         let mut outdated: Vec<OutdatedRow> = live
             .iter()
@@ -253,7 +253,7 @@ impl Security {
                 })
             })
             .collect();
-        outdated.sort_by(|a, b| b.outdated.cmp(&a.outdated));
+        outdated.sort_by_key(|r| std::cmp::Reverse(r.outdated));
 
         let mut artifact_agg: BTreeMap<String, (BTreeSet<String>, BTreeSet<String>)> = BTreeMap::new();
         for p in live {

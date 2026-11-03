@@ -61,12 +61,12 @@ impl Scanner for MavenScanner {
                         Ok(payload) => match serde_json::from_str::<Vec<Vulnerability>>(&payload) {
                             Ok(parsed_vulns) => stats.add_vulnerabilities(parsed_vulns),
                             Err(e) => {
-                                ctx.report_failure("maven", &format!("Failed to parse {}: {}", vulns_path.display(), e));
+                                ctx.report_failure("maven", format!("Failed to parse {}: {}", vulns_path.display(), e));
                                 vulns_ok = false;
                             }
                         },
                         Err(e) => {
-                            ctx.report_failure("maven", &format!("Missing or unreadable {}: {}", vulns_path.display(), e));
+                            ctx.report_failure("maven", format!("Missing or unreadable {}: {}", vulns_path.display(), e));
                             vulns_ok = false;
                         }
                     }
@@ -76,12 +76,12 @@ impl Scanner for MavenScanner {
                         Ok(payload) => match serde_json::from_str::<Vec<OutdatedDependency>>(&payload) {
                             Ok(parsed_updates) => stats.add_outdated_dependencies(parsed_updates),
                             Err(e) => {
-                                ctx.report_failure("maven", &format!("Failed to parse {}: {}", updates_path.display(), e));
+                                ctx.report_failure("maven", format!("Failed to parse {}: {}", updates_path.display(), e));
                                 outdated_ok = false;
                             }
                         },
                         Err(e) => {
-                            ctx.report_failure("maven", &format!("Missing or unreadable {}: {}", updates_path.display(), e));
+                            ctx.report_failure("maven", format!("Missing or unreadable {}: {}", updates_path.display(), e));
                             outdated_ok = false;
                         }
                     }
@@ -94,7 +94,7 @@ impl Scanner for MavenScanner {
                     } else {
                         dir.display().to_string()
                     };
-                    ctx.report_failure("maven", &format!("Maven failed for {}", dir_label));
+                    ctx.report_failure("maven", format!("Maven failed for {}", dir_label));
                 }
                 Err(e) => {
                     vulns_ok = false;
@@ -104,7 +104,7 @@ impl Scanner for MavenScanner {
                     } else {
                         dir.display().to_string()
                     };
-                    ctx.report_failure("maven", &format!("Failed to execute Maven for {}: {}", dir_label, e));
+                    ctx.report_failure("maven", format!("Failed to execute Maven for {}: {}", dir_label, e));
                 }
             }
         }

@@ -57,7 +57,7 @@ impl Scanner for NpmScanner {
                 let lockfile = match serde_json::from_str::<PackageLock>(&content) {
                     Ok(lf) => lf,
                     Err(e) => {
-                        ctx.report_failure("npm", &format!("Failed to parse package-lock.json {}: {}", lock_path.display(), e));
+                        ctx.report_failure("npm", format!("Failed to parse package-lock.json {}: {}", lock_path.display(), e));
                         return None;
                     }
                 };
@@ -66,7 +66,7 @@ impl Scanner for NpmScanner {
                     None => {
                         ctx.report_failure(
                             "npm",
-                            &format!("No 'packages' map in {} (lockfileVersion 1 is unsupported)", lock_path.display()),
+                            format!("No 'packages' map in {} (lockfileVersion 1 is unsupported)", lock_path.display()),
                         );
                         return None;
                     }
@@ -98,7 +98,7 @@ impl Scanner for NpmScanner {
                         Some(())
                     }
                     Err(e) => {
-                        ctx.report_failure("npm", &format!("OSV check failed for {}: {}", lock_path.display(), e));
+                        ctx.report_failure("npm", format!("OSV check failed for {}: {}", lock_path.display(), e));
                         None
                     }
                 }
@@ -126,13 +126,13 @@ impl Scanner for NpmScanner {
                             stats.add_outdated_dependencies(updates);
                         }
                         Err(e) => {
-                            ctx.report_failure("npm", &format!("Failed to parse npm outdated output for {}: {}", lock_path.display(), e));
+                            ctx.report_failure("npm", format!("Failed to parse npm outdated output for {}: {}", lock_path.display(), e));
                         }
                     }
                     true
                 }
                 Err(e) => {
-                    ctx.report_failure("npm", &format!("Failed to execute npm outdated for {}: {}", lock_path.display(), e));
+                    ctx.report_failure("npm", format!("Failed to execute npm outdated for {}: {}", lock_path.display(), e));
                     false
                 }
             };

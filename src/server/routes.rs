@@ -70,7 +70,7 @@ pub async fn api_staleness_handler(State(state): State<Arc<AppState>>, _auth: Va
             })
         })
         .collect();
-    rows.sort_by(|a, b| b.months.cmp(&a.months));
+    rows.sort_by_key(|r| std::cmp::Reverse(r.months));
     Json(rows).into_response()
 }
 

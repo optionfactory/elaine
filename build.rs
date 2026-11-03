@@ -27,6 +27,4 @@ fn main() {
     let mut file = File::create(&filename).unwrap_or_else(|e| panic!("Failed to create schema file '{}': {}", filename, e));
     file.write_all(schema_json.as_bytes())
         .unwrap_or_else(|e| panic!("Failed to write schema to '{}': {}", filename, e));
-
-    println!("cargo:warning=Generated JSON Schema: {}", filename);
 }

@@ -62,14 +62,14 @@ impl Scanner for RustScanner {
                 let lockfile = match toml::from_str::<CargoLock>(&content) {
                     Ok(lf) => lf,
                     Err(e) => {
-                        ctx.report_failure("rust", &format!("Failed to parse Cargo.lock {}: {}", lock_path.display(), e));
+                        ctx.report_failure("rust", format!("Failed to parse Cargo.lock {}: {}", lock_path.display(), e));
                         return None;
                     }
                 };
                 let packages = match lockfile.package {
                     Some(p) => p,
                     None => {
-                        ctx.report_failure("rust", &format!("No 'package' table in {}", lock_path.display()));
+                        ctx.report_failure("rust", format!("No 'package' table in {}", lock_path.display()));
                         return None;
                     }
                 };
@@ -91,7 +91,7 @@ impl Scanner for RustScanner {
                         Some(())
                     }
                     Err(e) => {
-                        ctx.report_failure("rust", &format!("OSV check failed for {}: {}", lock_path.display(), e));
+                        ctx.report_failure("rust", format!("OSV check failed for {}: {}", lock_path.display(), e));
                         None
                     }
                 }
@@ -104,7 +104,7 @@ impl Scanner for RustScanner {
                     let payload = String::from_utf8_lossy(&out.stdout).into_owned();
                     let parsed_any = payload.lines().any(|line| serde_json::from_str::<OutdatedOutput>(line).is_ok());
                     if !parsed_any && !payload.trim().is_empty() {
-                        ctx.report_failure("rust", &format!("Failed to parse cargo outdated output for {}", lock_path.display()));
+                        ctx.report_failure("rust", format!("Failed to parse cargo outdated output for {}", lock_path.display()));
                     }
                     for line in payload.lines() {
                         if let Ok(parsed) = serde_json::from_str::<OutdatedOutput>(line) {
@@ -125,7 +125,7 @@ impl Scanner for RustScanner {
                     true
                 }
                 Err(e) => {
-                    ctx.report_failure("rust", &format!("Failed to execute cargo outdated for {}: {}", lock_path.display(), e));
+                    ctx.report_failure("rust", format!("Failed to execute cargo outdated for {}: {}", lock_path.display(), e));
                     false
                 }
             };

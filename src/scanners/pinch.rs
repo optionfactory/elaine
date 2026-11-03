@@ -27,7 +27,7 @@ impl Scanner for PinchScanner {
             }
             None => {
                 stats.checked_for_containers();
-                ctx.report_failure("pinch", &"Failed to parse pinch.yaml".to_string());
+                ctx.report_failure("pinch", "Failed to parse pinch.yaml");
                 stats.record_check(ScannerKind::Pinch, "containers", CheckStatus::Failed);
             }
         }

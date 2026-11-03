@@ -34,11 +34,13 @@ pub struct StewardRecap {
     pub active: usize,
 }
 
+type IsPending = fn(&ComplianceManifest) -> bool;
+
 /// Compliance framework keys paired with their pending-value predicates.
 /// The keys are the JSON field names of ComplianceManifest; each predicate is a
 /// typed match, so a framework forgotten here is absent from the output rather
 /// than silently counted as assessed.
-const FRAMEWORKS: [(&str, fn(&ComplianceManifest) -> bool); 7] = [
+const FRAMEWORKS: [(&str, IsPending); 7] = [
     ("dora", |c| matches!(c.dora, DoraCriticality::PendingAssessment)),
     ("cra", |c| matches!(c.cra, CraClass::PendingAssessment)),
     ("nis2", |c| matches!(c.nis2, Nis2Category::PendingAssessment)),
@@ -109,7 +111,6 @@ impl Governance {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::server::aggregates::Aggregates;
     use crate::server::aggregates::testutil::{repo, with_manifest};
 
