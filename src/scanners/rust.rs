@@ -13,6 +13,7 @@ struct CargoLock {
 struct CargoPackage {
     name: String,
     version: String,
+    source: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -78,7 +79,16 @@ impl Scanner for RustScanner {
                         return None;
                     }
                 };
-                let deps: Vec<(&str, &str, &str)> = packages.iter().map(|p| ("crates.io", p.name.as_str(), p.version.as_str())).collect();
+                let deps: Vec<(&str, &str, &str)> = packages
+                    .iter()
+                    .filter(|p| {
+                        matches!(
+                            p.source.as_deref(),
+                            Some("registry+https://github.com/rust-lang/crates.io-index" | "sparse+https://index.crates.io/")
+                        )
+                    })
+                    .map(|p| ("crates.io", p.name.as_str(), p.version.as_str()))
+                    .collect();
                 match fetch_vulnerabilities(ctx.client, &deps) {
                     Ok(vulns) => {
                         stats.add_vulnerabilities(
