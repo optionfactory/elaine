@@ -1,4 +1,4 @@
-use crate::scanners::RepoStats;
+use crate::scanners::{CheckStatus, RepoStats};
 use anyhow::{Context, Result};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -38,7 +38,12 @@ impl StatsStore {
         let Ok(prev) = serde_json::from_str::<RepoStats>(&data) else {
             return false;
         };
-        prev.pushed_at == pushed_at && prev.updated_at == updated_at
+        let has_failed_checks = prev
+            .health
+            .values()
+            .flat_map(|checks| checks.values())
+            .any(|status| *status == CheckStatus::Failed);
+        prev.pushed_at == pushed_at && prev.updated_at == updated_at && !has_failed_checks
     }
 
     pub fn save_project_scan(&self, stat: &RepoStats) -> Result<PathBuf> {
@@ -131,7 +136,7 @@ impl StatsStore {
 mod tests {
     use super::*;
     use crate::github::GithubRepository;
-    use crate::scanners::RepoStats;
+    use crate::scanners::ScannerKind;
     use tempfile::TempDir;
 
     fn fresh_store() -> (TempDir, StatsStore) {
@@ -170,6 +175,21 @@ mod tests {
         let (_dir, store) = fresh_store();
         write_scan(&store, "acme", "2024-01-01T00:00:00Z", "2024-01-02T00:00:00Z");
         assert!(!store.is_scan_fresh("acme", "2024-09-01T00:00:00Z", "2024-01-02T00:00:00Z"));
+    }
+
+    #[test]
+    fn stale_when_prior_scan_has_failed_checks() {
+        let (_dir, store) = fresh_store();
+        let repo = GithubRepository {
+            name: "acme".to_string(),
+            updated_at: "2024-01-01T00:00:00Z".to_string(),
+            pushed_at: "2024-01-02T00:00:00Z".to_string(),
+            ..Default::default()
+        };
+        let mut stats = RepoStats::new_from_github(&repo);
+        stats.record_check(ScannerKind::Npm, "vulns", CheckStatus::Failed);
+        store.save_project_scan(&stats).unwrap();
+        assert!(!store.is_scan_fresh("acme", "2024-01-01T00:00:00Z", "2024-01-02T00:00:00Z"));
     }
 
     #[test]
