@@ -15,8 +15,6 @@ install:
 
 clean:
 	-@rm -rf target/
-clean-cache:
-	-@rm -rf cache/
 
 check-deps:
 	#cargo install cargo-edit
