@@ -374,7 +374,7 @@ impl Elaine {
             .ok()
             .and_then(|p| p.file_name().map(|n| n.to_string_lossy().to_string()))
             .unwrap_or_else(|| "my-project".to_string());
-        let manifest = include_str!("elaine.prototype.yaml").replace("{name}", &name);
+        let manifest = include_str!("elaine.prototype.yaml").replace("{name}", &serde_json::to_string(&name)?);
         std::fs::write(path, manifest).context("Failed to write elaine.yaml")?;
         eprintln!("Created elaine.yaml stub in the current folder.");
         Ok(())
