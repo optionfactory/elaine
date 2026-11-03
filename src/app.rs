@@ -27,9 +27,13 @@ impl Elaine {
 
     pub async fn bootstrap(&self, dev: bool) -> Result<()> {
         eprintln!("[Bootstrap] Syncing repositories...");
-        self.sync(false).await?;
+        if let Err(e) = self.sync(false).await {
+            eprintln!("[Bootstrap] Sync failed: {e:#}. Continuing with the cached repositories.");
+        }
         eprintln!("[Bootstrap] Scanning repositories...");
-        self.scan().await?;
+        if let Err(e) = self.scan().await {
+            eprintln!("[Bootstrap] Scan failed: {e:#}. Serving the last aggregated stats.");
+        }
         eprintln!("[Bootstrap] Starting server...");
         self.serve(dev).await
     }
