@@ -27,7 +27,13 @@ check-deps:
 	@cargo update --dry-run
 
 
-publish-github: build-release
+# the release is tagged on the commit GitHub has: only a clean tree, with master pushed
+pushed:
+	@git diff --quiet HEAD || { echo "uncommitted changes: commit them first"; exit 1; }
+	@git fetch -q origin master
+	@[ "$$(git rev-parse HEAD)" = "$$(git rev-parse origin/master)" ] || { echo "master is not pushed: push it first"; exit 1; }
+
+publish-github: pushed build-release
 	$(eval VERSION=v$(shell cargo metadata --format-version=1 --no-deps | jq -r '.packages[0].version'))
 	@cp target/x86_64-unknown-linux-musl/release/$(REPO_NAME) target/$(REPO_NAME)-linux-amd64-musl
 	@cd target && sha256sum $(REPO_NAME)-linux-amd64-musl > SHA256SUMS
