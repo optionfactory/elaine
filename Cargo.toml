@@ -1,6 +1,6 @@
 [package]
 name = "elaine"
-version = "1.3.0-dev"
+version = "1.3.0"
 edition = "2024"
 
 [lib]
