@@ -86,7 +86,7 @@ mod tests {
         let state = Arc::new(AppState {
             config,
             http_client: reqwest::Client::new(),
-            jwks: None,
+            session_key: ring::hmac::Key::new(ring::hmac::HMAC_SHA256, b"test"),
             cache: Arc::new(RwLock::new(CacheData {
                 projects: vec![],
                 stats: DashboardStats::calculate(&[]),

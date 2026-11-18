@@ -1,5 +1,5 @@
 pub mod aggregates;
-pub mod auth;
+pub mod login;
 pub mod routes;
 
 use crate::config::Config;
@@ -45,7 +45,8 @@ pub struct CacheData {
 pub struct AppState {
     pub config: Config,
     pub http_client: reqwest::Client,
-    pub jwks: Option<Arc<auth::JwksCache>>,
+    /// Signs the session cookies; new at every start, which signs everyone out.
+    pub session_key: ring::hmac::Key,
     pub cache: Arc<RwLock<CacheData>>,
     pub stats: Arc<crate::stats::StatsStore>,
 }

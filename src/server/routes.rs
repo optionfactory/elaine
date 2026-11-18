@@ -1,8 +1,9 @@
 use crate::schema::{ExposureType, LifecycleType, ProjectType, ServiceTier};
 use axum::{
-    Json, Router,
+    Extension, Json, Router,
     extract::{DefaultBodyLimit, State},
     http::StatusCode,
+    middleware,
     response::IntoResponse,
     routing::{get, put},
 };
@@ -10,7 +11,7 @@ use axum_extra::extract::Query;
 use serde::Deserialize;
 use std::sync::Arc;
 
-use super::auth::ValidatedUser;
+use super::login::{self, SignedIn};
 use super::{AppState, FrontendAssets};
 use crate::stats::StatsStore;
 
@@ -22,21 +23,21 @@ pub struct ApiQuery {
     pub limit: Option<usize>,
 }
 
-pub async fn api_config_handler(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn api_config_handler(State(state): State<Arc<AppState>>, signed_in: Option<Extension<SignedIn>>) -> impl IntoResponse {
     Json(serde_json::json!({
-        "google_auth": state.config.google_auth,
         "organization": state.config.organization,
+        "email": signed_in.map(|Extension(SignedIn(email))| email),
     }))
 }
 
-pub async fn api_stats_handler(State(state): State<Arc<AppState>>, _auth: ValidatedUser) -> impl IntoResponse {
+pub async fn api_stats_handler(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let cache = state.cache.read().await;
     Json(cache.stats.clone()).into_response()
 }
 
 /// Precalculated analytics for the governance/security/inventory pages.
 /// Computed once per stats cache refresh (see Aggregates::calculate), not per request.
-pub async fn api_aggregates_handler(State(state): State<Arc<AppState>>, _auth: ValidatedUser) -> impl IntoResponse {
+pub async fn api_aggregates_handler(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let cache = state.cache.read().await;
     Json(cache.aggregates.clone()).into_response()
 }
@@ -55,7 +56,7 @@ struct StalenessRow {
 
 /// Months since the last push for live repositories. Depends on the current time,
 /// so it is computed per request instead of being cached with the aggregates.
-pub async fn api_staleness_handler(State(state): State<Arc<AppState>>, _auth: ValidatedUser) -> impl IntoResponse {
+pub async fn api_staleness_handler(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     const MONTH_SECONDS: f64 = 30.44 * 24.0 * 3600.0;
     let cache = state.cache.read().await;
     let now = chrono::Utc::now();
@@ -83,14 +84,14 @@ pub async fn api_staleness_handler(State(state): State<Arc<AppState>>, _auth: Va
 
 /// The generated JSON schema (schema/elaine-v1.schema.json, produced by build.rs from
 /// the #[doc] comments in src/schema/manifest.rs). Compile-time static content.
-pub async fn api_schema_handler(_auth: ValidatedUser) -> impl IntoResponse {
+pub async fn api_schema_handler() -> impl IntoResponse {
     (
         [(axum::http::header::CONTENT_TYPE, "application/json")],
         include_str!("../../schema/elaine-v1.schema.json"),
     )
 }
 
-pub async fn api_projects_handler(State(state): State<Arc<AppState>>, Query(query): Query<ApiQuery>, _auth: ValidatedUser) -> impl IntoResponse {
+pub async fn api_projects_handler(State(state): State<Arc<AppState>>, Query(query): Query<ApiQuery>) -> impl IntoResponse {
     let cache = state.cache.read().await;
     let term = query.search.as_deref().map(|s| s.to_lowercase());
     let filter_values = query.filter.unwrap_or_default();
@@ -148,7 +149,7 @@ pub struct LogQuery {
 
 /// Serves saved scanner failure logs from <data_dir>/stats/logs/<repo>/<scanner>.log.
 /// Repo/scanner names are validated (no separators) to prevent path traversal.
-pub async fn api_logs_handler(State(state): State<Arc<AppState>>, Query(query): Query<LogQuery>, _auth: ValidatedUser) -> impl IntoResponse {
+pub async fn api_logs_handler(State(state): State<Arc<AppState>>, Query(query): Query<LogQuery>) -> impl IntoResponse {
     if !StatsStore::is_safe_log_name(&query.repo) || !StatsStore::is_safe_log_name(&query.scanner) {
         return (StatusCode::BAD_REQUEST, "Invalid repo or scanner").into_response();
     }
@@ -159,28 +160,35 @@ pub async fn api_logs_handler(State(state): State<Arc<AppState>>, Query(query): 
     }
 }
 
+/// Everything is behind the login except the favicon (the browser tab and the monitoring), the pushes (their own
+/// token) and the login itself.
 pub fn create_router(app_state: Arc<AppState>, dev: bool) -> Router {
-    let mut app = Router::new()
+    let mut behind_login = Router::new()
         .route("/api/config", get(api_config_handler))
         .route("/api/stats", get(api_stats_handler))
         .route("/api/aggregates", get(api_aggregates_handler))
         .route("/api/staleness", get(api_staleness_handler))
         .route("/api/schema", get(api_schema_handler))
         .route("/api/projects", get(api_projects_handler))
-        .route("/api/logs", get(api_logs_handler))
-        .route(
-            "/api/snapshot",
-            put(crate::push::receive_snapshot_handler).layer(DefaultBodyLimit::max(64 * 1024 * 1024)),
-        )
-        .with_state(app_state);
-
+        .route("/api/logs", get(api_logs_handler));
     if dev {
-        app = app.fallback_service(tower_http::services::ServeDir::new("src/frontend"));
+        behind_login = behind_login.fallback_service(tower_http::services::ServeDir::new("src/frontend"));
     } else {
-        app = app.fallback(get(embedded_assets_handler));
+        behind_login = behind_login.fallback(get(embedded_assets_handler));
     }
+    let behind_login = behind_login.layer(middleware::from_fn_with_state(Arc::clone(&app_state), login::require_session));
 
-    app
+    let mut public = Router::new().route("/favicon.svg", get(embedded_assets_handler)).route(
+        "/api/snapshot",
+        put(crate::push::receive_snapshot_handler).layer(DefaultBodyLimit::max(64 * 1024 * 1024)),
+    );
+    if app_state.config.login.is_some() {
+        public = public
+            .route("/login", get(login::sign_in))
+            .route("/oidc/callback", get(login::callback))
+            .route("/logout", get(login::sign_out));
+    }
+    public.merge(behind_login).with_state(app_state)
 }
 
 fn matches_filters(p: &crate::scanners::RepoStats, filters: &[&str]) -> bool {

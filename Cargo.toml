@@ -23,11 +23,12 @@ clap = { version = "4.6", features = ["derive"] }
 anyhow = "1.0"
 indicatif = "0.18"
 tokio = { version = "1.54", features = ["full"] }
-reqwest = { version = "0.13", features = ["json", "stream"] }
+reqwest = { version = "0.13", features = ["json", "stream", "form"] }
 futures = "0.3"
 axum = "0.8"
 tower-http = { version = "0.7", features = ["fs"] }
-jsonwebtoken = { version = "12", features = ["aws_lc_rs"] }
+ring = "0.17"
+base64 = "0.23"
 rust-embed = "8.13"
 mime_guess = "2.0"
 tempfile = "3.27"

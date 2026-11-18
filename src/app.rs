@@ -49,16 +49,8 @@ impl Elaine {
             );
         }
 
-        let jwks = if self.config.google_auth.is_some() {
-            eprintln!("Fetching Google public keys...");
-            let keys = crate::server::auth::fetch_jwks(&reqwest::Client::new())
-                .await
-                .context("Failed to fetch Google JWKS")?;
-            eprintln!("Successfully loaded Google keys.");
-            Some(Arc::new(crate::server::auth::JwksCache::new(keys)))
-        } else {
-            None
-        };
+        let session_key = ring::hmac::Key::generate(ring::hmac::HMAC_SHA256, &ring::rand::SystemRandom::new())
+            .map_err(|_| anyhow::anyhow!("No randomness for the session key"))?;
 
         let initial_data = fs::read_to_string(&stats_file).unwrap_or_else(|_| "[]".to_string());
         let initial_projects: Vec<crate::scanners::RepoStats> = serde_json::from_str(&initial_data).unwrap_or_default();
@@ -104,7 +96,7 @@ impl Elaine {
         let app_state = Arc::new(AppState {
             config: self.config.clone(),
             http_client: reqwest::Client::new(),
-            jwks,
+            session_key,
             cache: projects_cache,
             stats: Arc::clone(&self.stats),
         });
