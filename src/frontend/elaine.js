@@ -92,7 +92,13 @@ const authenticate = async () => {
 
     if (idTokenFromHash) {
         sessionStorage.setItem('google_token', idTokenFromHash);
-        window.history.replaceState(null, null, window.location.pathname);
+        const requested = new URL(hashParams.get('state') || window.location.pathname, window.location.origin);
+        const returnTo = requested.origin === window.location.origin ? requested : new URL('/', window.location.origin);
+        if (returnTo.pathname !== window.location.pathname) {
+            window.location.replace(returnTo);
+            await new Promise(() => { });
+        }
+        window.history.replaceState(null, null, returnTo.pathname + returnTo.search + returnTo.hash);
     }
 
     const storedToken = sessionStorage.getItem('google_token');
@@ -112,7 +118,9 @@ const authenticate = async () => {
         sessionStorage.removeItem('google_token');
         const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
         authUrl.searchParams.set('client_id', config.google_auth.client_id);
-        authUrl.searchParams.set('redirect_uri', window.location.origin + window.location.pathname);
+        // a single redirect uri to register on the google client; the page to go back to travels in the state
+        authUrl.searchParams.set('redirect_uri', window.location.origin + '/');
+        authUrl.searchParams.set('state', window.location.pathname + window.location.search + window.location.hash);
         authUrl.searchParams.set('response_type', 'id_token');
         authUrl.searchParams.set('scope', 'openid email profile');
         authUrl.searchParams.set('nonce', Math.random().toString(36).substring(2));

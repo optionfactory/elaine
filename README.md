@@ -39,6 +39,8 @@ Create an `elaine.conf.json` file in the directory where you run the tool:
 
 All fields except `organization` are optional: `data_dir` defaults to `data`, the server binds to `127.0.0.1:8000`, `github_token` can be set here or resolved from the environment, and omitting `google_auth` serves the dashboard without authentication.
 
+With `google_auth`, the OAuth client needs a single authorized redirect URI, the root of the dashboard (e.g. `https://elaine.example.com/`): the login always comes back there, then returns to the page where it started.
+
 ### Scanning on a different machine
 
 `serve` only needs the scan results, so the dashboard can run on a server while `sync` and `scan` run on another machine (the one holding the GitHub token and the ecosystem tools) that pushes the results to it.
