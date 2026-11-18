@@ -25,6 +25,7 @@ async fn main() -> Result<()> {
         Commands::Serve { dev } => app.serve(dev).await?,
         Commands::Sync { force } => app.sync(force).await?,
         Commands::Scan => app.scan().await?,
+        Commands::Push => app.push().await?,
         Commands::CleanRepositories => app.clean_repositories()?,
         Commands::CleanStats => app.clean_stats()?,
         Commands::Init => unreachable!(),

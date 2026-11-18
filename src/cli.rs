@@ -31,6 +31,8 @@ pub enum Commands {
     },
     #[command(about = "Audit cached organization repositories for governance metadata, vulnerabilities, and outdated dependencies")]
     Scan,
+    #[command(about = "Send the scan results to the remote server configured in elaine.conf.json")]
+    Push,
     #[command(about = "Remove cached per-repository scan data and the aggregated stats file")]
     CleanStats,
 

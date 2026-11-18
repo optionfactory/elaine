@@ -41,9 +41,12 @@ impl Elaine {
     pub async fn serve(&self, dev: bool) -> Result<()> {
         let address = self.config.address.as_deref().unwrap_or("127.0.0.1");
         let port = self.config.port.unwrap_or(8000);
-        let stats_file = self.config.data_dir.join("stats.json");
+        let stats_file = self.stats.aggregate_file_path();
         if !stats_file.exists() {
-            anyhow::bail!("Stats file {:?} does not exist. Run 'elaine scan' first.", stats_file);
+            eprintln!(
+                "Stats file {:?} does not exist yet: serving an empty dashboard until a scan or a push writes it.",
+                stats_file
+            );
         }
 
         let jwks = if self.config.google_auth.is_some() {
@@ -103,6 +106,7 @@ impl Elaine {
             http_client: reqwest::Client::new(),
             jwks,
             cache: projects_cache,
+            stats: Arc::clone(&self.stats),
         });
 
         let app = crate::server::routes::create_router(app_state, dev);
@@ -351,9 +355,23 @@ impl Elaine {
         let latest_path = self.stats.aggregate_scans()?;
         pb.println(format!("Successfully created aggregated data at {:?}", latest_path));
         pb.finish_and_clear();
+        if self.config.remote.is_some() {
+            self.push().await?;
+        }
         if failures > 0 {
             anyhow::bail!("scan completed with failures");
         }
+        Ok(())
+    }
+
+    pub async fn push(&self) -> Result<()> {
+        let Some(remote) = &self.config.remote else {
+            anyhow::bail!("No 'remote' configured in elaine.conf.json");
+        };
+        let snapshot = self.stats.load_snapshot()?;
+        eprintln!("Pushing {} repositories to {}...", snapshot.projects.len(), remote.url);
+        crate::push::send_snapshot(remote, &snapshot).await?;
+        eprintln!("Push complete.");
         Ok(())
     }
 

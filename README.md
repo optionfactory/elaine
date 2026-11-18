@@ -39,12 +39,40 @@ Create an `elaine.conf.json` file in the directory where you run the tool:
 
 All fields except `organization` are optional: `data_dir` defaults to `data`, the server binds to `127.0.0.1:8000`, `github_token` can be set here or resolved from the environment, and omitting `google_auth` serves the dashboard without authentication.
 
+### Scanning on a different machine
+
+`serve` only needs the scan results, so the dashboard can run on a server while `sync` and `scan` run on another machine (the one holding the GitHub token and the ecosystem tools) that pushes the results to it.
+
+On the server, set the token that pushes must present:
+
+```json
+{
+  "organization": "your-organization",
+  "push_token": "{{A LONG RANDOM STRING}}"
+}
+```
+
+On the scanning machine, point `remote` at the server:
+
+```json
+{
+  "organization": "your-organization",
+  "remote": {
+    "url": "https://elaine.your-organization.com",
+    "token": "{{THE SAME STRING}}"
+  }
+}
+```
+
+With `remote` configured, `scan` pushes its results at the end, even when some repositories failed; `elaine push` sends the last results again without rescanning. Each push replaces everything the server shows. The token travels in an HTTP header, so put the server behind a reverse proxy that terminates TLS. Without `push_token`, the server refuses every push.
+
 ## Usage
 
 ```bash
 elaine sync        # fetch repository metadata and cache .tar.gz archives from GitHub
 elaine scan        # unpack and audit the cached repositories
 elaine serve       # serve the dashboard and stats data over HTTP
+elaine push        # send the scan results to the configured remote server
 elaine bootstrap   # sync + scan + serve in one go
 elaine init        # create a stub elaine.yaml manifest in the current folder
 elaine clean-stats        # remove per-repository scan data and the aggregated stats file

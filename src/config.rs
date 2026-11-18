@@ -6,6 +6,15 @@ pub struct GoogleAuthConfig {
     pub hosted_domain: Option<String>,
 }
 
+/// Where `elaine push` sends the scan results.
+#[derive(Deserialize, Clone)]
+pub struct RemoteConfig {
+    /// Base URL of the `elaine serve` instance, e.g. `https://elaine.example.com`.
+    pub url: String,
+    /// Must match the server's `push_token`.
+    pub token: String,
+}
+
 #[derive(Deserialize, Clone)]
 pub struct Config {
     pub github_token: Option<String>,
@@ -15,6 +24,10 @@ pub struct Config {
     #[serde(default = "default_data_dir")]
     pub data_dir: std::path::PathBuf,
     pub google_auth: Option<GoogleAuthConfig>,
+    /// Token `serve` requires to accept pushed scan results; pushing is refused when absent.
+    pub push_token: Option<String>,
+    /// When set, `scan` pushes its results to this server, and `push` becomes available.
+    pub remote: Option<RemoteConfig>,
 }
 
 fn default_data_dir() -> std::path::PathBuf {

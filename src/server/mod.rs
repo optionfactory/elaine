@@ -47,6 +47,7 @@ pub struct AppState {
     pub http_client: reqwest::Client,
     pub jwks: Option<Arc<auth::JwksCache>>,
     pub cache: Arc<RwLock<CacheData>>,
+    pub stats: Arc<crate::stats::StatsStore>,
 }
 
 #[derive(RustEmbed)]

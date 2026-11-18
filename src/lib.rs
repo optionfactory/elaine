@@ -2,6 +2,7 @@ pub mod app;
 pub mod cli;
 pub mod config;
 pub mod github;
+pub mod push;
 pub mod repo_cache;
 pub mod sandbox;
 pub mod scanners;

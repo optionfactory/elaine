@@ -1,11 +1,18 @@
 use crate::schema::{ExposureType, LifecycleType, ProjectType, ServiceTier};
-use axum::{Json, Router, extract::State, http::StatusCode, response::IntoResponse, routing::get};
+use axum::{
+    Json, Router,
+    extract::{DefaultBodyLimit, State},
+    http::StatusCode,
+    response::IntoResponse,
+    routing::{get, put},
+};
 use axum_extra::extract::Query;
 use serde::Deserialize;
 use std::sync::Arc;
 
 use super::auth::ValidatedUser;
 use super::{AppState, FrontendAssets};
+use crate::stats::StatsStore;
 
 #[derive(Deserialize)]
 pub struct ApiQuery {
@@ -142,17 +149,10 @@ pub struct LogQuery {
 /// Serves saved scanner failure logs from <data_dir>/stats/logs/<repo>/<scanner>.log.
 /// Repo/scanner names are validated (no separators) to prevent path traversal.
 pub async fn api_logs_handler(State(state): State<Arc<AppState>>, Query(query): Query<LogQuery>, _auth: ValidatedUser) -> impl IntoResponse {
-    let is_safe = |s: &str| !s.is_empty() && !s.contains('/') && !s.contains('\\') && !s.contains("..");
-    if !is_safe(&query.repo) || !is_safe(&query.scanner) {
+    if !StatsStore::is_safe_log_name(&query.repo) || !StatsStore::is_safe_log_name(&query.scanner) {
         return (StatusCode::BAD_REQUEST, "Invalid repo or scanner").into_response();
     }
-    let path = state
-        .config
-        .data_dir
-        .join("stats")
-        .join("logs")
-        .join(&query.repo)
-        .join(format!("{}.log", query.scanner));
+    let path = state.stats.repo_logs_dir(&query.repo).join(format!("{}.log", query.scanner));
     match tokio::fs::read_to_string(&path).await {
         Ok(content) => ([(axum::http::header::CONTENT_TYPE, "text/plain; charset=utf-8")], content).into_response(),
         Err(_) => (StatusCode::NOT_FOUND, "Log not found").into_response(),
@@ -168,6 +168,10 @@ pub fn create_router(app_state: Arc<AppState>, dev: bool) -> Router {
         .route("/api/schema", get(api_schema_handler))
         .route("/api/projects", get(api_projects_handler))
         .route("/api/logs", get(api_logs_handler))
+        .route(
+            "/api/snapshot",
+            put(crate::push::receive_snapshot_handler).layer(DefaultBodyLimit::max(64 * 1024 * 1024)),
+        )
         .with_state(app_state);
 
     if dev {

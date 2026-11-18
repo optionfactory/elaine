@@ -1,12 +1,24 @@
 use crate::scanners::{CheckStatus, RepoStats};
 use anyhow::{Context, Result};
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::{Mutex, PoisonError};
+
+/// Everything `elaine serve` reads: sent by `elaine push` from the machine that scans.
+#[derive(Serialize, Deserialize)]
+pub struct Snapshot {
+    pub projects: Vec<RepoStats>,
+    /// Scanner failure logs by repository name, then by scanner name.
+    pub logs: BTreeMap<String, BTreeMap<String, String>>,
+}
 
 pub struct StatsStore {
     pub base_dir: PathBuf,
     pub stats_dir: PathBuf,
     pub logs_dir: PathBuf,
+    snapshot_replacement: Mutex<()>,
 }
 
 impl StatsStore {
@@ -16,7 +28,17 @@ impl StatsStore {
         fs::create_dir_all(&stats_dir)?;
         let logs_dir = base_dir.join("stats").join("logs");
         fs::create_dir_all(&logs_dir)?;
-        Ok(Self { base_dir, stats_dir, logs_dir })
+        Ok(Self {
+            base_dir,
+            stats_dir,
+            logs_dir,
+            snapshot_replacement: Mutex::new(()),
+        })
+    }
+
+    /// Whether `name` can be used as a single path component under the logs directory.
+    pub fn is_safe_log_name(name: &str) -> bool {
+        !name.is_empty() && !name.contains('/') && !name.contains('\\') && !name.contains("..")
     }
 
     pub fn project_file_path(&self, repo_name: &str) -> PathBuf {
@@ -113,11 +135,68 @@ impl StatsStore {
         }
 
         stats.sort_by(|a, b| a.name.cmp(&b.name));
-        let aggregate_path = self.aggregate_file_path();
-        let json_data = serde_json::to_string_pretty(&stats)?;
-        fs::write(&aggregate_path, &json_data).with_context(|| format!("Failed to update aggregate scan data at {:?}", aggregate_path))?;
+        self.write_aggregate(&stats)
+    }
 
+    /// Writes through a renamed temporary file, so `serve` never reloads a half-written file.
+    fn write_aggregate(&self, projects: &[RepoStats]) -> Result<PathBuf> {
+        let aggregate_path = self.aggregate_file_path();
+        let mut file = tempfile::Builder::new()
+            .permissions(std::os::unix::fs::PermissionsExt::from_mode(0o644))
+            .tempfile_in(&self.base_dir)?;
+        serde_json::to_writer_pretty(&mut file, projects)?;
+        file.persist(&aggregate_path)
+            .with_context(|| format!("Failed to update aggregate scan data at {:?}", aggregate_path))?;
         Ok(aggregate_path)
+    }
+
+    pub fn load_snapshot(&self) -> Result<Snapshot> {
+        let aggregate_path = self.aggregate_file_path();
+        let data = fs::read_to_string(&aggregate_path).with_context(|| format!("Failed to read {:?}. Run 'elaine scan' first.", aggregate_path))?;
+        let projects = serde_json::from_str(&data).with_context(|| format!("Failed to parse {:?}", aggregate_path))?;
+        let mut logs = BTreeMap::new();
+        for repo_dir in fs::read_dir(&self.logs_dir)?.filter_map(|e| e.ok()).filter(|e| e.path().is_dir()) {
+            let mut repo_logs = BTreeMap::new();
+            for log in fs::read_dir(repo_dir.path())?.filter_map(|e| e.ok()) {
+                let path = log.path();
+                let Some(scanner) = path.file_name().and_then(|n| n.to_str()).and_then(|n| n.strip_suffix(".log")) else {
+                    continue;
+                };
+                repo_logs.insert(scanner.to_string(), String::from_utf8_lossy(&fs::read(&path)?).into_owned());
+            }
+            logs.insert(repo_dir.file_name().to_string_lossy().into_owned(), repo_logs);
+        }
+        Ok(Snapshot { projects, logs })
+    }
+
+    /// Replaces the aggregated stats and every scanner log with the content of `snapshot`.
+    pub fn replace_with_snapshot(&self, snapshot: &Snapshot) -> Result<()> {
+        let mut names = snapshot.logs.iter().flat_map(|(repo, scanners)| std::iter::once(repo).chain(scanners.keys()));
+        if let Some(unsafe_name) = names.find(|name| !Self::is_safe_log_name(name)) {
+            anyhow::bail!("Invalid repository or scanner name in logs: {:?}", unsafe_name);
+        }
+        let _replacing = self.snapshot_replacement.lock().unwrap_or_else(PoisonError::into_inner);
+        let incoming = tempfile::Builder::new().prefix("logs.incoming").tempdir_in(&self.stats_dir)?;
+        for (repo, scanners) in &snapshot.logs {
+            let repo_dir = incoming.path().join(repo);
+            fs::create_dir_all(&repo_dir)?;
+            for (scanner, content) in scanners {
+                fs::write(repo_dir.join(format!("{}.log", scanner)), content)?;
+            }
+        }
+        let previous = self.stats_dir.join("logs.previous");
+        if previous.exists() {
+            fs::remove_dir_all(&previous)?;
+        }
+        if self.logs_dir.exists() {
+            fs::rename(&self.logs_dir, &previous)?;
+        }
+        fs::rename(incoming.keep(), &self.logs_dir)?;
+        if previous.exists() {
+            fs::remove_dir_all(&previous)?;
+        }
+        self.write_aggregate(&snapshot.projects)?;
+        Ok(())
     }
 
     pub fn clean_all(&self) -> anyhow::Result<()> {
@@ -219,6 +298,41 @@ mod tests {
     fn remove_missing_scan_is_noop() {
         let (_dir, store) = fresh_store();
         store.remove_project_scan("ghost").unwrap();
+    }
+
+    #[test]
+    fn snapshot_replaces_stats_and_drops_stale_logs() {
+        let (_dir, store) = fresh_store();
+        fs::create_dir_all(store.repo_logs_dir("gone")).unwrap();
+        fs::write(store.repo_logs_dir("gone").join("npm.log"), "old").unwrap();
+        let repo = GithubRepository {
+            name: "acme".to_string(),
+            ..Default::default()
+        };
+        let snapshot = Snapshot {
+            projects: vec![RepoStats::new_from_github(&repo)],
+            logs: BTreeMap::from([("acme".into(), BTreeMap::from([("go".into(), "go: not found".into())]))]),
+        };
+
+        store.replace_with_snapshot(&snapshot).unwrap();
+
+        let stored = store.load_snapshot().unwrap();
+        assert_eq!(stored.projects.len(), 1);
+        assert_eq!(stored.logs.keys().collect::<Vec<_>>(), vec!["acme"]);
+        assert_eq!(stored.logs["acme"]["go"], "go: not found");
+    }
+
+    #[test]
+    fn snapshot_with_log_names_outside_the_logs_dir_is_refused() {
+        let (dir, store) = fresh_store();
+        let snapshot = Snapshot {
+            projects: vec![],
+            logs: BTreeMap::from([("..".into(), BTreeMap::from([("escape".into(), "x".into())]))]),
+        };
+
+        assert!(store.replace_with_snapshot(&snapshot).is_err());
+        assert!(!dir.path().join("stats").join("escape.log").exists());
+        assert!(!store.aggregate_file_path().exists());
     }
 
     #[test]
