@@ -87,12 +87,12 @@ const authenticate = async () => {
     const config = await response.json();
     if (config.email) {
         const signOut = document.createElement('a');
+        signOut.className = 'sign-out';
         signOut.href = '/logout';
-        signOut.textContent = 'sign out';
-        const account = document.createElement('span');
-        account.className = 'account';
-        account.append(config.email, ' · ', signOut);
-        document.querySelector('body > header').append(account);
+        signOut.title = `Sign out ${config.email}`;
+        signOut.setAttribute('aria-label', 'Sign out');
+        signOut.innerHTML = '<svg aria-hidden="true"><use href="icons.svg#icon-sign-out"></use></svg>';
+        document.querySelector('body > header > nav').after(signOut);
     }
     const http = HttpClient.builder().withRedirectOnUnauthorized('/login').build();
     return { config, http };
