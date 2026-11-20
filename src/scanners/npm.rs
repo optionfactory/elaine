@@ -123,7 +123,7 @@ impl Scanner for NpmScanner {
                     match serde_json::from_str::<HashMap<String, NpmOutdatedDep>>(&payload) {
                         Ok(parsed) => {
                             let updates = outdated_dependencies(&ctx.repo.name, parsed, packages.as_ref());
-                            stats.add_outdated_dependencies(updates);
+                            stats.add_outdated_dependencies(ScannerKind::Npm, updates);
                             true
                         }
                         Err(e) => {
@@ -161,6 +161,7 @@ fn outdated_dependencies(project: &str, outdated: HashMap<String, NpmOutdatedDep
                 artifact: name,
                 current,
                 latest,
+                ..Default::default()
             })
         })
         .collect()

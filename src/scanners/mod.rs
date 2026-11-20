@@ -56,13 +56,16 @@ pub struct Dependency {
     pub trail: Vec<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct OutdatedDependency {
     pub project: String,
     pub kind: String,
     pub artifact: String,
     pub current: String,
     pub latest: String,
+    /// Missing in the results of earlier releases and in the JSON anarchitect writes for Maven.
+    #[serde(default)]
+    pub scanner: Option<ScannerKind>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -167,17 +170,10 @@ impl RepoStats {
         }
     }
 
-    pub fn add_outdated_dependency(&mut self, dep: OutdatedDependency) {
-        self.checked_for_outdated_dependencies();
-        if let Some(ref mut deps) = self.outdated_dependencies {
-            deps.push(dep);
-        }
-    }
-
-    pub fn add_outdated_dependencies(&mut self, mut deps: Vec<OutdatedDependency>) {
+    pub fn add_outdated_dependencies(&mut self, scanner: ScannerKind, deps: Vec<OutdatedDependency>) {
         self.checked_for_outdated_dependencies();
         if let Some(ref mut d) = self.outdated_dependencies {
-            d.append(&mut deps);
+            d.extend(deps.into_iter().map(|dep| OutdatedDependency { scanner: Some(scanner), ..dep }));
         }
     }
 
@@ -405,6 +401,17 @@ mod tests {
         let mut stats = RepoStats::new_from_github(&GithubRepository::default());
         stats.add_vulnerabilities(ScannerKind::Maven, anarchitect);
         let scanners: Vec<_> = stats.vulnerabilities.unwrap().into_iter().map(|vuln| vuln.scanner).collect();
+        assert_eq!(scanners, [Some(ScannerKind::Maven)]);
+    }
+
+    #[test]
+    fn an_outdated_dependency_carries_the_scanner_that_reported_it() {
+        let anarchitect: Vec<OutdatedDependency> =
+            serde_json::from_str(r#"[{"project": "core", "kind": "dependency", "artifact": "jackson-databind", "current": "2.9.0", "latest": "2.21.0"}]"#)
+                .unwrap();
+        let mut stats = RepoStats::new_from_github(&GithubRepository::default());
+        stats.add_outdated_dependencies(ScannerKind::Maven, anarchitect);
+        let scanners: Vec<_> = stats.outdated_dependencies.unwrap().into_iter().map(|dep| dep.scanner).collect();
         assert_eq!(scanners, [Some(ScannerKind::Maven)]);
     }
 

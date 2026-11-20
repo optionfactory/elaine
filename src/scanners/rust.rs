@@ -135,6 +135,7 @@ impl Scanner for RustScanner {
                     let outputs: Vec<OutdatedOutput> = payload.lines().filter_map(|line| serde_json::from_str(line).ok()).collect();
                     for output in &outputs {
                         stats.add_outdated_dependencies(
+                            ScannerKind::Rust,
                             output
                                 .dependencies
                                 .iter()
@@ -144,6 +145,7 @@ impl Scanner for RustScanner {
                                     artifact: dep.name.clone(),
                                     current: dep.project.clone(),
                                     latest: dep.latest.clone(),
+                                    ..Default::default()
                                 })
                                 .collect(),
                         );

@@ -296,6 +296,7 @@
                         <thead>
                             <tr>
                                 <th>Project</th>
+                                <th>Scanner</th>
                                 <th>Artifact</th>
                                 <th>Current</th>
                                 <th>Latest</th>
@@ -304,6 +305,7 @@
                         <tbody>
                             <tr data-tpl-each="outdated_dependencies" data-tpl-var="dep">
                                 <td><strong>{{ dep.project }}</strong></td>
+                                <td><tag data-tpl-if="dep.scanner">{{ dep.scanner }}</tag></td>
                                 <td>{{dep.artifact}}</td>
                                 <td>
                                     <tag class="current">{{dep.current}}</tag>

@@ -418,6 +418,7 @@ mod tests {
             artifact: artifact.into(),
             current: current.into(),
             latest: latest.into(),
+            ..Default::default()
         }
     }
 

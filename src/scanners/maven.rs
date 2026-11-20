@@ -92,7 +92,7 @@ impl Scanner for MavenScanner {
                     let updates_path = run_dir.join("target").join("anarchitect-outdated-dependencies.json");
                     match fs::read_to_string(&updates_path) {
                         Ok(payload) => match serde_json::from_str::<Vec<OutdatedDependency>>(&payload) {
-                            Ok(parsed_updates) => stats.add_outdated_dependencies(parsed_updates),
+                            Ok(parsed_updates) => stats.add_outdated_dependencies(ScannerKind::Maven, parsed_updates),
                             Err(e) => {
                                 ctx.report_failure("maven", format!("Failed to parse {}: {}", updates_path.display(), e));
                                 outdated_ok = false;

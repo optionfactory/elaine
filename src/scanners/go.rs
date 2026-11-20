@@ -78,10 +78,11 @@ impl Scanner for GoScanner {
                         artifact: m.path.clone(),
                         current: m.version.clone().unwrap_or_else(|| "unknown".to_string()),
                         latest: update.version.clone(),
+                        ..Default::default()
                     })
                 })
                 .collect();
-            stats.add_outdated_dependencies(updates);
+            stats.add_outdated_dependencies(ScannerKind::Go, updates);
 
             let mut osv_deps = Vec::new();
             for m in &parsed {
