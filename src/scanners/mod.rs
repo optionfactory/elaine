@@ -102,6 +102,7 @@ pub enum ScannerKind {
     Maven,
     Pinch,
     Elaine,
+    Ansible,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]

@@ -101,7 +101,7 @@ mailed. The first push that scanned images sends nothing for them.
 
 ### Container images
 
-After the repositories, `scan` looks at every image the live repositories run (from their pinch configurations), once
+After the repositories, `scan` looks at every image the live repositories run (from their pinch configurations and Ansible playbooks), once
 per image: it reads the SBOM the registry publishes for it with `docker buildx imagetools inspect` (the image is not
 pulled; for a multi-platform image, the `linux/amd64` one) and runs `grype --only-fixed` on it. Only the
 vulnerabilities that already have a fix are kept: the ones a newer image removes. An image whose registry publishes no
@@ -193,3 +193,13 @@ Adding the comment above as the first line of the file enables autocompletion an
 ### Process Supervision (`pinch.yaml`)
 
 Elaine also detects [`pinch.yaml`](https://github.com/optionfactory/pinch) manifests (the process supervisor's workflow manifest) and deduces the Docker container images declared by `type: "docker"` processes, reporting them as container dependencies.
+
+### Ansible playbooks
+
+In a repository with an `ansible.cfg`, Elaine reads the YAML files under its directory and takes the string value of
+every `image` key (`community.docker.docker_container`, or a module of a collection that nests it) as a container image.
+The `{{ a.b }}` references are resolved against the `vars` of the play the image is in, over the variables of each
+inventory (the `group_vars` and `host_vars` in the same directory): one image per distinct result, so two inventories
+with different tags give two images. Only plain dotted lookups are resolved; an image with a filter or a loop variable
+(`{{ item.image }}`) is left out, and the repository shows a failed `ansible`/`containers` check that lists it.
+Symbolic links are not followed.

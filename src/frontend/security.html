@@ -121,9 +121,10 @@
     <section id="images">
         <h2>Container images</h2>
         <p class="section-intro">
-            The images live repositories run, from their pinch configurations, the most serious first. Each image is
-            scanned once from the SBOM its registry publishes (it is not pulled), and only the vulnerabilities that
-            already have a fix are listed: a newer image, or moving the repositories to its newer tag, removes them.
+            The images live repositories run, from their pinch configurations and Ansible playbooks, the most serious
+            first. Each image is scanned once from the SBOM its registry publishes (it is not pulled), and only the
+            vulnerabilities that already have a fix are listed: a newer image, or moving the repositories to its newer
+            tag, removes them.
             They are kept apart from the vulnerabilities above, which are the dependencies' own.
         </p>
 

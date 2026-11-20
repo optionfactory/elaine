@@ -105,7 +105,7 @@ impl Inventory {
         let mut toolchain_agg: BTreeMap<ScannerKind, usize> = BTreeMap::new();
         for p in live {
             for kind in p.health.keys() {
-                if matches!(kind, ScannerKind::Elaine | ScannerKind::Pinch) {
+                if matches!(kind, ScannerKind::Elaine | ScannerKind::Pinch | ScannerKind::Ansible) {
                     continue;
                 }
                 *toolchain_agg.entry(*kind).or_insert(0) += 1;
