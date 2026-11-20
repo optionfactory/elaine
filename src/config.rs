@@ -21,6 +21,22 @@ pub struct RemoteConfig {
     pub token: String,
 }
 
+/// Where `serve` mails the vulnerabilities a push brings that the previous one did not have.
+#[derive(Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
+pub struct AlertsConfig {
+    /// A relay that takes mail without credentials. STARTTLS is required, except on a loopback address.
+    pub smtp_host: String,
+    #[serde(default = "default_smtp_port")]
+    pub smtp_port: u16,
+    pub from: lettre::message::Mailbox,
+    pub to: lettre::message::Mailbox,
+}
+
+fn default_smtp_port() -> u16 {
+    587
+}
+
 /// Unknown fields are refused, so that a misspelled or renamed `login` cannot serve the dashboard without it.
 #[derive(Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
@@ -37,6 +53,8 @@ pub struct Config {
     pub push_token: Option<String>,
     /// When set, `scan` pushes its results to this server, and `push` becomes available.
     pub remote: Option<RemoteConfig>,
+    /// Without it, no mail.
+    pub alerts: Option<AlertsConfig>,
 }
 
 fn default_data_dir() -> std::path::PathBuf {

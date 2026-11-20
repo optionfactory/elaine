@@ -70,6 +70,30 @@ On the scanning machine, point `remote` at the server:
 
 With `remote` configured, `scan` pushes its results at the end, even when some repositories failed; `elaine push` sends the last results again without rescanning. Each push replaces everything the server shows. The token travels in an HTTP header, so put the server behind a reverse proxy that terminates TLS. Without `push_token`, the server refuses every push.
 
+### Mail on new vulnerabilities
+
+With `alerts`, the server mails the vulnerabilities each push brings that the previous one did not have:
+
+```json
+{
+  "alerts": {
+    "smtp_host": "smtp-relay.example.com",
+    "smtp_port": 587,
+    "from": "elaine-noreply@your-organization.com",
+    "to": "admins@your-organization.com"
+  }
+}
+```
+
+The relay must take mail without credentials (by the address of the server, for example). STARTTLS is required, except
+on a loopback address; `smtp_port` defaults to 587, and the domain of `from` is the name elaine gives in `EHLO`.
+
+A vulnerability is new once per repository, artifact and advisory: the same advisory at another version of the
+artifact is not. The first push, or the first after the data was lost, sends nothing. A repository counts only when both
+pushes scanned it for vulnerabilities, so a scan that failed once does not make all its vulnerabilities new at the
+next; a repository that shows up for the first time counts whole. Archived repositories are left out. The push
+answers without waiting for the mail; a mail that fails is only logged.
+
 ## Usage
 
 ```bash

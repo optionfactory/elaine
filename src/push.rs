@@ -1,4 +1,6 @@
+use crate::alert;
 use crate::config::RemoteConfig;
+use crate::scanners::RepoStats;
 use crate::server::AppState;
 use crate::stats::Snapshot;
 use anyhow::Context;
@@ -51,11 +53,25 @@ pub async fn receive_snapshot_handler(State(state): State<Arc<AppState>>, header
         Ok(snapshot) => snapshot,
         Err(e) => return (StatusCode::BAD_REQUEST, format!("Invalid snapshot: {}", e)).into_response(),
     };
-    let projects = snapshot.projects.len();
     let stats = Arc::clone(&state.stats);
-    match tokio::task::spawn_blocking(move || stats.replace_with_snapshot(&snapshot)).await {
-        Ok(Ok(())) => {
-            eprintln!("[Push] Received a snapshot of {} repositories.", projects);
+    let stored = tokio::task::spawn_blocking(move || {
+        let previous = std::fs::read_to_string(stats.aggregate_file_path())
+            .ok()
+            .and_then(|data| serde_json::from_str::<Vec<RepoStats>>(&data).ok());
+        stats.replace_with_snapshot(&snapshot).map(|()| (previous, snapshot.projects))
+    });
+    match stored.await {
+        Ok(Ok((previous, projects))) => {
+            eprintln!("[Push] Received a snapshot of {} repositories.", projects.len());
+            if let Some(alerts) = state.config.alerts.clone() {
+                let dashboard = state.config.login.as_ref().map(|login| login.public_url.clone());
+                // the push answers at once; a mail that fails is only logged
+                tokio::spawn(async move {
+                    if let Err(e) = alert::notify(&alerts, previous.as_deref(), &projects, dashboard.as_deref()).await {
+                        eprintln!("[Alert] Failed to mail the new vulnerabilities: {:#}", e);
+                    }
+                });
+            }
             StatusCode::NO_CONTENT.into_response()
         }
         Ok(Err(e)) => (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to store snapshot: {:#}", e)).into_response(),
