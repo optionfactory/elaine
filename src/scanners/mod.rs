@@ -8,6 +8,7 @@ mod npm;
 mod osv;
 pub mod pathcollector;
 mod pinch;
+pub mod recheck;
 mod rust;
 
 use crate::github::GithubRepository;
@@ -42,6 +43,19 @@ pub struct Vulnerability {
     pub scanner: Option<ScannerKind>,
 }
 
+/// A dependency a scanner checked against OSV. Kept on the scanning machine only, so that a repository that did not
+/// change can be checked again for new advisories without running its build tool.
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct Dependency {
+    /// OSV's name of the ecosystem: `Maven`, `npm`, `Go`, `crates.io`.
+    pub ecosystem: String,
+    pub project: String,
+    pub artifact: String,
+    pub version: String,
+    #[serde(default)]
+    pub trail: Vec<String>,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct OutdatedDependency {
     pub project: String,
@@ -74,6 +88,9 @@ pub struct RepoStats {
     //
     pub vulnerabilities: Option<Vec<Vulnerability>>,
     pub outdated_dependencies: Option<Vec<OutdatedDependency>>,
+    /// What each scanner checked against OSV, when the check succeeded; saved apart, never pushed.
+    #[serde(skip)]
+    pub checked_dependencies: BTreeMap<ScannerKind, Vec<Dependency>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -116,6 +133,7 @@ impl RepoStats {
             legopfa_confs: Vec::new(),
             vulnerabilities: None,
             outdated_dependencies: None,
+            checked_dependencies: BTreeMap::new(),
         }
     }
     pub fn record_check(&mut self, kind: ScannerKind, check: &str, status: CheckStatus) {
@@ -126,6 +144,10 @@ impl RepoStats {
         if self.vulnerabilities.is_none() {
             self.vulnerabilities = Some(Vec::new());
         }
+    }
+
+    pub fn add_checked_dependencies(&mut self, scanner: ScannerKind, deps: impl IntoIterator<Item = Dependency>) {
+        self.checked_dependencies.entry(scanner).or_default().extend(deps);
     }
 
     pub fn add_vulnerabilities(&mut self, scanner: ScannerKind, vulns: Vec<Vulnerability>) {

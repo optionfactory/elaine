@@ -138,6 +138,8 @@ The three main phases in detail:
 
    When a check fails (tool missing, unparseable lockfile, OSV unreachable), the failure is recorded per repo and scanner, and the command's full output is kept in `data/stats/logs/<repo>/<scanner>.log`. The dashboard's Security page lists all failures and lets you inspect the logs.
 
+   A repository that did not change since its last scan, and whose checks all passed, is not unpacked again. Its dependencies are still checked against OSV at every scan, in one batch for all such repositories, from the list each scanner recorded at the last full scan (`data/stats/dependencies/<repo>.json`, kept on the scanning machine and never pushed): new advisories hit dependencies that did not change. For Maven the list comes from `anarchitect-dependencies.json`, written by anarchitect since 1.17; with an earlier anarchitect, the Maven vulnerabilities of an unchanged repository stay as the last full scan found them. If OSV cannot be reached, the repositories keep the vulnerabilities they had.
+
 3. **Serve:** Launch the embedded Axum web server to view the aggregated statistics in a browser dashboard. Pass `--dev` to serve frontend assets from `./src/frontend/` instead of the embedded binary.
 
 ## Repository Manifests

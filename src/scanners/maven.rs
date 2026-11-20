@@ -1,5 +1,5 @@
 use crate::scanners::pathcollector::Pattern;
-use crate::scanners::{CheckStatus, OutdatedDependency, RepoStats, ScanContext, Scanner, ScannerKind, Vulnerability};
+use crate::scanners::{CheckStatus, Dependency, OutdatedDependency, RepoStats, ScanContext, Scanner, ScannerKind, Vulnerability};
 use std::fs;
 use std::path::Path;
 
@@ -25,6 +25,8 @@ impl Scanner for MavenScanner {
 
         let mut vulns_ok = true;
         let mut outdated_ok = true;
+        // all the roots or none: a partial list would drop the vulnerabilities of the missing roots at the next recheck
+        let mut audited: Option<Vec<Dependency>> = Some(Vec::new());
 
         for dir in pom_dirs {
             let is_submodule = selected_dirs.iter().any(|selected| dir.starts_with(selected));
@@ -71,6 +73,22 @@ impl Scanner for MavenScanner {
                         }
                     }
 
+                    // written by anarchitect since 1.17
+                    let audited_path = run_dir.join("target").join("anarchitect-dependencies.json");
+                    let read = fs::read_to_string(&audited_path)
+                        .ok()
+                        .and_then(|payload| serde_json::from_str::<Vec<AuditedDependency>>(&payload).ok());
+                    match (audited.as_mut(), read) {
+                        (Some(all), Some(read)) => all.extend(read.into_iter().map(|d| Dependency {
+                            ecosystem: "Maven".to_string(),
+                            project: d.project,
+                            artifact: d.artifact,
+                            version: d.version,
+                            trail: d.trail,
+                        })),
+                        _ => audited = None,
+                    }
+
                     let updates_path = run_dir.join("target").join("anarchitect-outdated-dependencies.json");
                     match fs::read_to_string(&updates_path) {
                         Ok(payload) => match serde_json::from_str::<Vec<OutdatedDependency>>(&payload) {
@@ -109,8 +127,21 @@ impl Scanner for MavenScanner {
             }
         }
 
+        if vulns_ok && let Some(audited) = audited {
+            stats.add_checked_dependencies(ScannerKind::Maven, audited);
+        }
         stats.record_check(ScannerKind::Maven, "vulns", if vulns_ok { CheckStatus::Ok } else { CheckStatus::Failed });
         stats.record_check(ScannerKind::Maven, "outdated", if outdated_ok { CheckStatus::Ok } else { CheckStatus::Failed });
         Ok(())
     }
+}
+
+/// An entry of `anarchitect-dependencies.json`.
+#[derive(serde::Deserialize)]
+struct AuditedDependency {
+    project: String,
+    artifact: String,
+    version: String,
+    #[serde(default)]
+    trail: Vec<String>,
 }

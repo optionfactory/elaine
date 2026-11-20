@@ -1,6 +1,6 @@
 use crate::scanners::osv::fetch_vulnerabilities;
 use crate::scanners::pathcollector::Pattern;
-use crate::scanners::{CheckStatus, OutdatedDependency, RepoStats, ScanContext, Scanner, ScannerKind, Vulnerability};
+use crate::scanners::{CheckStatus, Dependency, OutdatedDependency, RepoStats, ScanContext, Scanner, ScannerKind, Vulnerability};
 use serde::Deserialize;
 use std::fs;
 
@@ -91,6 +91,16 @@ impl Scanner for RustScanner {
                     .collect();
                 match fetch_vulnerabilities(ctx.client, &deps) {
                     Ok(vulns) => {
+                        stats.add_checked_dependencies(
+                            ScannerKind::Rust,
+                            deps.iter().map(|(ecosystem, name, version)| Dependency {
+                                ecosystem: ecosystem.to_string(),
+                                project: ctx.repo.name.clone(),
+                                artifact: name.to_string(),
+                                version: version.to_string(),
+                                trail: vec![],
+                            }),
+                        );
                         stats.add_vulnerabilities(
                             ScannerKind::Rust,
                             vulns

@@ -1,5 +1,5 @@
 use crate::images::ImageScan;
-use crate::scanners::{CheckStatus, RepoStats};
+use crate::scanners::{CheckStatus, Dependency, RepoStats, ScannerKind};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -22,6 +22,8 @@ pub struct StatsStore {
     pub base_dir: PathBuf,
     pub stats_dir: PathBuf,
     pub logs_dir: PathBuf,
+    /// What each repository's scanners checked against OSV: only on the scanning machine, never pushed.
+    pub dependencies_dir: PathBuf,
     snapshot_replacement: Mutex<()>,
 }
 
@@ -32,10 +34,13 @@ impl StatsStore {
         fs::create_dir_all(&stats_dir)?;
         let logs_dir = base_dir.join("stats").join("logs");
         fs::create_dir_all(&logs_dir)?;
+        let dependencies_dir = base_dir.join("stats").join("dependencies");
+        fs::create_dir_all(&dependencies_dir)?;
         Ok(Self {
             base_dir,
             stats_dir,
             logs_dir,
+            dependencies_dir,
             snapshot_replacement: Mutex::new(()),
         })
     }
@@ -104,6 +109,32 @@ impl StatsStore {
         Ok(file_path)
     }
 
+    pub fn dependencies_file_path(&self, repo_name: &str) -> PathBuf {
+        self.dependencies_dir.join(format!("{}.json", repo_name))
+    }
+
+    /// Replaces what the last full scan of the repository checked; nothing kept when it checked nothing.
+    pub fn save_dependencies(&self, repo_name: &str, dependencies: &BTreeMap<ScannerKind, Vec<Dependency>>) -> Result<()> {
+        let path = self.dependencies_file_path(repo_name);
+        if dependencies.is_empty() {
+            return match fs::remove_file(&path) {
+                Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e).with_context(|| format!("Failed to remove {:?}", path)),
+                _ => Ok(()),
+            };
+        }
+        fs::write(&path, serde_json::to_string(dependencies)?).with_context(|| format!("Failed to write {:?}", path))
+    }
+
+    /// Empty when the last full scan checked nothing, or ran with a release that did not keep it.
+    pub fn load_dependencies(&self, repo_name: &str) -> Result<BTreeMap<ScannerKind, Vec<Dependency>>> {
+        let path = self.dependencies_file_path(repo_name);
+        match fs::read_to_string(&path) {
+            Ok(data) => serde_json::from_str(&data).with_context(|| format!("Failed to parse {:?}", path)),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(BTreeMap::new()),
+            Err(e) => Err(e).with_context(|| format!("Failed to read {:?}", path)),
+        }
+    }
+
     pub fn remove_project_scan(&self, repo_name: &str) -> Result<()> {
         let path = self.project_file_path(repo_name);
         if path.exists() {
@@ -113,7 +144,7 @@ impl StatsStore {
         if logs.is_dir() {
             fs::remove_dir_all(&logs).with_context(|| format!("Failed to remove scan logs at {:?}", logs))?;
         }
-        Ok(())
+        self.save_dependencies(repo_name, &BTreeMap::new())
     }
 
     pub fn clean_orphans(&self, current_repo_names: &std::collections::HashSet<&str>) -> Result<()> {
@@ -134,6 +165,7 @@ impl StatsStore {
             if !current_repo_names.contains(repo_name) {
                 eprintln!("  Removing orphaned scan file: {}", file_name);
                 let _ = fs::remove_file(&path);
+                let _ = fs::remove_file(self.dependencies_file_path(repo_name));
                 let logs = self.repo_logs_dir(repo_name);
                 if logs.is_dir() {
                     let _ = fs::remove_dir_all(&logs);

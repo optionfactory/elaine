@@ -273,6 +273,11 @@ impl Elaine {
         let repos = self.repositories.load_all_metadata()?;
         let current_repo_names: HashSet<&str> = repos.keys().map(|s| s.as_str()).collect();
         self.stats.clean_orphans(&current_repo_names)?;
+        let unchanged: Vec<String> = repos
+            .values()
+            .filter(|r| self.stats.is_scan_fresh(&r.name, &r.updated_at, &r.pushed_at))
+            .map(|r| r.name.clone())
+            .collect();
         let total = repos.len() as u64;
 
         let sem = Arc::new(Semaphore::new(worker_count.max(1)));
@@ -333,6 +338,9 @@ impl Elaine {
                         if let Err(e) = data_store.save_project_scan(&stat) {
                             pb.println(format!("[{}] 🔥 Failed to save scan: {}", repo_name, e));
                         }
+                        if let Err(e) = data_store.save_dependencies(&repo_name, &stat.checked_dependencies) {
+                            pb.println(format!("[{}] 🔥 Failed to save the checked dependencies: {}", repo_name, e));
+                        }
                         Ok(())
                     }
                     Err(e) => {
@@ -353,6 +361,11 @@ impl Elaine {
         if failures > 0 {
             pb.println(format!("🔥 {failures} repo(s) failed during scan (see errors above)."));
         }
+        if let Err(e) = self.recheck_unchanged(&unchanged).await {
+            pb.println(format!(
+                "🔥 Recheck of the unchanged repositories failed, they keep their vulnerabilities: {e:#}"
+            ));
+        }
         let latest_path = self.stats.aggregate_scans()?;
         pb.println(format!("Successfully created aggregated data at {:?}", latest_path));
         pb.finish_and_clear();
@@ -364,6 +377,33 @@ impl Elaine {
             anyhow::bail!("scan completed with failures");
         }
         Ok(())
+    }
+
+    /// The repositories skipped because they did not change are checked again against OSV with the dependencies their
+    /// last full scan recorded: new advisories hit dependencies that did not change.
+    async fn recheck_unchanged(&self, names: &[String]) -> Result<()> {
+        let mut repos = Vec::new();
+        for name in names {
+            let recorded = self.stats.load_dependencies(name)?;
+            if recorded.is_empty() {
+                continue;
+            }
+            let data = fs::read_to_string(self.stats.project_file_path(name))?;
+            repos.push((serde_json::from_str::<crate::scanners::RepoStats>(&data)?, recorded));
+        }
+        if repos.is_empty() {
+            return Ok(());
+        }
+        eprintln!("Checking {} unchanged repositories again against OSV...", repos.len());
+        let stats = Arc::clone(&self.stats);
+        tokio::task::spawn_blocking(move || -> Result<()> {
+            crate::scanners::recheck::recheck(&reqwest::Client::new(), &mut repos)?;
+            for (stat, _) in &repos {
+                stats.save_project_scan(stat)?;
+            }
+            Ok(())
+        })
+        .await?
     }
 
     /// Every run, not only for the repositories that changed: new advisories hit images that did not.
