@@ -7,9 +7,11 @@ pub use governance::Governance;
 pub use inventory::Inventory;
 pub use security::Security;
 
+use crate::images::ImageScan;
 use crate::scanners::RepoStats;
 use crate::schema::{LifecycleType, ProjectType, ServiceTier};
 use serde::Serialize;
+use std::collections::BTreeMap;
 
 /// Aggregated views for the analytics pages (governance, security, inventory).
 ///
@@ -26,11 +28,11 @@ pub struct Aggregates {
 }
 
 impl Aggregates {
-    pub fn calculate(projects: &[RepoStats]) -> Self {
+    pub fn calculate(projects: &[RepoStats], images: &BTreeMap<String, ImageScan>) -> Self {
         let live: Vec<&RepoStats> = projects.iter().filter(|p| !p.archived).collect();
         Self {
             governance: Governance::calculate(&live),
-            security: Security::calculate(&live),
+            security: Security::calculate(&live, images),
             inventory: Inventory::calculate(&live),
         }
     }

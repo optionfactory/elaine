@@ -370,10 +370,19 @@
                     <tag data-tpl-if="containers?.length == 0">
                         No containers referenced in this project
                     </tag>
-                    <tag data-tpl-if="containers?.length > 0" data-tpl-each="containers" class="container">
-                        {{ self }}
-                    </tag>
                 </tag-list>
+                <image-list data-tpl-if="images?.length > 0">
+                    <image-row data-tpl-each="images" data-tpl-var="img">
+                        <tag class="container">{{ img.image }}</tag>
+                        <tag data-tpl-if="img.status == 'vulnerable'" data-tpl-class-append="`severity {img.highest}`">
+                            {{ img.fixable }} fixable, up to {{ img.highest }}
+                        </tag>
+                        <tag data-tpl-if="img.status == 'clean'" class="severity clean">no fixable vulnerabilities</tag>
+                        <tag data-tpl-if="img.status == 'no-sbom'" class="dashed">no SBOM</tag>
+                        <tag data-tpl-if="img.status == 'failed'" class="dashed">scan failed</tag>
+                        <tag data-tpl-if="img.status == 'unscanned'" class="dashed">not scanned</tag>
+                    </image-row>
+                </image-list>
             </section>
 
             <section>

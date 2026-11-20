@@ -54,41 +54,50 @@ impl Elaine {
 
         let initial_data = fs::read_to_string(&stats_file).unwrap_or_else(|_| "[]".to_string());
         let initial_projects: Vec<crate::scanners::RepoStats> = serde_json::from_str(&initial_data).unwrap_or_default();
+        let initial_images = self.stats.load_images().unwrap_or_default();
         let initial_stats = DashboardStats::calculate(&initial_projects);
-        let initial_aggregates = Aggregates::calculate(&initial_projects);
+        let initial_aggregates = Aggregates::calculate(&initial_projects, &initial_images);
 
         let projects_cache = Arc::new(RwLock::new(CacheData {
             projects: initial_projects,
+            images: initial_images,
             stats: initial_stats,
             aggregates: initial_aggregates,
         }));
 
         let bg_projects_cache = Arc::clone(&projects_cache);
+        let bg_stats = Arc::clone(&self.stats);
 
+        let images_file = self.stats.images_file_path();
         tokio::spawn(async move {
-            let mut last_mtime = tokio::fs::metadata(&stats_file)
-                .await
-                .and_then(|m| m.modified())
-                .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+            async fn modified(path: &std::path::Path) -> std::time::SystemTime {
+                tokio::fs::metadata(path)
+                    .await
+                    .and_then(|m| m.modified())
+                    .unwrap_or(std::time::SystemTime::UNIX_EPOCH)
+            }
+            // a push writes the images before the aggregate, a local scan after it: either change reloads both
+            let mut last_mtimes = (modified(&stats_file).await, modified(&images_file).await);
 
             let mut interval = tokio::time::interval(std::time::Duration::from_secs(2));
 
             loop {
                 interval.tick().await;
-                if let Ok(meta) = tokio::fs::metadata(&stats_file).await
-                    && let Ok(mtime) = meta.modified()
-                    && mtime != last_mtime
+                let mtimes = (modified(&stats_file).await, modified(&images_file).await);
+                if mtimes != last_mtimes
                     && let Ok(data) = tokio::fs::read_to_string(&stats_file).await
                     && let Ok(parsed) = serde_json::from_str::<Vec<crate::scanners::RepoStats>>(&data)
                 {
+                    let images = bg_stats.load_images().unwrap_or_default();
                     let new_stats = DashboardStats::calculate(&parsed);
-                    let new_aggregates = Aggregates::calculate(&parsed);
+                    let new_aggregates = Aggregates::calculate(&parsed, &images);
                     let mut w = bg_projects_cache.write().await;
                     w.projects = parsed;
+                    w.images = images;
                     w.stats = new_stats;
                     w.aggregates = new_aggregates;
-                    last_mtime = mtime;
-                    eprintln!("[Background] Detected stats.json change. Recalculated stats and aggregates, reloaded memory.");
+                    last_mtimes = mtimes;
+                    eprintln!("[Background] Detected a change of the scan data. Recalculated stats and aggregates, reloaded memory.");
                 }
             }
         });
@@ -347,12 +356,33 @@ impl Elaine {
         let latest_path = self.stats.aggregate_scans()?;
         pb.println(format!("Successfully created aggregated data at {:?}", latest_path));
         pb.finish_and_clear();
+        self.scan_images(&latest_path).await?;
         if self.config.remote.is_some() {
             self.push().await?;
         }
         if failures > 0 {
             anyhow::bail!("scan completed with failures");
         }
+        Ok(())
+    }
+
+    /// Every run, not only for the repositories that changed: new advisories hit images that did not.
+    async fn scan_images(&self, aggregate: &std::path::Path) -> Result<()> {
+        let projects: Vec<crate::scanners::RepoStats> = serde_json::from_str(&fs::read_to_string(aggregate)?)?;
+        let images: std::collections::BTreeSet<String> = projects
+            .iter()
+            .filter(|p| !p.archived)
+            .flat_map(|p| p.containers.iter().flatten().cloned())
+            .collect();
+        eprintln!("Scanning {} container images...", images.len());
+        let work_dir = self.stats.base_dir.clone();
+        let scans = tokio::task::spawn_blocking(move || crate::images::scan_images(&images, &work_dir)).await?;
+        for (image, scan) in &scans {
+            if let crate::images::ImageScan::Failed { reason } = scan {
+                eprintln!("[{}] 🔥 Image scan failed: {}", image, reason);
+            }
+        }
+        self.stats.save_images(&scans)?;
         Ok(())
     }
 

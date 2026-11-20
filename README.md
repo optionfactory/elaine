@@ -11,6 +11,7 @@ A CLI tool for aggregating and inspecting governance manifests and dependency vu
 * A GitHub personal access token with read permissions for the target organization. This can be provided via the `GITHUB_TOKEN` or `GH_TOKEN` environment variables, or by having an active `gh auth token` session.
 * An `elaine.conf.json` configuration file in the working directory.
 * The ecosystem tools the scanners invoke: `mvn`, `npm`, `go`, and `cargo` with [`cargo-outdated`](https://github.com/kbknapp/cargo-outdated) (only needed for repositories using that ecosystem).
+* For the container images: `docker` with `buildx`, and [`grype`](https://github.com/anchore/grype), which keeps its own vulnerability database (a few hundred MB, updated at every scan). Without them every image shows as failed, and the rest of the scan goes on.
 
 ## Installation
 
@@ -93,6 +94,24 @@ artifact is not. The first push, or the first after the data was lost, sends not
 pushes scanned it for vulnerabilities, so a scan that failed once does not make all its vulnerabilities new at the
 next; a repository that shows up for the first time counts whole. Archived repositories are left out. The push
 answers without waiting for the mail; a mail that fails is only logged.
+
+The container images follow the same rules, with the image compared without its tag (moving a repository to a newer tag
+does not announce again what the newer tag still has), and only their fixable high and critical vulnerabilities are
+mailed. The first push that scanned images sends nothing for them.
+
+### Container images
+
+After the repositories, `scan` looks at every image the live repositories run (from their pinch configurations), once
+per image: it reads the SBOM the registry publishes for it with `docker buildx imagetools inspect` (the image is not
+pulled; for a multi-platform image, the `linux/amd64` one) and runs `grype --only-fixed` on it. Only the
+vulnerabilities that already have a fix are kept: the ones a newer image removes. An image whose registry publishes no
+SBOM is shown as such and not scanned. This runs at every scan, also when no repository changed, since new advisories
+hit images that did not change. The results go to `images.json` next to `stats.json`, and travel in the push.
+
+The dashboard shows them apart from the vulnerabilities of the dependencies: on each repository, the images it runs
+with what their scan found; on the security page, a section with every image and its vulnerabilities, and in the
+ranking of the repositories a column with the fixable high and critical vulnerabilities of their images, which does not
+change the order.
 
 ## Usage
 

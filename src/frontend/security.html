@@ -36,6 +36,7 @@
             <a href="#risk">Risk matrix</a>
             <a href="#failures">Scanner failures</a>
             <a href="#vulns">Vulnerabilities</a>
+            <a href="#images">Container images</a>
             <a href="#outdated">Outdated</a>
         </nav>
     </header>
@@ -64,6 +65,8 @@
         <h2>Highest risk repositories (top 50)</h2>
         <p class="section-intro">
             Ranked by tier &times; exposure score, then by known vulnerabilities and outdated dependencies as tie-breakers.
+            Image vulns are the fixable high and critical vulnerabilities of the container images the repository runs:
+            shown next to the ranking, not part of it.
         </p>
 
         <risk-repos-grid>
@@ -113,6 +116,23 @@
             <skeleton-row></skeleton-row>
             <skeleton-row></skeleton-row>
         </vulns-grid>
+    </section>
+
+    <section id="images">
+        <h2>Container images</h2>
+        <p class="section-intro">
+            The images live repositories run, from their pinch configurations, the most serious first. Each image is
+            scanned once from the SBOM its registry publishes (it is not pulled), and only the vulnerabilities that
+            already have a fix are listed: a newer image, or moving the repositories to its newer tag, removes them.
+            They are kept apart from the vulnerabilities above, which are the dependencies' own.
+        </p>
+
+        <images-grid>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+        </images-grid>
     </section>
 
     <section id="outdated">
@@ -195,6 +215,62 @@
         </table>
     </template>
 
+    <template id="images-template">
+        <table class="images-board">
+            <thead>
+                <tr>
+                    <th>Image</th>
+                    <th>Run by</th>
+                    <th>Fixable</th>
+                    <th>High and critical</th>
+                    <th>Scan</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr data-tpl-each="self" data-tpl-var="i">
+                    <td><strong>{{ i.image }}</strong></td>
+                    <td>{{ i.repos.join(', ') }}</td>
+                    <td>{{ i.fixable }}</td>
+                    <td>{{ i.serious }}</td>
+                    <td>
+                        <tag data-tpl-if="i.status == 'vulnerable'" data-tpl-class-append="`severity {i.highest}`">up to {{ i.highest }}</tag>
+                        <tag data-tpl-if="i.status == 'clean'" class="severity clean">clean</tag>
+                        <tag data-tpl-if="i.status == 'no-sbom'" class="dashed">no SBOM</tag>
+                        <tag data-tpl-if="i.status == 'failed'" class="dashed" data-tpl-title="i.reason">scan failed</tag>
+                        <tag data-tpl-if="i.status == 'unscanned'" class="dashed">not scanned</tag>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+        <image-details>
+            <details data-tpl-each="self" data-tpl-var="i" data-tpl-when="i.fixable > 0">
+                <summary>{{ i.image }}: {{ i.fixable }} fixable</summary>
+                <table class="image-vulns">
+                    <thead>
+                        <tr>
+                            <th>Package</th>
+                            <th>Installed</th>
+                            <th>Fixed in</th>
+                            <th>Severity</th>
+                            <th>Advisory</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr data-tpl-each="i.vulnerabilities" data-tpl-var="v">
+                            <td><strong>{{ v.package }}</strong></td>
+                            <td>{{ v.version }}</td>
+                            <td>{{ v.fixed_in }}</td>
+                            <td><tag data-tpl-class-append="`severity {v.severity}`">{{ v.severity }}</tag></td>
+                            <td>
+                                <a class="danger" data-tpl-href="`https://osv.dev/vulnerability/{v.vuln_id}`" target="_blank" rel="noopener noreferrer">{{ v.vuln_id }}</a>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </details>
+        </image-details>
+    </template>
+
     <template id="outdated-template">
         <table class="outdated-board">
             <thead>
@@ -269,6 +345,7 @@
                     <th>Type</th>
                     <th>Lifecycle</th>
                     <th>Vulns</th>
+                    <th>Image vulns</th>
                     <th>Outdated</th>
                 </tr>
             </thead>
@@ -280,6 +357,7 @@
                     <td>{{ r.type ?? 'unspecified' }}</td>
                     <td>{{ r.lifecycle ?? 'unspecified' }}</td>
                     <td>{{ r.vulns }}</td>
+                    <td>{{ r.image_vulns }}</td>
                     <td>{{ r.outdated }}</td>
                 </tr>
             </tbody>
@@ -297,6 +375,7 @@
 
         Templates.fromSelector('#failures-template').withOverlay(s.failures).renderToSelector('failures-grid');
         Templates.fromSelector('#vulns-template').withOverlay(s.vulns.slice(0, 50)).renderToSelector('vulns-grid');
+        Templates.fromSelector('#images-template').withOverlay(s.images).renderToSelector('images-grid');
         Templates.fromSelector('#outdated-template').withOverlay(s.outdated.slice(0, 50)).renderToSelector('outdated-grid');
         Templates.fromSelector('#artifacts-template').withOverlay(s.artifacts.slice(0, 50)).renderToSelector('artifacts-grid');
         Templates.fromSelector('#risk-template').withOverlay({ rows: s.risk.rows, exposures: s.risk.exposures }).renderToSelector('risk-grid');

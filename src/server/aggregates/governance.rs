@@ -127,7 +127,7 @@ mod tests {
         let no_compliance = with_manifest(repo("c", false), r#"{ "schema_version": 1, "name": "c" }"#);
         let archived = repo("d", true);
 
-        let agg = Aggregates::calculate(&[assessed, pending, no_compliance, archived]);
+        let agg = Aggregates::calculate(&[assessed, pending, no_compliance, archived], &Default::default());
         let g = &agg.governance;
         assert_eq!(g.with_compliance, 2);
         assert_eq!(g.missing, 1); // live without compliance block
@@ -143,7 +143,7 @@ mod tests {
             repo("a", false),
             r#"{ "schema_version": 1, "name": "a", "compliance": { "dora": "non-critical", "cra": "default", "nis2": "out-of-scope", "ai_act": "out-of-scope", "gdpr": "controller", "data_residency": "eu", "ads": "pending-nomination" } }"#,
         );
-        let agg = Aggregates::calculate(&[r]);
+        let agg = Aggregates::calculate(&[r], &Default::default());
         let ads = agg.governance.coverage.iter().find(|r| r.framework == "ads").unwrap();
         assert_eq!((ads.assessed, ads.pending), (0, 1));
     }
@@ -158,7 +158,7 @@ mod tests {
             repo("lib", false),
             r#"{ "schema_version": 1, "name": "lib", "tier": "tier3", "lifecycle": "unmaintained", "stewards": ["alice"] }"#,
         );
-        let agg = Aggregates::calculate(&[a, b]);
+        let agg = Aggregates::calculate(&[a, b], &Default::default());
         let recap = &agg.governance.stewards_recap;
         // sorted by active desc: alice first
         assert_eq!(recap[0].steward, "alice");

@@ -37,6 +37,7 @@ impl DashboardStats {
 
 pub struct CacheData {
     pub projects: Vec<crate::scanners::RepoStats>,
+    pub images: std::collections::BTreeMap<String, crate::images::ImageScan>,
     pub stats: DashboardStats,
     /// Precalculated analytics; recomputed together with stats whenever the scan data changes.
     pub aggregates: aggregates::Aggregates,

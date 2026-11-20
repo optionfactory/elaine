@@ -3,6 +3,7 @@ pub mod app;
 pub mod cli;
 pub mod config;
 pub mod github;
+pub mod images;
 pub mod push;
 pub mod repo_cache;
 pub mod sandbox;

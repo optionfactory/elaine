@@ -159,7 +159,7 @@ mod tests {
         a.health.insert(ScannerKind::Elaine, BTreeMap::new());
         let mut b = repo("b", false);
         b.health.insert(ScannerKind::Maven, BTreeMap::new());
-        let agg = Aggregates::calculate(&[a, b]);
+        let agg = Aggregates::calculate(&[a, b], &Default::default());
         let tc = &agg.inventory.toolchains;
         assert_eq!(tc.len(), 1);
         assert_eq!((tc[0].toolchain, tc[0].repos, tc[0].pct), (ScannerKind::Maven, 2, 100));
@@ -170,7 +170,7 @@ mod tests {
         let t2 = with_manifest(repo("zzz", false), r#"{ "schema_version": 1, "name": "zzz", "tier": "tier2" }"#);
         let t1 = with_manifest(repo("aaa", false), r#"{ "schema_version": 1, "name": "aaa", "tier": "tier1" }"#);
         let un = with_manifest(repo("nope", false), r#"{ "schema_version": 1, "name": "nope" }"#);
-        let agg = Aggregates::calculate(&[t2, t1, un]);
+        let agg = Aggregates::calculate(&[t2, t1, un], &Default::default());
         let tiers = &agg.inventory.tiers;
         assert_eq!(tiers.len(), 2);
         assert_eq!(tiers[0].name, "aaa");

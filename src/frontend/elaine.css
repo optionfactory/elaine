@@ -730,7 +730,16 @@ table {
     }
 
     &.risk-repos {
-        grid-template-columns: 1fr auto auto auto auto auto auto;
+        grid-template-columns: 1fr auto auto auto auto auto auto auto;
+    }
+
+    &.images-board {
+        grid-template-columns: auto 1fr auto auto auto;
+    }
+
+    &.image-vulns {
+        grid-template-columns: auto 1fr 1fr auto auto;
+        margin-top: 0.5rem;
     }
 
     thead {
@@ -887,6 +896,62 @@ tag {
         background: transparent;
         color: var(--text-muted);
     }
+
+    /* the most severe fixable vulnerability of a container image, as grype rates it */
+    &.severity {
+        &.critical {
+            background: color-mix(in srgb, var(--danger) 20%, var(--card-bg));
+            color: var(--danger);
+        }
+
+        &.high {
+            background: color-mix(in srgb, #fb923c 18%, var(--card-bg));
+            color: #fb923c;
+        }
+
+        &.medium {
+            background: color-mix(in srgb, var(--warning) 15%, var(--card-bg));
+            color: var(--warning);
+        }
+
+        &.low,
+        &.negligible,
+        &.unknown {
+            background: var(--border);
+            color: var(--text-muted);
+        }
+
+        &.clean {
+            background: color-mix(in srgb, var(--success) 15%, var(--card-bg));
+            color: var(--success);
+        }
+    }
+}
+
+image-details {
+    display: grid;
+    gap: 0.5rem;
+    margin-top: 1rem;
+
+    summary {
+        cursor: pointer;
+        font-family: monospace;
+        font-size: 0.875rem;
+        color: var(--text-muted);
+    }
+}
+
+image-list {
+    display: grid;
+    gap: 0.4rem;
+    margin-top: 0.4rem;
+}
+
+image-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
 }
 
 error-box {

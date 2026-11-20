@@ -1,3 +1,4 @@
+use crate::images::ImageScan;
 use crate::scanners::{CheckStatus, RepoStats};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
@@ -12,6 +13,9 @@ pub struct Snapshot {
     pub projects: Vec<RepoStats>,
     /// Scanner failure logs by repository name, then by scanner name.
     pub logs: BTreeMap<String, BTreeMap<String, String>>,
+    /// Missing from the pushes of earlier releases.
+    #[serde(default)]
+    pub images: BTreeMap<String, ImageScan>,
 }
 
 pub struct StatsStore {
@@ -51,6 +55,31 @@ impl StatsStore {
 
     pub fn aggregate_file_path(&self) -> PathBuf {
         self.base_dir.join("stats.json")
+    }
+
+    pub fn images_file_path(&self) -> PathBuf {
+        self.base_dir.join("images.json")
+    }
+
+    /// Empty when no scan wrote it yet.
+    pub fn load_images(&self) -> Result<BTreeMap<String, ImageScan>> {
+        let path = self.images_file_path();
+        match fs::read_to_string(&path) {
+            Ok(data) => serde_json::from_str(&data).with_context(|| format!("Failed to parse {:?}", path)),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(BTreeMap::new()),
+            Err(e) => Err(e).with_context(|| format!("Failed to read {:?}", path)),
+        }
+    }
+
+    /// Written through a renamed temporary file, like the aggregate.
+    pub fn save_images(&self, images: &BTreeMap<String, ImageScan>) -> Result<()> {
+        let path = self.images_file_path();
+        let mut file = tempfile::Builder::new()
+            .permissions(std::os::unix::fs::PermissionsExt::from_mode(0o644))
+            .tempfile_in(&self.base_dir)?;
+        serde_json::to_writer_pretty(&mut file, images)?;
+        file.persist(&path).with_context(|| format!("Failed to update {:?}", path))?;
+        Ok(())
     }
 
     pub fn is_scan_fresh(&self, repo_name: &str, updated_at: &str, pushed_at: &str) -> bool {
@@ -166,7 +195,11 @@ impl StatsStore {
             }
             logs.insert(repo_dir.file_name().to_string_lossy().into_owned(), repo_logs);
         }
-        Ok(Snapshot { projects, logs })
+        Ok(Snapshot {
+            projects,
+            logs,
+            images: self.load_images()?,
+        })
     }
 
     /// Replaces the aggregated stats and every scanner log with the content of `snapshot`.
@@ -195,6 +228,8 @@ impl StatsStore {
         if previous.exists() {
             fs::remove_dir_all(&previous)?;
         }
+        // before the aggregate, whose change is what makes `serve` reload both
+        self.save_images(&snapshot.images)?;
         self.write_aggregate(&snapshot.projects)?;
         Ok(())
     }
@@ -312,12 +347,14 @@ mod tests {
         let snapshot = Snapshot {
             projects: vec![RepoStats::new_from_github(&repo)],
             logs: BTreeMap::from([("acme".into(), BTreeMap::from([("go".into(), "go: not found".into())]))]),
+            images: BTreeMap::from([("maildev/maildev:2.2.1".into(), crate::images::ImageScan::NoSbom)]),
         };
 
         store.replace_with_snapshot(&snapshot).unwrap();
 
         let stored = store.load_snapshot().unwrap();
         assert_eq!(stored.projects.len(), 1);
+        assert_eq!(stored.images, snapshot.images);
         assert_eq!(stored.logs.keys().collect::<Vec<_>>(), vec!["acme"]);
         assert_eq!(stored.logs["acme"]["go"], "go: not found");
     }
@@ -328,6 +365,7 @@ mod tests {
         let snapshot = Snapshot {
             projects: vec![],
             logs: BTreeMap::from([("..".into(), BTreeMap::from([("escape".into(), "x".into())]))]),
+            images: BTreeMap::new(),
         };
 
         assert!(store.replace_with_snapshot(&snapshot).is_err());

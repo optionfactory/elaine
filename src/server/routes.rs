@@ -120,9 +120,30 @@ pub async fn api_projects_handler(State(state): State<Arc<AppState>>, Query(quer
         filtered = vec![filtered[pick_index]];
     }
 
+    /// A repository with what the last image scan found in each image it runs.
+    #[derive(serde::Serialize)]
+    struct ProjectView<'a> {
+        #[serde(flatten)]
+        repo: &'a crate::scanners::RepoStats,
+        images: Vec<crate::images::ImageSummary>,
+    }
+
     let offset = query.offset.unwrap_or(0);
     let limit = query.limit.unwrap_or(5);
-    let paginated: Vec<&crate::scanners::RepoStats> = filtered.into_iter().skip(offset).take(limit).collect();
+    let paginated: Vec<ProjectView> = filtered
+        .into_iter()
+        .skip(offset)
+        .take(limit)
+        .map(|repo| ProjectView {
+            repo,
+            images: repo
+                .containers
+                .iter()
+                .flatten()
+                .map(|image| crate::images::ImageSummary::of(image, cache.images.get(image)))
+                .collect(),
+        })
+        .collect();
     Json(paginated).into_response()
 }
 

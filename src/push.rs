@@ -11,6 +11,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use flate2::{Compression, read::GzDecoder, write::GzEncoder};
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 /// Sends `snapshot` as gzipped JSON to the `elaine serve` instance at `remote`, replacing what it shows.
@@ -58,16 +59,28 @@ pub async fn receive_snapshot_handler(State(state): State<Arc<AppState>>, header
         let previous = std::fs::read_to_string(stats.aggregate_file_path())
             .ok()
             .and_then(|data| serde_json::from_str::<Vec<RepoStats>>(&data).ok());
-        stats.replace_with_snapshot(&snapshot).map(|()| (previous, snapshot.projects))
+        let previous_images = stats.load_images().ok();
+        stats
+            .replace_with_snapshot(&snapshot)
+            .map(|()| (previous, previous_images, snapshot.projects, snapshot.images))
     });
     match stored.await {
-        Ok(Ok((previous, projects))) => {
+        Ok(Ok((previous, previous_images, projects, images))) => {
             eprintln!("[Push] Received a snapshot of {} repositories.", projects.len());
             if let Some(alerts) = state.config.alerts.clone() {
                 let dashboard = state.config.login.as_ref().map(|login| login.public_url.clone());
                 // the push answers at once; a mail that fails is only logged
                 tokio::spawn(async move {
-                    if let Err(e) = alert::notify(&alerts, previous.as_deref(), &projects, dashboard.as_deref()).await {
+                    let empty = BTreeMap::new();
+                    let previous = previous.as_deref().map(|projects| alert::Scan {
+                        projects,
+                        images: previous_images.as_ref().unwrap_or(&empty),
+                    });
+                    let current = alert::Scan {
+                        projects: &projects,
+                        images: &images,
+                    };
+                    if let Err(e) = alert::notify(&alerts, previous, current, dashboard.as_deref()).await {
                         eprintln!("[Alert] Failed to mail the new vulnerabilities: {:#}", e);
                     }
                 });
@@ -105,8 +118,9 @@ mod tests {
             session_key: ring::hmac::Key::new(ring::hmac::HMAC_SHA256, b"test"),
             cache: Arc::new(RwLock::new(CacheData {
                 projects: vec![],
+                images: Default::default(),
                 stats: DashboardStats::calculate(&[]),
-                aggregates: Aggregates::calculate(&[]),
+                aggregates: Aggregates::calculate(&[], &Default::default()),
             })),
             stats: Arc::clone(&stats),
         });
@@ -121,6 +135,7 @@ mod tests {
         let snapshot = Snapshot {
             projects: vec![RepoStats::new_from_github(&repo)],
             logs: BTreeMap::from([("acme-api".into(), BTreeMap::from([("npm".into(), "npm ERR!".into())]))]),
+            images: BTreeMap::new(),
         };
 
         let wrong = RemoteConfig {

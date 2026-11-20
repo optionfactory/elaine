@@ -343,8 +343,9 @@ mod tests {
             session_key: key,
             cache: Arc::new(RwLock::new(CacheData {
                 projects: vec![],
+                images: Default::default(),
                 stats: DashboardStats::calculate(&[]),
-                aggregates: Aggregates::calculate(&[]),
+                aggregates: Aggregates::calculate(&[], &Default::default()),
             })),
             stats: Arc::new(StatsStore::new(data_dir.path()).unwrap()),
         });

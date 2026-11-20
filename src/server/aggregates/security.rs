@@ -1,4 +1,5 @@
 use super::{manifest_meta, tier_weight};
+use crate::images::{ImageScan, ImageSummary, ImageVulnerability};
 use crate::scanners::{CheckStatus, RepoStats, ScannerKind};
 use crate::schema::{ElaineManifest, ExposureType, LifecycleType, ProjectType, ServiceTier};
 use serde::Serialize;
@@ -14,7 +15,19 @@ pub struct Security {
     pub outdated: Vec<OutdatedRow>,
     /// Outdated artifacts aggregated across the organization, sorted by affected repositories.
     pub artifacts: Vec<ArtifactRow>,
+    /// The container images live repositories run, the most serious first; apart from `vulns`, which are the
+    /// dependencies' own.
+    pub images: Vec<ImageRow>,
     pub risk: Risk,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ImageRow {
+    #[serde(flatten)]
+    pub summary: ImageSummary,
+    /// The live repositories that run it.
+    pub repos: Vec<String>,
+    pub vulnerabilities: Vec<ImageVulnerability>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -88,6 +101,8 @@ pub struct WorstRow {
     pub lifecycle: Option<LifecycleType>,
     pub vulns: usize,
     pub outdated: usize,
+    /// Fixable high and critical vulnerabilities of the images it runs: shown, not part of the ranking.
+    pub image_vulns: usize,
 }
 
 /// Network exposure classification, from most to least permissive.
@@ -186,7 +201,7 @@ fn risk_level(score: u32) -> &'static str {
 }
 
 impl Security {
-    pub(super) fn calculate(live: &[&RepoStats]) -> Self {
+    pub(super) fn calculate(live: &[&RepoStats], images: &BTreeMap<String, ImageScan>) -> Self {
         // Failures: repositories with failed checks, busiest first, flattened per scanner.
         let mut failing: Vec<(usize, &RepoStats)> = live
             .iter()
@@ -273,20 +288,50 @@ impl Security {
             .collect();
         artifacts.sort_by(|a, b| b.repos.cmp(&a.repos).then_with(|| a.artifact.cmp(&b.artifact)));
 
-        let risk = Risk::calculate(live);
+        let mut runners: BTreeMap<&str, Vec<String>> = BTreeMap::new();
+        for p in live {
+            for image in p.containers.iter().flatten() {
+                runners.entry(image.as_str()).or_default().push(p.name.clone());
+            }
+        }
+        let mut image_rows: Vec<ImageRow> = runners
+            .into_iter()
+            .map(|(image, repos)| {
+                let scan = images.get(image);
+                let vulnerabilities = match scan {
+                    Some(ImageScan::Scanned { vulnerabilities }) => vulnerabilities.clone(),
+                    _ => Vec::new(),
+                };
+                ImageRow {
+                    summary: ImageSummary::of(image, scan),
+                    repos,
+                    vulnerabilities,
+                }
+            })
+            .collect();
+        image_rows.sort_by(|a, b| {
+            b.summary
+                .serious
+                .cmp(&a.summary.serious)
+                .then_with(|| b.summary.fixable.cmp(&a.summary.fixable))
+                .then_with(|| a.summary.image.cmp(&b.summary.image))
+        });
+
+        let risk = Risk::calculate(live, images);
 
         Self {
             failures,
             vulns,
             outdated,
             artifacts,
+            images: image_rows,
             risk,
         }
     }
 }
 
 impl Risk {
-    fn calculate(live: &[&RepoStats]) -> Self {
+    fn calculate(live: &[&RepoStats], images: &BTreeMap<String, ImageScan>) -> Self {
         const TIERS: [ServiceTier; 4] = [ServiceTier::Tier1, ServiceTier::Tier2, ServiceTier::Tier3, ServiceTier::Tier4];
 
         let classified: Vec<(&RepoStats, ServiceTier, Exposure, usize, usize)> = live
@@ -336,6 +381,12 @@ impl Risk {
                     lifecycle,
                     vulns: *vulns,
                     outdated: *outdated,
+                    image_vulns: p
+                        .containers
+                        .iter()
+                        .flatten()
+                        .map(|image| ImageSummary::of(image, images.get(image)).serious)
+                        .sum(),
                 };
                 (score > 0).then_some((score, row))
             })
@@ -376,7 +427,7 @@ mod tests {
             repo("a", false),
             r#"{ "schema_version": 1, "name": "a", "environments": [ { "name": "dev", "type": "development", "ingress": "local" }, { "name": "prod", "type": "production", "ingress": "internet" } ] }"#,
         );
-        let agg = Aggregates::calculate(&[exposed]);
+        let agg = Aggregates::calculate(&[exposed], &Default::default());
         let worst = &agg.security.risk.worst;
         assert_eq!(worst[0].exposure, "internet");
     }
@@ -391,7 +442,7 @@ mod tests {
             repo("sandbox", false),
             r#"{ "schema_version": 1, "name": "sandbox", "tier": "tier4", "environments": [ { "name": "dev", "type": "development", "ingress": "local" } ] }"#,
         );
-        let agg = Aggregates::calculate(&[t1_net, t4_local]);
+        let agg = Aggregates::calculate(&[t1_net, t4_local], &Default::default());
         let risk = &agg.security.risk;
         let t1 = risk.rows.iter().find(|r| r.tier == ServiceTier::Tier1).unwrap();
         let net = t1.cells.iter().find(|c| c.repos == 1).unwrap();
@@ -402,12 +453,42 @@ mod tests {
     }
 
     #[test]
+    fn images_are_listed_apart_and_shown_next_to_the_ranking_without_changing_it() {
+        use crate::images::{ImageScan, ImageVulnerability, Severity};
+        let manifest =
+            r#"{ "schema_version": 1, "name": "x", "tier": "tier1", "environments": [ { "name": "prod", "type": "production", "ingress": "internet" } ] }"#;
+        let mut stale = with_manifest(repo("stale", false), manifest);
+        stale.containers = Some(vec!["acme/nginx:257".into()]);
+        let mut fresh = with_manifest(repo("fresh", false), manifest);
+        fresh.vulnerabilities = Some(vec![crate::scanners::Vulnerability::default()]);
+        let vuln = |severity| ImageVulnerability {
+            package: "openssl".into(),
+            version: "3.0".into(),
+            fixed_in: "3.1".into(),
+            severity,
+            vuln_id: "CVE-1".into(),
+        };
+        let images = BTreeMap::from([(
+            "acme/nginx:257".to_string(),
+            ImageScan::Scanned {
+                vulnerabilities: vec![vuln(Severity::Critical), vuln(Severity::Low)],
+            },
+        )]);
+        let agg = Aggregates::calculate(&[stale, fresh], &images);
+        let row = &agg.security.images[0];
+        assert_eq!((row.summary.fixable, row.summary.serious, row.repos.clone()), (2, 1, vec!["stale".to_string()]));
+        let worst: Vec<_> = agg.security.risk.worst.iter().map(|w| (w.name.as_str(), w.vulns, w.image_vulns)).collect();
+        assert_eq!(worst, [("fresh", 1, 0), ("stale", 0, 1)]);
+        assert!(agg.security.vulns.iter().all(|r| r.name == "fresh"));
+    }
+
+    #[test]
     fn artifacts_aggregate_repos_and_latest_versions() {
         let mut a = repo("a", false);
         a.outdated_dependencies = Some(vec![dep("lib:x", "1.0", "2.0"), dep("lib:y", "1.0", "2.0")]);
         let mut b = repo("b", false);
         b.outdated_dependencies = Some(vec![dep("lib:x", "1.0", "2.0"), dep("lib:x", "1.0", "3.0")]);
-        let agg = Aggregates::calculate(&[a, b]);
+        let agg = Aggregates::calculate(&[a, b], &Default::default());
         let x = agg.security.artifacts.iter().find(|r| r.artifact == "lib:x").unwrap();
         assert_eq!(x.repos, 2);
         assert_eq!(x.latest, "2.0, 3.0");
