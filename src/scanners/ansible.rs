@@ -54,9 +54,11 @@ impl Scanner for AnsibleScanner {
     }
 }
 
-/// The string values of the `image` keys, with their `{{ a.b }}` references resolved against the variables of each
-/// inventory (the `group_vars` and `host_vars` in the same directory), under the `vars` of the play the image is in:
-/// one image per distinct result. The images nothing resolves are returned apart, as written.
+/// The string values of the `image` keys in playbooks and task files, with their `{{ a.b }}` references resolved
+/// against the variables of each inventory (the `group_vars` and `host_vars` in the same directory), under the `vars`
+/// of the play the image is in: one image per distinct result. The images nothing resolves are returned apart, as
+/// written. Playbooks and task files are the YAML documents that are a list: a `pinch.yaml`, a `docker-compose.yml`
+/// or a GitHub workflow is a mapping, with variables Ansible does not know.
 fn container_images(documents: &[(PathBuf, Value)]) -> (BTreeSet<String>, BTreeSet<String>) {
     let mut inventories: BTreeMap<PathBuf, Map<String, Value>> = BTreeMap::new();
     for (path, document) in documents {
@@ -74,14 +76,11 @@ fn container_images(documents: &[(PathBuf, Value)]) -> (BTreeSet<String>, BTreeS
     let no_vars = Map::new();
     let mut written: Vec<(String, &Map<String, Value>)> = Vec::new();
     for (_, document) in documents {
-        match document {
-            Value::Array(plays) => {
-                for play in plays {
-                    let play_vars = play.get("vars").and_then(Value::as_object).unwrap_or(&no_vars);
-                    collect_images(play, play_vars, &mut written);
-                }
+        if let Value::Array(plays) = document {
+            for play in plays {
+                let play_vars = play.get("vars").and_then(Value::as_object).unwrap_or(&no_vars);
+                collect_images(play, play_vars, &mut written);
             }
-            other => collect_images(other, &no_vars, &mut written),
         }
     }
     let reference = Regex::new(r"\{\{\s*([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)*)\s*\}\}").expect("valid regex");
@@ -203,6 +202,18 @@ mod tests {
             ),
         ]));
         assert_eq!(found.0, BTreeSet::from(["app:2".to_string(), "superset:5".to_string()]));
+    }
+
+    #[test]
+    fn only_playbooks_and_task_files_are_read_for_images() {
+        let found = container_images(&documents(&[
+            (
+                "pinch.yaml",
+                "vars:\n  v: \"253\"\nprocesses:\n  - name: web\n    run:\n      type: docker\n      image: \"nginx:{{ v }}\"\n",
+            ),
+            ("roles/web/tasks/main.yml", "- docker_container:\n    image: postgres:16\n"),
+        ]));
+        assert_eq!(found, (BTreeSet::from(["postgres:16".to_string()]), BTreeSet::new()));
     }
 
     #[test]

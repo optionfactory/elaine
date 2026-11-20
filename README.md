@@ -196,8 +196,10 @@ Elaine also detects [`pinch.yaml`](https://github.com/optionfactory/pinch) manif
 
 ### Ansible playbooks
 
-In a repository with an `ansible.cfg`, Elaine reads the YAML files under its directory and takes the string value of
-every `image` key (`community.docker.docker_container`, or a module of a collection that nests it) as a container image.
+In a repository with an `ansible.cfg`, Elaine reads the playbooks and task files under its directory (the YAML files
+that are a list: a `pinch.yaml`, a `docker-compose.yml` or a GitHub workflow is a mapping, and is left out) and takes
+the string value of every `image` key (`community.docker.docker_container`, or a module of a collection that nests it)
+as a container image.
 The `{{ a.b }}` references are resolved against the `vars` of the play the image is in, over the variables of each
 inventory (the `group_vars` and `host_vars` in the same directory): one image per distinct result, so two inventories
 with different tags give two images. Only plain dotted lookups are resolved; an image with a filter or a loop variable
