@@ -331,6 +331,7 @@
                         <thead>
                             <tr>
                                 <th>Project</th>
+                                <th>Scanner</th>
                                 <th>Artifact</th>
                                 <th>Version</th>
                                 <th>Vuln ID</th>
@@ -340,6 +341,7 @@
                         <tbody>
                             <tr data-tpl-each="vulnerabilities" data-tpl-var="vuln">
                                 <td><strong>{{ vuln.project }}</strong></td>
+                                <td><tag data-tpl-if="vuln.scanner">{{ vuln.scanner }}</tag></td>
                                 <td>{{vuln.artifact}}</td>
                                 <td>{{vuln.version}}</td>
                                 <td>

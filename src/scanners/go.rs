@@ -99,10 +99,10 @@ impl Scanner for GoScanner {
                             artifact: pkg,
                             version: ver,
                             vuln_id: id,
-                            trail: vec![],
+                            ..Default::default()
                         })
                         .collect();
-                    stats.add_vulnerabilities(vulnerabilities);
+                    stats.add_vulnerabilities(ScannerKind::Go, vulnerabilities);
                 }
                 Err(e) => {
                     ctx.report_failure("go", format!("OSV check failed for {}: {}", mod_path.display(), e));

@@ -92,6 +92,7 @@ impl Scanner for RustScanner {
                 match fetch_vulnerabilities(ctx.client, &deps) {
                     Ok(vulns) => {
                         stats.add_vulnerabilities(
+                            ScannerKind::Rust,
                             vulns
                                 .into_iter()
                                 .map(|(pkg, ver, id)| Vulnerability {
@@ -99,7 +100,7 @@ impl Scanner for RustScanner {
                                     artifact: pkg,
                                     version: ver,
                                     vuln_id: id,
-                                    trail: vec![],
+                                    ..Default::default()
                                 })
                                 .collect(),
                         );

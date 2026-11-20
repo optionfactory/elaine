@@ -84,6 +84,7 @@ impl Scanner for NpmScanner {
                 match fetch_vulnerabilities(ctx.client, &deps) {
                     Ok(vulns) => {
                         stats.add_vulnerabilities(
+                            ScannerKind::Npm,
                             vulns
                                 .into_iter()
                                 .map(|(pkg, ver, id)| Vulnerability {
@@ -91,7 +92,7 @@ impl Scanner for NpmScanner {
                                     artifact: pkg,
                                     version: ver,
                                     vuln_id: id,
-                                    trail: vec![],
+                                    ..Default::default()
                                 })
                                 .collect(),
                         );

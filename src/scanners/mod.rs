@@ -30,13 +30,16 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct Vulnerability {
     pub project: String,
     pub artifact: String,
     pub version: String,
     pub vuln_id: String,
     pub trail: Vec<String>,
+    /// Missing in the results of earlier releases and in the JSON anarchitect writes for Maven.
+    #[serde(default)]
+    pub scanner: Option<ScannerKind>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -125,17 +128,13 @@ impl RepoStats {
         }
     }
 
-    pub fn add_vulnerability(&mut self, vuln: Vulnerability) {
-        self.checked_for_vulnerabilities();
-        if let Some(ref mut vulns) = self.vulnerabilities {
-            vulns.push(vuln);
-        }
-    }
-
-    pub fn add_vulnerabilities(&mut self, mut vulns: Vec<Vulnerability>) {
+    pub fn add_vulnerabilities(&mut self, scanner: ScannerKind, vulns: Vec<Vulnerability>) {
         self.checked_for_vulnerabilities();
         if let Some(ref mut v) = self.vulnerabilities {
-            v.append(&mut vulns);
+            v.extend(vulns.into_iter().map(|vuln| Vulnerability {
+                scanner: Some(scanner),
+                ..vuln
+            }));
         }
     }
 
@@ -375,6 +374,16 @@ mod tests {
     use super::*;
     use crate::github::GithubRepository;
     use tempfile::TempDir;
+
+    #[test]
+    fn a_vulnerability_carries_the_scanner_that_reported_it() {
+        let anarchitect: Vec<Vulnerability> =
+            serde_json::from_str(r#"[{"project": "core", "artifact": "jackson-databind", "version": "2.9.0", "vuln_id": "GHSA-1", "trail": []}]"#).unwrap();
+        let mut stats = RepoStats::new_from_github(&GithubRepository::default());
+        stats.add_vulnerabilities(ScannerKind::Maven, anarchitect);
+        let scanners: Vec<_> = stats.vulnerabilities.unwrap().into_iter().map(|vuln| vuln.scanner).collect();
+        assert_eq!(scanners, [Some(ScannerKind::Maven)]);
+    }
 
     #[test]
     fn run_logged_truncates_then_appends_with_command_headers() {

@@ -59,7 +59,7 @@ impl Scanner for MavenScanner {
                     let vulns_path = run_dir.join("target").join("anarchitect-vulnerabilities.json");
                     match fs::read_to_string(&vulns_path) {
                         Ok(payload) => match serde_json::from_str::<Vec<Vulnerability>>(&payload) {
-                            Ok(parsed_vulns) => stats.add_vulnerabilities(parsed_vulns),
+                            Ok(parsed_vulns) => stats.add_vulnerabilities(ScannerKind::Maven, parsed_vulns),
                             Err(e) => {
                                 ctx.report_failure("maven", format!("Failed to parse {}: {}", vulns_path.display(), e));
                                 vulns_ok = false;

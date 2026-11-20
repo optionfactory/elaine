@@ -673,7 +673,7 @@ table {
     }
 
     &.vulnerabilities {
-        grid-template-columns: auto 1fr auto auto auto;
+        grid-template-columns: auto auto 1fr fit-content(12rem) auto auto;
         margin-top: 1rem;
     }
 
