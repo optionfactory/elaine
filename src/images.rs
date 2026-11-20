@@ -107,6 +107,9 @@ const WORKERS: usize = 4;
 /// the image (the `linux/amd64` one of a multi-platform image), then grype on that SBOM, keeping the vulnerabilities
 /// that have a fix: the ones a newer image can remove.
 pub fn scan_images(images: &BTreeSet<String>, work_dir: &Path) -> BTreeMap<String, ImageScan> {
+    if images.is_empty() {
+        return BTreeMap::new();
+    }
     // once here, so that the parallel runs below do not each try to update the same database
     let updated = Command::new("grype").args(["db", "update"]).output();
     let failure = match updated {
