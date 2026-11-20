@@ -1,6 +1,6 @@
 [package]
 name = "elaine"
-version = "1.6.0"
+version = "1.7.0"
 license = "MIT"
 edition = "2024"
 
