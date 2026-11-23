@@ -59,14 +59,14 @@ struct StalenessRow {
 pub async fn api_staleness_handler(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     const MONTH_SECONDS: f64 = 30.44 * 24.0 * 3600.0;
     let cache = state.cache.read().await;
-    let now = chrono::Utc::now();
+    let now = jiff::Timestamp::now();
     let mut rows: Vec<StalenessRow> = cache
         .projects
         .iter()
         .filter(|p| !p.archived && !p.pushed_at.is_empty())
         .filter_map(|p| {
-            let pushed = chrono::DateTime::parse_from_rfc3339(&p.pushed_at).ok()?;
-            let months = ((now - pushed.with_timezone(&chrono::Utc)).num_seconds() as f64 / MONTH_SECONDS).floor() as i64;
+            let pushed: jiff::Timestamp = p.pushed_at.parse().ok()?;
+            let months = ((now - pushed).as_secs() as f64 / MONTH_SECONDS).floor() as i64;
             Some(StalenessRow {
                 name: p.name.clone(),
                 html_url: p.html_url.clone(),

@@ -114,7 +114,7 @@ pub async fn callback(State(state): State<Arc<AppState>>, headers: HeaderMap, Qu
             return message(StatusCode::BAD_GATEWAY, "Google did not confirm the login: sign in again.");
         }
     };
-    let expiry = chrono::Utc::now().timestamp() + SESSION_SECONDS;
+    let expiry = jiff::Timestamp::now().as_second() + SESSION_SECONDS;
     (
         AppendHeaders([
             (
@@ -191,7 +191,7 @@ fn id_token_email(login: &LoginConfig, id_token: &str) -> anyhow::Result<String>
     if claims.aud != login.client_id {
         anyhow::bail!("ID token for {}", claims.aud);
     }
-    if claims.exp <= chrono::Utc::now().timestamp() {
+    if claims.exp <= jiff::Timestamp::now().as_second() {
         anyhow::bail!("expired ID token");
     }
     if !claims.email_verified {
@@ -229,7 +229,7 @@ fn signed_in(key: &ring::hmac::Key, session: &str) -> Option<String> {
     ring::hmac::verify(key, payload.as_bytes(), &URL_SAFE_NO_PAD.decode(tag).ok()?).ok()?;
     let payload = String::from_utf8(URL_SAFE_NO_PAD.decode(payload).ok()?).ok()?;
     let (email, expiry) = payload.split_once(' ')?;
-    (expiry.parse::<i64>().ok()? > chrono::Utc::now().timestamp()).then(|| email.to_string())
+    (expiry.parse::<i64>().ok()? > jiff::Timestamp::now().as_second()).then(|| email.to_string())
 }
 
 fn cookie<'a>(headers: &'a HeaderMap, name: &str) -> Option<&'a str> {
@@ -274,10 +274,10 @@ mod tests {
     fn a_session_counts_only_signed_with_this_key_and_unexpired() {
         let key = ring::hmac::Key::new(ring::hmac::HMAC_SHA256, b"this run");
         let other_run = ring::hmac::Key::new(ring::hmac::HMAC_SHA256, b"previous run");
-        let later = chrono::Utc::now().timestamp() + 60;
+        let later = jiff::Timestamp::now().as_second() + 60;
         let valid = session(&key, "mario.rossi@example.com", later);
         let forged = session(&other_run, "mario.rossi@example.com", later);
-        let expired = session(&key, "mario.rossi@example.com", chrono::Utc::now().timestamp() - 1);
+        let expired = session(&key, "mario.rossi@example.com", jiff::Timestamp::now().as_second() - 1);
         let tampered = format!(
             "{}.{}",
             URL_SAFE_NO_PAD.encode(format!("luigi.verdi@example.com {later}")),
@@ -295,7 +295,7 @@ mod tests {
             let claims = serde_json::json!({
                 "iss": "https://accounts.google.com",
                 "aud": aud,
-                "exp": chrono::Utc::now().timestamp() + 60,
+                "exp": jiff::Timestamp::now().as_second() + 60,
                 "email": email,
                 "email_verified": verified,
                 "hd": hd,
@@ -330,7 +330,7 @@ mod tests {
     async fn without_a_session_pages_go_to_google_and_the_api_refuses() {
         let data_dir = tempfile::TempDir::new().unwrap();
         let key = ring::hmac::Key::new(ring::hmac::HMAC_SHA256, b"this run");
-        let signed = session(&key, "mario.rossi@example.com", chrono::Utc::now().timestamp() + 60);
+        let signed = session(&key, "mario.rossi@example.com", jiff::Timestamp::now().as_second() + 60);
         let mut config: crate::config::Config = serde_json::from_value(serde_json::json!({
             "organization": "acme",
             "data_dir": data_dir.path(),
