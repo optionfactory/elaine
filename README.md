@@ -97,7 +97,8 @@ answers without waiting for the mail; a mail that fails is only logged.
 
 The container images follow the same rules, with the image compared without its tag (moving a repository to a newer tag
 does not announce again what the newer tag still has), and only their fixable high and critical vulnerabilities are
-mailed. The first push that scanned images sends nothing for them.
+mailed. The first push that scanned images sends nothing for them. A tag the previous push could not scan (Docker Hub
+rate limits the inspections) sends nothing either, rather than being compared with the other tags of its image.
 
 ### Container images
 

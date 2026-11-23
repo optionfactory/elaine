@@ -68,7 +68,8 @@ pub struct NewImageVulnerability<'a> {
 ///
 /// The same rules as for the dependencies: nothing when the previous push scanned no image at all (the first one, or
 /// the first from a scanning machine with grype); an image counts only when both pushes scanned it, and one that
-/// appears for the first time counts whole.
+/// appears for the first time counts whole. A tag the previous push could not scan (the registry rate limits the
+/// inspections) is skipped as well, not compared with the other tags of its image, which do not have its packages.
 pub fn new_image_vulnerabilities<'a>(previous: Option<&BTreeMap<String, ImageScan>>, current: &Scan<'a>) -> Vec<NewImageVulnerability<'a>> {
     let Some(previous) = previous.filter(|previous| previous.values().any(|scan| matches!(scan, ImageScan::Scanned { .. }))) else {
         return Vec::new();
@@ -88,6 +89,9 @@ pub fn new_image_vulnerabilities<'a>(previous: Option<&BTreeMap<String, ImageSca
         let ImageScan::Scanned { vulnerabilities } = scan else {
             continue;
         };
+        if previous.get(image).is_some_and(|before| !matches!(before, ImageScan::Scanned { .. })) {
+            continue;
+        }
         let name = images::without_tag(image);
         let before = match known.get(name) {
             Some(None) => continue,
@@ -444,6 +448,34 @@ mod tests {
         assert_eq!(found, ["acme/nginx:258 CVE-2 web", "redis:7 CVE-5 web"]);
         let never_scanned = BTreeMap::from([("acme/nginx:257".to_string(), ImageScan::NoSbom)]);
         assert!(new_image_vulnerabilities(Some(&never_scanned), &current).is_empty());
+    }
+
+    #[test]
+    fn a_tag_the_previous_push_could_not_scan_brings_nothing() {
+        let mut runner = repo("web", Some(&[]));
+        runner.containers = Some(vec!["acme/nginx:257".into(), "acme/nginx:258".into()]);
+        let previous = BTreeMap::from([
+            (
+                "acme/nginx:257".to_string(),
+                ImageScan::Failed {
+                    reason: "429 Too Many Requests".into(),
+                },
+            ),
+            ("acme/nginx:258".to_string(), scanned(&[("openssl", "CVE-1", Severity::High)])),
+        ]);
+        let images = BTreeMap::from([
+            (
+                "acme/nginx:257".to_string(),
+                scanned(&[("openssl", "CVE-1", Severity::High), ("zlib", "CVE-2", Severity::High)]),
+            ),
+            ("acme/nginx:258".to_string(), scanned(&[("openssl", "CVE-1", Severity::High)])),
+        ]);
+        let projects = [runner];
+        let current = Scan {
+            projects: &projects,
+            images: &images,
+        };
+        assert!(new_image_vulnerabilities(Some(&previous), &current).is_empty());
     }
 
     #[test]
