@@ -111,7 +111,12 @@ per image: it reads the SBOM the registry publishes for it with `docker buildx i
 pulled; for a multi-platform image, the `linux/amd64` one) and runs `grype --only-fixed` on it. Only the
 vulnerabilities that already have a fix are kept: the ones a newer image removes. An image whose registry publishes no
 SBOM is shown as such and not scanned. This runs at every scan, also when no repository changed, since new advisories
-hit images that did not change. The results go to `images.json` next to `stats.json`, and travel in the push.
+hit images that did not change. The registries rate limit the inspections (Docker Hub above all), so the SBOM is kept
+in `<data_dir>/stats/sboms/` with the digest it belongs to, and inspected again only when the image's digest has
+changed: elaine asks for it first with a HEAD request on the manifest, which Docker Hub does not count, with an
+anonymous token. Grype still runs on every image at every scan. An image pinned by digest is never inspected twice; one
+whose registry refuses the HEAD (a private one) is inspected every time, as before; one rate limited anyway is scanned
+from its last SBOM. The results go to `images.json` next to `stats.json`, and travel in the push.
 
 The dashboard shows them apart from the vulnerabilities of the dependencies: on each repository, the images it runs
 with what their scan found; on the security page, a section with every image and its vulnerabilities, and in the

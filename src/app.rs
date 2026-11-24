@@ -415,8 +415,12 @@ impl Elaine {
             .flat_map(|p| p.containers.iter().flatten().cloned())
             .collect();
         eprintln!("Scanning {} container images...", images.len());
+        let http = reqwest::Client::builder().timeout(std::time::Duration::from_secs(20)).build()?;
+        let digests = crate::images::current_digests(&http, &images).await;
         let work_dir = self.stats.base_dir.clone();
-        let scans = tokio::task::spawn_blocking(move || crate::images::scan_images(&images, &work_dir)).await?;
+        let cache_dir = self.stats.stats_dir.join("sboms");
+        std::os::unix::fs::DirBuilderExt::mode(std::fs::DirBuilder::new().recursive(true), 0o700).create(&cache_dir)?;
+        let scans = tokio::task::spawn_blocking(move || crate::images::scan_images(&images, &digests, &cache_dir, &work_dir)).await?;
         for (image, scan) in &scans {
             if let crate::images::ImageScan::Failed { reason } = scan {
                 eprintln!("[{}] 🔥 Image scan failed: {}", image, reason);

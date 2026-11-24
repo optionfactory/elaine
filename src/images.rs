@@ -103,10 +103,115 @@ pub fn without_tag(image: &str) -> &str {
 
 const WORKERS: usize = 4;
 
+/// Registry, repository and tag (or digest) of an image as docker reads its name: no registry means Docker Hub, and a
+/// single name there is an official image under `library/`.
+fn reference(image: &str) -> (String, String, String) {
+    let (name, reference) = match image.split_once('@') {
+        Some((name, digest)) => (name, digest.to_string()),
+        None => {
+            // a colon after the last slash starts the tag; one before it is the port of the registry
+            let last = image.rfind('/').map_or(0, |slash| slash + 1);
+            match image[last..].rfind(':') {
+                Some(colon) => (&image[..last + colon], image[last + colon + 1..].to_string()),
+                None => (image, "latest".to_string()),
+            }
+        }
+    };
+    let (registry, repository) = match name.split_once('/') {
+        Some((first, rest)) if first.contains('.') || first.contains(':') || first == "localhost" => (first, rest.to_string()),
+        Some(_) => ("docker.io", name.to_string()),
+        None => ("docker.io", format!("library/{name}")),
+    };
+    let registry = match registry {
+        "docker.io" | "index.docker.io" => "registry-1.docker.io",
+        other => other,
+    };
+    (registry.to_string(), repository, reference)
+}
+
+/// What each image's tag points to now, by a HEAD request on its manifest, which Docker Hub does not count against
+/// its rate limit, with an anonymous token when the registry asks for one. An image pinned by digest needs no request;
+/// one whose registry refuses (a private one, or none reachable) is left out, and is inspected as before.
+pub async fn current_digests(http: &reqwest::Client, images: &BTreeSet<String>) -> BTreeMap<String, String> {
+    let mut digests = BTreeMap::new();
+    for image in images {
+        if let Some(digest) = current_digest(http, image).await {
+            digests.insert(image.clone(), digest);
+        }
+    }
+    digests
+}
+
+async fn current_digest(http: &reqwest::Client, image: &str) -> Option<String> {
+    let (registry, repository, reference) = reference(image);
+    if reference.starts_with("sha256:") {
+        return Some(reference);
+    }
+    let url = format!("https://{registry}/v2/{repository}/manifests/{reference}");
+    let accept = "application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, \
+                  application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json";
+    let head = |token: Option<String>| {
+        let request = http.head(&url).header(reqwest::header::ACCEPT, accept);
+        match token {
+            Some(token) => request.bearer_auth(token),
+            None => request,
+        }
+        .send()
+    };
+    let mut response = head(None).await.ok()?;
+    if response.status() == reqwest::StatusCode::UNAUTHORIZED {
+        let challenge = response.headers().get(reqwest::header::WWW_AUTHENTICATE)?.to_str().ok()?.to_string();
+        response = head(Some(anonymous_token(http, &challenge).await?)).await.ok()?;
+    }
+    if !response.status().is_success() {
+        return None;
+    }
+    response.headers().get("docker-content-digest")?.to_str().ok().map(str::to_string)
+}
+
+/// The token a `Bearer realm="...",service="...",scope="..."` challenge asks for, without credentials: enough for the
+/// public images, and Docker Hub does not count token requests either.
+async fn anonymous_token(http: &reqwest::Client, challenge: &str) -> Option<String> {
+    let parameters: BTreeMap<&str, &str> = challenge
+        .strip_prefix("Bearer ")?
+        .split(',')
+        .filter_map(|pair| pair.split_once('='))
+        .map(|(key, value)| (key.trim(), value.trim().trim_matches('"')))
+        .collect();
+    let query: Vec<(&str, &str)> = ["service", "scope"]
+        .into_iter()
+        .filter_map(|key| parameters.get(key).map(|value| (key, *value)))
+        .collect();
+    #[derive(Deserialize)]
+    struct Token {
+        token: Option<String>,
+        access_token: Option<String>,
+    }
+    let url = reqwest::Url::parse_with_params(parameters.get("realm")?, &query).ok()?;
+    let token: Token = http.get(url).send().await.ok()?.json().await.ok()?;
+    token.token.or(token.access_token)
+}
+
+/// The SBOM of an image as last inspected, with the digest it belonged to: `spdx` is `None` when the registry had none.
+#[derive(Serialize, Deserialize)]
+struct CachedSbom {
+    digest: Option<String>,
+    spdx: Option<serde_json::Value>,
+}
+
+fn cached_sbom_path(cache_dir: &Path, image: &str) -> std::path::PathBuf {
+    let digest = ring::digest::digest(&ring::digest::SHA256, image.as_bytes());
+    let name: String = digest.as_ref().iter().map(|byte| format!("{byte:02x}")).collect();
+    cache_dir.join(format!("{name}.json"))
+}
+
 /// Scans each image once: its SBOM from the registry, as `docker buildx imagetools inspect` gives it without pulling
 /// the image (the `linux/amd64` one of a multi-platform image), then grype on that SBOM, keeping the vulnerabilities
-/// that have a fix: the ones a newer image can remove.
-pub fn scan_images(images: &BTreeSet<String>, work_dir: &Path) -> BTreeMap<String, ImageScan> {
+/// that have a fix: the ones a newer image can remove. The SBOM is kept in `cache_dir` with the digest it belongs to,
+/// and inspected again only when the image's digest in `digests` has changed: the registries, Docker Hub first, rate
+/// limit the inspections, not the HEAD requests that give the digests. Grype runs every time, since new advisories hit
+/// images that did not change.
+pub fn scan_images(images: &BTreeSet<String>, digests: &BTreeMap<String, String>, cache_dir: &Path, work_dir: &Path) -> BTreeMap<String, ImageScan> {
     if images.is_empty() {
         return BTreeMap::new();
     }
@@ -129,7 +234,8 @@ pub fn scan_images(images: &BTreeSet<String>, work_dir: &Path) -> BTreeMap<Strin
         for _ in 0..WORKERS {
             scope.spawn(|| {
                 while let Some(image) = queue.lock().unwrap_or_else(|e| e.into_inner()).next() {
-                    let scan = scan_image(image, work_dir).unwrap_or_else(|reason| ImageScan::Failed { reason });
+                    let scan =
+                        scan_image(image, digests.get(image).map(String::as_str), cache_dir, work_dir).unwrap_or_else(|reason| ImageScan::Failed { reason });
                     scans.lock().unwrap_or_else(|e| e.into_inner()).insert(image.clone(), scan);
                 }
             });
@@ -138,16 +244,31 @@ pub fn scan_images(images: &BTreeSet<String>, work_dir: &Path) -> BTreeMap<Strin
     scans.into_inner().unwrap_or_else(|e| e.into_inner())
 }
 
-fn scan_image(image: &str, work_dir: &Path) -> Result<ImageScan, String> {
-    let inspected = Command::new("docker")
-        .args(["buildx", "imagetools", "inspect", image, "--format", "{{ json .SBOM }}"])
-        .output()
-        .map_err(|e| format!("docker: {e}"))?;
-    if !inspected.status.success() {
-        return Err(String::from_utf8_lossy(&inspected.stderr).trim().to_string());
-    }
-    let sboms: serde_json::Value = serde_json::from_slice(&inspected.stdout).map_err(|e| format!("SBOM of {image}: {e}"))?;
-    let Some(spdx) = sboms.get("SPDX").or_else(|| sboms.get("linux/amd64").and_then(|platform| platform.get("SPDX"))) else {
+fn scan_image(image: &str, digest: Option<&str>, cache_dir: &Path, work_dir: &Path) -> Result<ImageScan, String> {
+    let cache_path = cached_sbom_path(cache_dir, image);
+    let cached: Option<CachedSbom> = std::fs::read(&cache_path).ok().and_then(|json| serde_json::from_slice(&json).ok());
+    let spdx = match cached {
+        Some(cached) if digest.is_some() && cached.digest.as_deref() == digest => cached.spdx,
+        cached => match inspect_sbom(image) {
+            Ok(spdx) => {
+                let entry = CachedSbom {
+                    digest: digest.map(str::to_string),
+                    spdx,
+                };
+                let mut file = tempfile::Builder::new().tempfile_in(cache_dir).map_err(|e| e.to_string())?;
+                serde_json::to_writer(&mut file, &entry).map_err(|e| e.to_string())?;
+                file.persist(&cache_path).map_err(|e| e.to_string())?;
+                entry.spdx
+            }
+            // rate limited: the last SBOM still tells which advisories hit the image, better than no scan at all
+            Err(reason) if reason.contains("429") || reason.to_lowercase().contains("toomanyrequests") => match cached {
+                Some(cached) => cached.spdx,
+                None => return Err(reason),
+            },
+            Err(reason) => return Err(reason),
+        },
+    };
+    let Some(spdx) = spdx else {
         return Ok(ImageScan::NoSbom);
     };
     let mut file = tempfile::Builder::new()
@@ -155,7 +276,7 @@ fn scan_image(image: &str, work_dir: &Path) -> Result<ImageScan, String> {
         .suffix(".spdx.json")
         .tempfile_in(work_dir)
         .map_err(|e| e.to_string())?;
-    serde_json::to_writer(&mut file, spdx).map_err(|e| e.to_string())?;
+    serde_json::to_writer(&mut file, &spdx).map_err(|e| e.to_string())?;
     let matched = Command::new("grype")
         .arg(format!("sbom:{}", file.path().display()))
         .args(["--only-fixed", "-o", "json"])
@@ -170,6 +291,26 @@ fn scan_image(image: &str, work_dir: &Path) -> Result<ImageScan, String> {
     Ok(ImageScan::Scanned {
         vulnerabilities: fixable(report),
     })
+}
+
+/// The SPDX SBOM the registry publishes for the image, `None` when it publishes none.
+fn inspect_sbom(image: &str) -> Result<Option<serde_json::Value>, String> {
+    let inspected = Command::new("docker")
+        .args(["buildx", "imagetools", "inspect", image, "--format", "{{ json .SBOM }}"])
+        .output()
+        .map_err(|e| format!("docker: {e}"))?;
+    if !inspected.status.success() {
+        return Err(String::from_utf8_lossy(&inspected.stderr).trim().to_string());
+    }
+    let mut sboms: serde_json::Value = serde_json::from_slice(&inspected.stdout).map_err(|e| format!("SBOM of {image}: {e}"))?;
+    let spdx = match sboms.get_mut("SPDX") {
+        Some(spdx) => Some(spdx.take()),
+        None => sboms
+            .get_mut("linux/amd64")
+            .and_then(|platform| platform.get_mut("SPDX"))
+            .map(serde_json::Value::take),
+    };
+    Ok(spdx)
 }
 
 #[derive(Deserialize)]
@@ -224,6 +365,19 @@ fn fixable(report: GrypeReport) -> Vec<ImageVulnerability> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn image_names_read_as_docker_reads_them() {
+        let read = |image: &str| {
+            let (registry, repository, reference) = reference(image);
+            format!("{registry} {repository} {reference}")
+        };
+        assert_eq!(read("nginx"), "registry-1.docker.io library/nginx latest");
+        assert_eq!(read("bitnami/redis:7.2"), "registry-1.docker.io bitnami/redis 7.2");
+        assert_eq!(read("ghcr.io/owner/app:1.0"), "ghcr.io owner/app 1.0");
+        assert_eq!(read("localhost:5000/app"), "localhost:5000 app latest");
+        assert_eq!(read("mongo@sha256:abc"), "registry-1.docker.io library/mongo sha256:abc");
+    }
 
     #[test]
     fn the_tag_and_the_digest_are_not_part_of_the_image() {
