@@ -1,4 +1,4 @@
-use super::{manifest_meta, tier_weight};
+use super::{RepoRef, manifest_meta, tier_weight};
 use crate::images::{ImageScan, ImageSummary, ImageVulnerability};
 use crate::scanners::{CheckStatus, RepoStats, ScannerKind};
 use crate::schema::{ElaineManifest, ExposureType, LifecycleType, ProjectType, ServiceTier};
@@ -26,7 +26,7 @@ pub struct ImageRow {
     #[serde(flatten)]
     pub summary: ImageSummary,
     /// The live repositories that run it.
-    pub repos: Vec<String>,
+    pub repos: Vec<RepoRef>,
     pub vulnerabilities: Vec<ImageVulnerability>,
 }
 
@@ -35,6 +35,7 @@ pub struct FailureRow {
     pub name: String,
     pub html_url: String,
     pub tier: Option<ServiceTier>,
+    pub manifest: bool,
     pub scanner: ScannerKind,
     pub checks: Vec<String>,
 }
@@ -44,6 +45,7 @@ pub struct VulnsRow {
     pub name: String,
     pub html_url: String,
     pub vulns: usize,
+    pub manifest: bool,
     #[serde(rename = "type")]
     pub project_type: Option<ProjectType>,
     pub tier: Option<ServiceTier>,
@@ -55,6 +57,7 @@ pub struct OutdatedRow {
     pub name: String,
     pub html_url: String,
     pub outdated: usize,
+    pub manifest: bool,
     #[serde(rename = "type")]
     pub project_type: Option<ProjectType>,
     pub tier: Option<ServiceTier>,
@@ -72,7 +75,8 @@ pub struct ArtifactRow {
 pub struct Risk {
     pub exposures: Vec<&'static str>,
     pub rows: Vec<RiskMatrixRow>,
-    /// Highest-risk repositories, sorted by score (full list; top-N slicing is presentation).
+    /// Every live repository, sorted by score (full list; top-N slicing is presentation), so that each matrix
+    /// cell can list its own.
     pub worst: Vec<WorstRow>,
 }
 
@@ -94,6 +98,8 @@ pub struct RiskCell {
 pub struct WorstRow {
     pub name: String,
     pub html_url: String,
+    /// Without a manifest, tier and exposure are the defaults: tier4, unknown.
+    pub manifest: bool,
     pub tier: ServiceTier,
     pub exposure: &'static str,
     #[serde(rename = "type")]
@@ -225,6 +231,7 @@ impl Security {
                         name: p.name.clone(),
                         html_url: p.html_url.clone(),
                         tier,
+                        manifest: p.manifest.is_some(),
                         scanner: *kind,
                         checks: checks
                             .iter()
@@ -245,6 +252,7 @@ impl Security {
                     name: p.name.clone(),
                     html_url: p.html_url.clone(),
                     vulns: count,
+                    manifest: p.manifest.is_some(),
                     project_type,
                     tier,
                     lifecycle,
@@ -262,6 +270,7 @@ impl Security {
                     name: p.name.clone(),
                     html_url: p.html_url.clone(),
                     outdated: count,
+                    manifest: p.manifest.is_some(),
                     project_type,
                     tier,
                     lifecycle,
@@ -288,10 +297,10 @@ impl Security {
             .collect();
         artifacts.sort_by(|a, b| b.repos.cmp(&a.repos).then_with(|| a.artifact.cmp(&b.artifact)));
 
-        let mut runners: BTreeMap<&str, Vec<String>> = BTreeMap::new();
+        let mut runners: BTreeMap<&str, Vec<RepoRef>> = BTreeMap::new();
         for p in live {
             for image in p.containers.iter().flatten() {
-                runners.entry(image.as_str()).or_default().push(p.name.clone());
+                runners.entry(image.as_str()).or_default().push(RepoRef::of(p));
             }
         }
         let mut image_rows: Vec<ImageRow> = runners
@@ -369,12 +378,13 @@ impl Risk {
 
         let mut worst: Vec<(u32, WorstRow)> = classified
             .iter()
-            .filter_map(|(p, tier, exposure, vulns, outdated)| {
+            .map(|(p, tier, exposure, vulns, outdated)| {
                 let score = tier_weight(*tier) * exposure.weight();
                 let (project_type, _, lifecycle) = manifest_meta(p);
                 let row = WorstRow {
                     name: p.name.clone(),
                     html_url: p.html_url.clone(),
+                    manifest: p.manifest.is_some(),
                     tier: *tier,
                     exposure: exposure.as_str(),
                     project_type,
@@ -388,7 +398,7 @@ impl Risk {
                         .map(|image| ImageSummary::of(image, images.get(image)).serious)
                         .sum(),
                 };
-                (score > 0).then_some((score, row))
+                (score, row)
             })
             .collect();
         worst.sort_by(|a, b| {
@@ -434,7 +444,7 @@ mod tests {
     }
 
     #[test]
-    fn risk_matrix_counts_cells_and_worst_omits_zero_score() {
+    fn risk_matrix_counts_cells_and_ranks_every_repository() {
         let t1_net = with_manifest(
             repo("critical", false),
             r#"{ "schema_version": 1, "name": "critical", "tier": "tier1", "environments": [ { "name": "prod", "type": "production", "ingress": "internet" } ] }"#,
@@ -448,9 +458,8 @@ mod tests {
         let t1 = risk.rows.iter().find(|r| r.tier == ServiceTier::Tier1).unwrap();
         let net = t1.cells.iter().find(|c| c.repos == 1).unwrap();
         assert_eq!((net.score, net.level), (16, "critical"));
-        // tier4 * local = 1*1 = 1 > 0 so both are listed, ordered by score desc
-        assert_eq!(risk.worst[0].name, "critical");
-        assert!(risk.worst.iter().all(|w| w.tier == ServiceTier::Tier1 || w.name == "sandbox"));
+        let worst: Vec<_> = risk.worst.iter().map(|w| (w.name.as_str(), w.tier, w.exposure)).collect();
+        assert_eq!(worst, [("critical", ServiceTier::Tier1, "internet"), ("sandbox", ServiceTier::Tier4, "local")]);
     }
 
     #[test]
@@ -477,7 +486,8 @@ mod tests {
         )]);
         let agg = Aggregates::calculate(&[stale, fresh], &images);
         let row = &agg.security.images[0];
-        assert_eq!((row.summary.fixable, row.summary.serious, row.repos.clone()), (2, 1, vec!["stale".to_string()]));
+        let runners: Vec<_> = row.repos.iter().map(|r| r.name.as_str()).collect();
+        assert_eq!((row.summary.fixable, row.summary.serious, runners), (2, 1, vec!["stale"]));
         let worst: Vec<_> = agg.security.risk.worst.iter().map(|w| (w.name.as_str(), w.vulns, w.image_vulns)).collect();
         assert_eq!(worst, [("fresh", 1, 0), ("stale", 0, 1)]);
         assert!(agg.security.vulns.iter().all(|r| r.name == "fresh"));

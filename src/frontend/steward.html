@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
+    <title>Elaine - Steward</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <script type="importmap">
+            {
+                "imports": {
+                    "ftl": "https://cdn.jsdelivr.net/npm/@optionfactory/fml@9.0.0/dist/ftl.min.mjs",
+                    "httpc": "https://cdn.jsdelivr.net/npm/@optionfactory/fml@9.0.0/dist/httpc.min.mjs"
+                },
+                "integrity": {
+                    "https://cdn.jsdelivr.net/npm/@optionfactory/fml@9.0.0/dist/ftl.min.mjs": "sha384-3FsxO49AlvCvGHZwOtw/qThTSOiWoboe/Pxw/zWDmmzt4qaAeYaWwtItd6sE7wva",
+                    "https://cdn.jsdelivr.net/npm/@optionfactory/fml@9.0.0/dist/httpc.min.mjs": "sha384-n4SJMMuykr2GPJAfVzpof4Lmi1NI0sZu8+cUHrw5hI4JayCxQ4BkM3AGAkpa9bzN"
+                }
+            }
+        </script>
+    <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/@optionfactory/fml@9.0.0/dist/ftl.min.mjs" integrity="sha384-3FsxO49AlvCvGHZwOtw/qThTSOiWoboe/Pxw/zWDmmzt4qaAeYaWwtItd6sE7wva">
+    <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/@optionfactory/fml@9.0.0/dist/httpc.min.mjs" integrity="sha384-n4SJMMuykr2GPJAfVzpof4Lmi1NI0sZu8+cUHrw5hI4JayCxQ4BkM3AGAkpa9bzN">
+    <link rel="stylesheet" href="elaine.css">
+</head>
+
+<body>
+    <header>
+        <h1><img class="brand-icon" src="favicon.svg" alt="">Elaine <span class="page">/ Steward</span></h1>
+        <nav>
+            <a href="index.html">Dashboard</a>
+            <a href="governance.html">Governance</a>
+            <a href="security.html">Security</a>
+            <a href="inventory.html">Inventory</a>
+        </nav>
+        <nav>
+            <a href="#repositories">Repositories</a>
+            <a href="#compliance">Pending compliance</a>
+        </nav>
+    </header>
+
+    <main>
+    <section id="repositories">
+        <steward-summary>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+        </steward-summary>
+        <h2>Live repositories</h2>
+        <p class="section-intro">
+            The live repositories whose manifest names this steward, the highest tier first. A steward written as an
+            email <code>first.last@domain</code> is the same person as <code>First Last</code>, whatever the case.
+        </p>
+        <steward-repositories-grid>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+        </steward-repositories-grid>
+    </section>
+
+    <section id="compliance">
+        <h2>Pending compliance</h2>
+        <p class="section-intro">
+            The compliance frameworks still to assess on these repositories, each with the repositories where it is pending.
+        </p>
+        <steward-compliance-grid>
+            <skeleton-row></skeleton-row>
+        </steward-compliance-grid>
+    </section>
+    </main>
+
+    <template id="summary-template">
+        <h2>{{ steward }}</h2>
+        <p data-tpl-if="written_as.length > 1">Written in the manifests as {{ written_as.join(', ') }}.</p>
+        <info-group>
+            <info-item>
+                <span class="label">Live repositories</span>
+                <span class="value">{{ repositories.length }}</span>
+            </info-item>
+            <info-item>
+                <span class="label">Tier 1 or 2</span>
+                <span class="value">{{ critical }}</span>
+            </info-item>
+            <info-item>
+                <span class="label">Known vulnerabilities</span>
+                <span class="value">{{ vulnerabilities }}</span>
+            </info-item>
+            <info-item>
+                <span class="label">Outdated dependencies</span>
+                <span class="value">{{ outdated }}</span>
+            </info-item>
+        </info-group>
+    </template>
+
+    <template id="repositories-template">
+        <p class="nothing" data-tpl-if="self.length == 0">No live repository names this steward.</p>
+        <table class="steward-repositories" data-tpl-if="self.length > 0">
+            <thead>
+                <tr>
+                    <th>Repository</th>
+                    <th>Tier</th>
+                    <th>Lifecycle</th>
+                    <th>Vulnerabilities</th>
+                    <th>Outdated</th>
+                    <th>Last push</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr data-tpl-each="self" data-tpl-var="r">
+                    <td><a data-tpl-href="r.href">{{ r.name }}</a></td>
+                    <td>{{ r.tier ?? 'unspecified' }}</td>
+                    <td>{{ r.lifecycle ?? 'unspecified' }}</td>
+                    <td data-tpl-class-append="r.vulnerabilities == null ? 'unknown' : ''">{{ r.vulnerabilities ?? 'no data' }}</td>
+                    <td data-tpl-class-append="r.outdated == null ? 'unknown' : ''">{{ r.outdated ?? 'no data' }}</td>
+                    <td data-tpl-title="r.pushed.exact">{{ r.pushed.relative }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </template>
+
+    <template id="compliance-template">
+        <p class="nothing" data-tpl-if="repositories == 0">No live repositories, so nothing pending.</p>
+        <p class="nothing" data-tpl-if="repositories > 0 && pending.length == 0 && without_compliance.length == 0">Every framework is assessed on these repositories.</p>
+        <table class="steward-pending" data-tpl-if="pending.length > 0">
+            <thead>
+                <tr>
+                    <th>Framework</th>
+                    <th>Pending on</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr data-tpl-each="pending" data-tpl-var="f">
+                    <td><strong>{{ f.label }}</strong></td>
+                    <td>
+                        <repository-links>
+                            <a data-tpl-each="f.repositories" data-tpl-var="r" data-tpl-href="r.href">{{ r.name }}</a>
+                        </repository-links>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+        <h3 data-tpl-if="without_compliance.length > 0">Without a compliance block</h3>
+        <repository-links data-tpl-if="without_compliance.length > 0">
+            <a data-tpl-each="without_compliance" data-tpl-var="r" data-tpl-href="r.href">{{ r.name }}</a>
+        </repository-links>
+    </template>
+
+    <template id="not-found-template">
+        <error-box>No repository names <strong>{{ steward }}</strong> as a steward.</error-box>
+    </template>
+
+    <script type="module">
+        import { Templates } from "ftl";
+        import { authenticate, setupNavSpy, repositoryHref, relativeTime, exactTime } from "/elaine.js";
+
+        const { http } = await authenticate();
+
+        const FRAMEWORK_LABELS = {
+            dora: 'DORA',
+            cra: 'CRA',
+            nis2: 'NIS2',
+            ai_act: 'AI Act',
+            gdpr: 'GDPR',
+            data_residency: 'Data residency',
+            ads: 'ADS',
+        };
+        const linked = name => ({ name, href: repositoryHref(name) });
+
+        async function showSteward() {
+            const steward = decodeURIComponent(window.location.hash.slice(1));
+            let page;
+            try {
+                page = await http.get(`/api/stewards/${encodeURIComponent(steward)}`).fetchJson();
+            } catch {
+                document.querySelector('header h1 .page').textContent = `/ ${steward || 'Steward'}`;
+                Templates.fromSelector('#not-found-template').withOverlay({ steward }).renderToSelector('steward-summary');
+                document.querySelector('steward-repositories-grid').replaceChildren();
+                document.querySelector('steward-compliance-grid').replaceChildren();
+                return;
+            }
+            document.querySelector('header h1 .page').textContent = `/ ${page.steward}`;
+            document.title = `Elaine - ${page.steward}`;
+            const repositories = page.repositories.map(r => ({ ...r, href: repositoryHref(r.name), pushed: { relative: relativeTime(r.pushed_at), exact: exactTime(r.pushed_at) } }));
+            const summary = {
+                ...page,
+                critical: repositories.filter(r => r.tier === 'tier1' || r.tier === 'tier2').length,
+                vulnerabilities: repositories.reduce((sum, r) => sum + (r.vulnerabilities ?? 0), 0),
+                outdated: repositories.reduce((sum, r) => sum + (r.outdated ?? 0), 0),
+            };
+            Templates.fromSelector('#summary-template').withOverlay(summary).renderToSelector('steward-summary');
+            Templates.fromSelector('#repositories-template').withOverlay(repositories).renderToSelector('steward-repositories-grid');
+            Templates.fromSelector('#compliance-template').withOverlay({
+                repositories: repositories.length,
+                pending: page.pending.map(f => ({ label: FRAMEWORK_LABELS[f.framework] ?? f.framework, repositories: f.repositories.map(linked) })),
+                without_compliance: page.without_compliance.map(linked),
+            }).renderToSelector('steward-compliance-grid');
+        }
+
+        // The hash names the steward, so the section links scroll without changing it.
+        document.querySelector('header > nav:nth-of-type(2)').addEventListener('click', e => {
+            const link = e.target.closest('a');
+            if (!link) return;
+            e.preventDefault();
+            document.querySelector(link.hash)?.scrollIntoView();
+        });
+
+        window.addEventListener('hashchange', () => {
+            window.scrollTo(0, 0);
+            showSteward();
+        });
+        await showSteward();
+        setupNavSpy();
+    </script>
+</body>
+
+</html>

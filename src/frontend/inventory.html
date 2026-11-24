@@ -99,7 +99,8 @@
     <section id="stewards">
         <h2>Repositories by steward</h2>
         <p class="section-intro">
-            One row per stewardship assignment across the live repositories, sorted by steward name. Use the
+            One row per stewardship assignment across the live repositories, sorted by steward name. Stewards are
+            compared ignoring case, and one written as an email is listed under the name it spells. Use the
             filter to narrow the table down to rows matching a steward or a repository name. The aggregated
             recap by steward lives on the Governance page.
         </p>
@@ -133,7 +134,7 @@
             </thead>
             <tbody>
                 <tr data-tpl-each="self" data-tpl-var="r">
-                    <td><a data-tpl-href="r.html_url" target="_blank" rel="noopener noreferrer">{{ r.name }}</a></td>
+                    <td><span class="repo-link"><a data-tpl-href="#elaine:repositoryHref(r.name)">{{ r.name }}</a><a class="github" data-tpl-href="r.html_url" target="_blank" rel="noopener noreferrer" title="Open on GitHub" aria-label="Open on GitHub"></a></span></td>
                     <td>{{ r.type ?? 'unspecified' }}</td>
                     <td>{{ r.tier ?? 'unspecified' }}</td>
                     <td>{{ r.lifecycle ?? 'unspecified' }}</td>
@@ -156,8 +157,8 @@
             </thead>
             <tbody>
                 <tr data-tpl-each="projects" data-tpl-var="row" data-tpl-attr-append="row.attrs">
-                    <td>{{ row.steward }}</td>
-                    <td><a data-tpl-href="row.html_url" target="_blank" rel="noopener noreferrer">{{ row.name }}</a></td>
+                    <td><a data-tpl-href="#elaine:stewardHref(row.steward)">{{ row.steward }}</a></td>
+                    <td><span class="repo-link"><a data-tpl-href="#elaine:repositoryHref(row.name)">{{ row.name }}</a><a class="github" data-tpl-href="row.html_url" target="_blank" rel="noopener noreferrer" title="Open on GitHub" aria-label="Open on GitHub"></a></span></td>
                     <td>{{ row.type ?? 'unspecified' }}</td>
                     <td>{{ row.tier ?? 'unspecified' }}</td>
                     <td>{{ row.lifecycle ?? 'unspecified' }}</td>
@@ -181,10 +182,10 @@
             <tbody>
                 <tr data-tpl-each="self" data-tpl-var="d">
                     <td><strong>{{ d.domain }}</strong></td>
-                    <td><a data-tpl-href="d.html_url" target="_blank" rel="noopener noreferrer">{{ d.repo }}</a></td>
+                    <td><span class="repo-link"><a data-tpl-href="#elaine:repositoryHref(d.repo)">{{ d.repo }}</a><a class="github" data-tpl-href="d.html_url" target="_blank" rel="noopener noreferrer" title="Open on GitHub" aria-label="Open on GitHub"></a></span></td>
                     <td>{{ d.type ?? 'unspecified' }}</td>
                     <td>{{ d.ingress ?? 'unspecified' }}</td>
-                    <td>{{ d.certs ?? 'unspecified' }}</td>
+                    <td>{{ d.certificates ?? 'unspecified' }}</td>
                 </tr>
             </tbody>
         </table>
@@ -215,8 +216,10 @@
     </template>
 
     <script type="module">
-        import { Templates } from "ftl";
-        import { authenticate, setupNavSpy } from "/elaine.js";
+        import { Templates, registry } from "ftl";
+        import { authenticate, setupNavSpy, repositoryHref, stewardHref } from "/elaine.js";
+
+        registry.defineModule('elaine', { repositoryHref, stewardHref });
 
         const { config, http } = await authenticate();
 

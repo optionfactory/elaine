@@ -38,6 +38,81 @@ impl Aggregates {
     }
 }
 
+/// A repository as the pages link it: to its elaine page by name, and to GitHub.
+#[derive(Debug, Clone, Serialize)]
+pub struct RepoRef {
+    pub name: String,
+    pub html_url: String,
+}
+
+impl RepoRef {
+    pub(crate) fn of(p: &RepoStats) -> Self {
+        Self {
+            name: p.name.clone(),
+            html_url: p.html_url.clone(),
+        }
+    }
+}
+
+/// The person a steward entry names: `first.last@domain` is `First Last`, anything else is the name as written.
+pub(crate) fn steward_name(written: &str) -> String {
+    let written = written.trim();
+    let Some((local, _)) = written.split_once('@') else {
+        return written.to_string();
+    };
+    local
+        .split('.')
+        .filter(|word| !word.is_empty())
+        .map(|word| {
+            let mut chars = word.chars();
+            chars
+                .next()
+                .into_iter()
+                .flat_map(char::to_uppercase)
+                .chain(chars.flat_map(char::to_lowercase))
+                .collect::<String>()
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// One display name per steward across the live repositories. Stewards compare case-insensitively and an
+/// email counts as the name it spells; the display name is a spelling written as a name when there is one.
+pub(crate) struct StewardNames(BTreeMap<String, (String, bool)>);
+
+impl StewardNames {
+    pub(crate) fn of(live: &[&RepoStats]) -> Self {
+        let mut names: BTreeMap<String, (String, bool)> = BTreeMap::new();
+        for written in live.iter().filter_map(|p| p.manifest.as_ref()?.stewards.as_ref()).flatten() {
+            let name = steward_name(written);
+            let from_email = written.contains('@');
+            let entry = names.entry(name.to_lowercase()).or_insert_with(|| (name.clone(), from_email));
+            if entry.1 && !from_email {
+                *entry = (name, false);
+            }
+        }
+        Self(names)
+    }
+
+    /// The display name of a steward as a manifest writes it.
+    pub(crate) fn display(&self, written: &str) -> String {
+        let name = steward_name(written);
+        self.0.get(&name.to_lowercase()).map(|(display, _)| display.clone()).unwrap_or(name)
+    }
+
+    /// The distinct stewards of a repository, by display name, in manifest order.
+    pub(crate) fn of_repo(&self, p: &RepoStats) -> Vec<String> {
+        let mut stewards: Vec<String> = Vec::new();
+        for written in p.manifest.iter().flat_map(|m| m.stewards.iter().flatten()) {
+            let display = self.display(written);
+            if !stewards.contains(&display) {
+                stewards.push(display);
+            }
+        }
+        stewards
+    }
+}
+
 /// The manifest metadata every per-repository row carries, in one place.
 pub(crate) fn manifest_meta(p: &RepoStats) -> (Option<ProjectType>, Option<ServiceTier>, Option<LifecycleType>) {
     let m = p.manifest.as_ref();

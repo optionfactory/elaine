@@ -1,7 +1,7 @@
 use crate::schema::{ExposureType, LifecycleType, ProjectType, ServiceTier};
 use axum::{
     Extension, Json, Router,
-    extract::{DefaultBodyLimit, State},
+    extract::{DefaultBodyLimit, Path, State},
     http::StatusCode,
     middleware,
     response::IntoResponse,
@@ -9,10 +9,13 @@ use axum::{
 };
 use axum_extra::extract::Query;
 use serde::Deserialize;
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use super::login::{self, SignedIn};
-use super::{AppState, FrontendAssets};
+use super::{AppState, CacheData, FrontendAssets};
+use crate::images::{ImageScan, ImageSummary, ImageVulnerability};
+use crate::scanners::RepoStats;
 use crate::stats::StatsStore;
 
 #[derive(Deserialize)]
@@ -48,6 +51,7 @@ struct StalenessRow {
     html_url: String,
     pushed_at: String,
     months: i64,
+    manifest: bool,
     #[serde(rename = "type")]
     project_type: Option<ProjectType>,
     tier: Option<ServiceTier>,
@@ -72,6 +76,7 @@ pub async fn api_staleness_handler(State(state): State<Arc<AppState>>) -> impl I
                 html_url: p.html_url.clone(),
                 pushed_at: p.pushed_at.clone(),
                 months,
+                manifest: p.manifest.is_some(),
                 project_type: p.manifest.as_ref().and_then(|m| m.project_type),
                 tier: p.manifest.as_ref().and_then(|m| m.tier),
                 lifecycle: p.manifest.as_ref().and_then(|m| m.lifecycle),
@@ -97,13 +102,12 @@ pub async fn api_projects_handler(State(state): State<Arc<AppState>>, Query(quer
     let filter_values = query.filter.unwrap_or_default();
     let filters: Vec<&str> = filter_values.iter().map(|s| s.as_str()).collect();
 
-    let mut filtered: Vec<&crate::scanners::RepoStats> = cache
+    let mut filtered: Vec<&RepoStats> = cache
         .projects
         .iter()
         .filter(|p| {
             if let Some(t) = &term
-                && !p.name.to_lowercase().contains(t)
-                && !p.description.as_deref().is_some_and(|d| d.to_lowercase().contains(t))
+                && !searched_text(p).any(|text| text.to_lowercase().contains(t))
             {
                 return false;
             }
@@ -120,32 +124,98 @@ pub async fn api_projects_handler(State(state): State<Arc<AppState>>, Query(quer
         filtered = vec![filtered[pick_index]];
     }
 
-    /// A repository with what the last image scan found in each image it runs.
-    #[derive(serde::Serialize)]
-    struct ProjectView<'a> {
-        #[serde(flatten)]
-        repo: &'a crate::scanners::RepoStats,
-        images: Vec<crate::images::ImageSummary>,
-    }
-
+    let total = filtered.len();
     let offset = query.offset.unwrap_or(0);
     let limit = query.limit.unwrap_or(5);
     let paginated: Vec<ProjectView> = filtered
         .into_iter()
         .skip(offset)
         .take(limit)
-        .map(|repo| ProjectView {
+        .map(|repo| ProjectView::of(repo, &cache.images))
+        .collect();
+    ([(TOTAL_COUNT, total.to_string())], Json(paginated)).into_response()
+}
+
+/// A repository with what the last image scan found in each image it runs.
+#[derive(serde::Serialize)]
+struct ProjectView<'a> {
+    #[serde(flatten)]
+    repo: &'a RepoStats,
+    images: Vec<ImageSummary>,
+}
+
+impl<'a> ProjectView<'a> {
+    fn of(repo: &'a RepoStats, images: &BTreeMap<String, ImageScan>) -> Self {
+        Self {
             repo,
             images: repo
                 .containers
                 .iter()
                 .flatten()
-                .map(|image| crate::images::ImageSummary::of(image, cache.images.get(image)))
+                .map(|image| ImageSummary::of(image, images.get(image)))
                 .collect(),
-        })
-        .collect();
-    Json(paginated).into_response()
+        }
+    }
 }
+
+/// A repository as `/api/projects` lists it, plus what only its own page shows: the compliance frameworks still
+/// pending and the vulnerabilities found in the images it runs.
+#[derive(serde::Serialize)]
+struct ProjectDetail<'a> {
+    #[serde(flatten)]
+    view: ProjectView<'a>,
+    pending_frameworks: Vec<&'static str>,
+    image_vulnerabilities: BTreeMap<&'a str, &'a [ImageVulnerability]>,
+}
+
+fn find_project<'a>(cache: &'a CacheData, name: &str) -> Option<ProjectDetail<'a>> {
+    let repo = cache.projects.iter().find(|p| p.name == name)?;
+    let compliance = repo.manifest.as_ref().and_then(|m| m.compliance.as_ref());
+    Some(ProjectDetail {
+        view: ProjectView::of(repo, &cache.images),
+        pending_frameworks: super::aggregates::FRAMEWORKS
+            .iter()
+            .filter(|(_, is_pending)| compliance.is_some_and(is_pending))
+            .map(|(framework, _)| *framework)
+            .collect(),
+        image_vulnerabilities: repo
+            .containers
+            .iter()
+            .flatten()
+            .filter_map(|image| match cache.images.get(image) {
+                Some(ImageScan::Scanned { vulnerabilities }) if !vulnerabilities.is_empty() => Some((image.as_str(), vulnerabilities.as_slice())),
+                _ => None,
+            })
+            .collect(),
+    })
+}
+
+pub async fn api_project_handler(State(state): State<Arc<AppState>>, Path(name): Path<String>) -> impl IntoResponse {
+    let cache = state.cache.read().await;
+    match find_project(&cache, &name) {
+        Some(project) => Json(project).into_response(),
+        None => (StatusCode::NOT_FOUND, "No such repository").into_response(),
+    }
+}
+
+/// What the search of the dashboard looks in: the name, the description, and from the manifest the stewards, the
+/// commissioner and the domains of the environments.
+fn searched_text(p: &RepoStats) -> impl Iterator<Item = &str> {
+    let manifest = p.manifest.as_ref();
+    std::iter::once(p.name.as_str())
+        .chain(p.description.as_deref())
+        .chain(manifest.into_iter().flat_map(|m| m.stewards.iter().flatten().map(String::as_str)))
+        .chain(manifest.and_then(|m| m.commissioner.as_deref()))
+        .chain(
+            manifest
+                .into_iter()
+                .flat_map(|m| m.environments.iter().flatten())
+                .flat_map(|environment| environment.domains.iter().flatten().map(String::as_str)),
+        )
+}
+
+/// How many repositories match the search and the filters, whatever the page asked: the body stays a plain array.
+const TOTAL_COUNT: &str = "x-total-count";
 
 pub async fn embedded_assets_handler(uri: axum::http::Uri) -> impl IntoResponse {
     let mut path = uri.path().trim_start_matches('/');
@@ -191,6 +261,8 @@ pub fn create_router(app_state: Arc<AppState>, dev: bool) -> Router {
         .route("/api/staleness", get(api_staleness_handler))
         .route("/api/schema", get(api_schema_handler))
         .route("/api/projects", get(api_projects_handler))
+        .route("/api/projects/{name}", get(api_project_handler))
+        .route("/api/stewards/{name}", get(super::steward::api_steward_handler))
         .route("/api/logs", get(api_logs_handler));
     if dev {
         behind_login = behind_login.fallback_service(tower_http::services::ServeDir::new("src/frontend"));
@@ -212,7 +284,7 @@ pub fn create_router(app_state: Arc<AppState>, dev: bool) -> Router {
     public.merge(behind_login).with_state(app_state)
 }
 
-fn matches_filters(p: &crate::scanners::RepoStats, filters: &[&str]) -> bool {
+fn matches_filters(p: &RepoStats, filters: &[&str]) -> bool {
     let live = !p.archived;
     let manifest = p.manifest.is_some();
     let public = !p.private;
@@ -356,7 +428,6 @@ fn matches_filters(p: &crate::scanners::RepoStats, filters: &[&str]) -> bool {
 mod tests {
     use super::*;
     use crate::github::GithubRepository;
-    use crate::scanners::RepoStats;
 
     fn repo(audit_json: Option<&str>) -> RepoStats {
         let mut r = RepoStats::new_from_github(&GithubRepository {
@@ -397,5 +468,35 @@ mod tests {
         ));
         assert!(matches_filters(&pending, &["non-compliant"]));
         assert!(!matches_filters(&pending, &["compliant"]));
+    }
+
+    #[test]
+    fn a_project_is_found_by_name_with_its_pending_frameworks_and_image_vulnerabilities() {
+        let mut x = repo(Some(
+            r#"{ "schema_version": 1, "name": "x", "compliance": { "dora": "non-critical", "cra": "default", "nis2": "out-of-scope", "ai_act": "out-of-scope", "gdpr": "pending-assessment", "data_residency": "eu", "ads": "internal" } }"#,
+        ));
+        x.containers = Some(vec!["acme/nginx:257".into()]);
+        let vulnerability = ImageVulnerability {
+            package: "openssl".into(),
+            version: "3.0".into(),
+            fixed_in: "3.1".into(),
+            severity: crate::images::Severity::High,
+            vuln_id: "CVE-1".into(),
+        };
+        let cache = CacheData {
+            projects: vec![x],
+            images: BTreeMap::from([(
+                "acme/nginx:257".to_string(),
+                ImageScan::Scanned {
+                    vulnerabilities: vec![vulnerability],
+                },
+            )]),
+            stats: Default::default(),
+            aggregates: Default::default(),
+        };
+        let found = find_project(&cache, "x").unwrap();
+        assert_eq!(found.pending_frameworks, ["gdpr"]);
+        assert_eq!(found.image_vulnerabilities["acme/nginx:257"].len(), 1);
+        assert!(find_project(&cache, "y").is_none());
     }
 }

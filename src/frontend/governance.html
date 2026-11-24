@@ -60,6 +60,7 @@
             <skeleton-row></skeleton-row>
             <skeleton-row></skeleton-row>
         </compliance-grid>
+        <coverage-repos hidden></coverage-repos>
     </section>
 
     <section id="stewards">
@@ -70,7 +71,8 @@
             measures assignments rather than unique repositories. <em>Tier 1/2</em> counts the projects carrying
             an SLA and <em>Active</em> the ones with an <em>active</em> lifecycle: together they hint at how much
             operational weight sits on each person. Rows are sorted by active project count, descending.
-            Repositories declaring no steward are not listed &mdash; an unowned project is nobody's problem,
+            Stewards are compared ignoring case, and one written as an email counts as the name it spells.
+            Repositories declaring no steward are not listed: an unowned project is nobody's problem,
             which is exactly the problem.
         </p>
 
@@ -83,6 +85,18 @@
             <skeleton-row></skeleton-row>
             <skeleton-row></skeleton-row>
         </stewards-recap-grid>
+
+        <h2>Stewards written as an email</h2>
+        <p class="section-intro">
+            Manifests naming a steward by email instead of by name. They are counted above under the name the email
+            spells (<code>first.last@domain</code> is <em>First Last</em>), but the manifest is easier to read and to
+            search when it writes the name: fix these entries in their <code>elaine.yaml</code>.
+        </p>
+
+        <steward-emails-grid>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+        </steward-emails-grid>
     </section>
 
     <section id="staleness">
@@ -128,8 +142,14 @@
                             <p>{{ applicability }}</p>
                         </tooltip>
                     </td>
-                    <td>{{ assessed }}</td>
-                    <td>{{ pending }}</td>
+                    <td>
+                        <a data-tpl-if="assessed > 0" data-tpl-href="`#coverage/{key}/assessed`" title="Show the assessed repositories">{{ assessed }}</a>
+                        <span data-tpl-if="assessed == 0">0</span>
+                    </td>
+                    <td>
+                        <a data-tpl-if="pending > 0" data-tpl-href="`#coverage/{key}/pending`" title="Show the pending repositories">{{ pending }}</a>
+                        <span data-tpl-if="pending == 0">0</span>
+                    </td>
                     <td>{{ missing }}</td>
                     <td>
                         <div class="coverage-bar">
@@ -158,7 +178,7 @@
             </thead>
             <tbody>
                 <tr data-tpl-each="self" data-tpl-var="s">
-                    <td>{{ s.steward }}</td>
+                    <td><a data-tpl-href="#elaine:stewardHref(s.steward)">{{ s.steward }}</a></td>
                     <td>{{ s.projects }}</td>
                     <td>{{ s.critical }}</td>
                     <td>{{ s.active }}</td>
@@ -180,21 +200,53 @@
                 </tr>
             </thead>
             <tbody>
-                <tr data-tpl-each="self">
-                    <td><a data-tpl-href="html_url" target="_blank" rel="noopener noreferrer">{{ name }}</a></td>
-                    <td>{{ pushed_at }}</td>
-                    <td><badge data-tpl-class-append="`stale-{bucket}`">{{ months }} months</badge></td>
-                    <td>{{ type ?? 'unspecified' }}</td>
-                    <td>{{ tier ?? 'unspecified' }}</td>
-                    <td>{{ lifecycle ?? 'unspecified' }}</td>
+                <tr data-tpl-each="self" data-tpl-var="r">
+                    <td><span class="repo-link"><a data-tpl-href="#elaine:repositoryHref(r.name)">{{ r.name }}</a><a class="github" data-tpl-href="r.html_url" target="_blank" rel="noopener noreferrer" title="Open on GitHub" aria-label="Open on GitHub"></a></span></td>
+                    <td><time data-tpl-datetime="r.pushed_at" data-tpl-title="#elaine:exactTime(r.pushed_at)">{{ #elaine:relativeTime(r.pushed_at) }}</time></td>
+                    <td><badge data-tpl-class-append="`stale-{r.bucket}`">{{ r.months }} months</badge></td>
+                    <td class="no-manifest" data-tpl-if="!r.manifest"><badges><badge class="nomanifest">no manifest</badge></badges></td>
+                    <td data-tpl-if="r.manifest">{{ r.type ?? 'unspecified' }}</td>
+                    <td data-tpl-if="r.manifest">{{ r.tier ?? 'unspecified' }}</td>
+                    <td data-tpl-if="r.manifest">{{ r.lifecycle ?? 'unspecified' }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </template>
+
+    <template id="coverage-repos-template">
+        <h3>{{ framework }} {{ state }}: {{ repos.length }} repositories <a href="#coverage">close</a></h3>
+        <ul>
+            <li data-tpl-each="repos" data-tpl-var="r">
+                <a data-tpl-href="#elaine:repositoryHref(r.name)">{{ r.name }}</a><a class="github" data-tpl-href="r.html_url" target="_blank" rel="noopener noreferrer" title="Open on GitHub" aria-label="Open on GitHub"></a>
+            </li>
+        </ul>
+    </template>
+
+    <template id="steward-emails-template">
+        <p data-tpl-if="self.length == 0">Every manifest names its stewards by name.</p>
+        <table class="steward-emails" data-tpl-if="self.length > 0">
+            <thead>
+                <tr>
+                    <th>Repository</th>
+                    <th>Written as</th>
+                    <th>Counted as</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr data-tpl-each="self" data-tpl-var="e">
+                    <td><span class="repo-link"><a data-tpl-href="#elaine:repositoryHref(e.name)">{{ e.name }}</a><a class="github" data-tpl-href="e.html_url" target="_blank" rel="noopener noreferrer" title="Open on GitHub" aria-label="Open on GitHub"></a></span></td>
+                    <td>{{ e.written }}</td>
+                    <td><a data-tpl-href="#elaine:stewardHref(e.steward)">{{ e.steward }}</a></td>
                 </tr>
             </tbody>
         </table>
     </template>
 
     <script type="module">
-        import { Templates } from "ftl";
-        import { authenticate, setupNavSpy } from "/elaine.js";
+        import { Templates, registry } from "ftl";
+        import { authenticate, setupNavSpy, repositoryHref, stewardHref, relativeTime, exactTime } from "/elaine.js";
+
+        registry.defineModule('elaine', { repositoryHref, stewardHref, relativeTime, exactTime });
 
         const { config, http } = await authenticate();
 
@@ -208,6 +260,7 @@
         const rows = g.coverage.map(r => {
             const color = r.coverage_pct >= 80 ? 'var(--success)' : r.coverage_pct >= 50 ? 'var(--warning)' : 'var(--danger)';
             return {
+                key: r.framework,
                 framework: r.framework.replace('_', '-').toUpperCase(),
                 applicability: docs[r.framework]?.description ?? '',
                 assessed: r.assessed,
@@ -220,7 +273,23 @@
         rows.sort((a, b) => a.coverage_pct - b.coverage_pct);
         Templates.fromSelector('#compliance-template').withOverlay(rows).renderToSelector('compliance-grid');
 
+        // #coverage/<framework>/<assessed|pending> lists the repositories behind that count
+        const coverageRepos = document.querySelector('coverage-repos');
+        const showCoverageReposFromHash = () => {
+            const [section, key, state] = decodeURIComponent(window.location.hash.slice(1)).split('/');
+            const row = g.coverage.find(r => r.framework === key);
+            const repos = row?.[`${state}_repos`];
+            coverageRepos.hidden = section !== 'coverage' || !repos;
+            if (coverageRepos.hidden) return;
+            const framework = rows.find(r => r.key === key).framework;
+            Templates.fromSelector('#coverage-repos-template').withOverlay({ framework, state, repos }).renderTo(coverageRepos);
+            coverageRepos.scrollIntoView({ block: 'nearest' });
+        };
+        window.addEventListener('hashchange', showCoverageReposFromHash);
+        showCoverageReposFromHash();
+
         Templates.fromSelector('#stewards-recap-template').withOverlay(g.stewards_recap).renderToSelector('stewards-recap-grid');
+        Templates.fromSelector('#steward-emails-template').withOverlay(g.steward_emails).renderToSelector('steward-emails-grid');
 
         const staleness = await http.get('/api/staleness').fetchJson();
         const enriched = staleness

@@ -1,6 +1,7 @@
 pub mod aggregates;
 pub mod login;
 pub mod routes;
+mod steward;
 
 use crate::config::Config;
 use rust_embed::RustEmbed;

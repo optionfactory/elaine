@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
+    <title>Elaine - Repository</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <script type="importmap">
+            {
+                "imports": {
+                    "ftl": "https://cdn.jsdelivr.net/npm/@optionfactory/fml@9.0.0/dist/ftl.min.mjs",
+                    "httpc": "https://cdn.jsdelivr.net/npm/@optionfactory/fml@9.0.0/dist/httpc.min.mjs"
+                },
+                "integrity": {
+                    "https://cdn.jsdelivr.net/npm/@optionfactory/fml@9.0.0/dist/ftl.min.mjs": "sha384-3FsxO49AlvCvGHZwOtw/qThTSOiWoboe/Pxw/zWDmmzt4qaAeYaWwtItd6sE7wva",
+                    "https://cdn.jsdelivr.net/npm/@optionfactory/fml@9.0.0/dist/httpc.min.mjs": "sha384-n4SJMMuykr2GPJAfVzpof4Lmi1NI0sZu8+cUHrw5hI4JayCxQ4BkM3AGAkpa9bzN"
+                }
+            }
+        </script>
+    <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/@optionfactory/fml@9.0.0/dist/ftl.min.mjs" integrity="sha384-3FsxO49AlvCvGHZwOtw/qThTSOiWoboe/Pxw/zWDmmzt4qaAeYaWwtItd6sE7wva">
+    <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/@optionfactory/fml@9.0.0/dist/httpc.min.mjs" integrity="sha384-n4SJMMuykr2GPJAfVzpof4Lmi1NI0sZu8+cUHrw5hI4JayCxQ4BkM3AGAkpa9bzN">
+    <link rel="stylesheet" href="elaine.css">
+</head>
+
+<body>
+    <header>
+        <h1><img class="brand-icon" src="favicon.svg" alt="">Elaine <span class="page">/ Repository</span></h1>
+        <nav>
+            <a href="index.html">Dashboard</a>
+            <a href="governance.html">Governance</a>
+            <a href="security.html">Security</a>
+            <a href="inventory.html">Inventory</a>
+        </nav>
+        <nav>
+            <a href="#overview">Overview</a>
+            <a href="#manifest">Manifest</a>
+            <a href="#compliance">Compliance</a>
+            <a href="#vulnerabilities">Vulnerabilities</a>
+            <a href="#images">Container images</a>
+            <a href="#outdated">Outdated</a>
+            <a href="#failures">Scanner failures</a>
+        </nav>
+    </header>
+
+    <main>
+    <section id="overview">
+        <repository-summary>
+            <skeleton-row></skeleton-row>
+            <skeleton-row></skeleton-row>
+        </repository-summary>
+    </section>
+
+    <section id="manifest">
+        <h2>Manifest</h2>
+        <manifest-grid>
+            <skeleton-row></skeleton-row>
+        </manifest-grid>
+    </section>
+
+    <section id="compliance">
+        <h2>Compliance</h2>
+        <compliance-grid>
+            <skeleton-row></skeleton-row>
+        </compliance-grid>
+    </section>
+
+    <section id="vulnerabilities">
+        <h2>Known vulnerabilities</h2>
+        <p class="section-intro">
+            Vulnerabilities of the dependencies, as OSV reports them, one row per package and installed version.
+            The scanners do not record a severity or a fixed version for these: the advisory has both.
+        </p>
+        <vulnerabilities-grid>
+            <skeleton-row></skeleton-row>
+        </vulnerabilities-grid>
+    </section>
+
+    <section id="images">
+        <h2>Container images</h2>
+        <p class="section-intro">
+            The images this repository runs, from its pinch configurations and Ansible playbooks. Only the
+            vulnerabilities that already have a fix are listed, grouped by severity: a newer image removes them.
+        </p>
+        <images-grid>
+            <skeleton-row></skeleton-row>
+        </images-grid>
+    </section>
+
+    <section id="outdated">
+        <h2>Outdated dependencies</h2>
+        <outdated-grid>
+            <skeleton-row></skeleton-row>
+        </outdated-grid>
+    </section>
+
+    <section id="failures">
+        <h2>Scanner failures</h2>
+        <p class="section-intro">
+            A failed check means its numbers above are <em>unknown</em>, not zero, until it succeeds again.
+        </p>
+        <failures-grid>
+            <skeleton-row></skeleton-row>
+        </failures-grid>
+    </section>
+    </main>
+
+    <template id="summary-template">
+        <h2><a data-tpl-href="html_url" target="_blank" rel="noopener noreferrer">{{ name }}</a></h2>
+        <p>{{ description ?? 'no description' }}</p>
+        <badges>
+            <badge data-tpl-if="private" class="private">Private</badge>
+            <badge data-tpl-if="!private" class="public">Public</badge>
+            <badge data-tpl-if="fork" class="fork">Fork</badge>
+            <badge data-tpl-if="disabled" class="disabled">Disabled</badge>
+            <badge data-tpl-if="archived" class="archived">Archived</badge>
+            <badge data-tpl-if="!manifest" class="nomanifest">No manifest</badge>
+            <badge data-tpl-if="manifest?.tier" class="tier">{{ manifest.tier }}</badge>
+            <badge data-tpl-if="manifest?.lifecycle" class="lifecycle">{{ manifest.lifecycle }}</badge>
+            <badge data-tpl-if="failed_checks > 0" class="failed-checks">{{ failed_checks }} check{{ failed_checks > 1 ? 's' : '' }} failed</badge>
+        </badges>
+        <info-group>
+            <info-item>
+                <span class="label">Created</span>
+                <span class="value" data-tpl-title="created.exact">{{ created.relative }}</span>
+            </info-item>
+            <info-item>
+                <span class="label">Last push</span>
+                <span class="value" data-tpl-title="pushed.exact">{{ pushed.relative }}</span>
+            </info-item>
+            <info-item>
+                <span class="label">Updated</span>
+                <span class="value" data-tpl-title="updated.exact">{{ updated.relative }}</span>
+            </info-item>
+            <info-item>
+                <span class="label">GitHub</span>
+                <span class="value"><a data-tpl-href="html_url" target="_blank" rel="noopener noreferrer">{{ html_url.replace('https://', '') }}</a></span>
+            </info-item>
+        </info-group>
+    </template>
+
+    <template id="manifest-template">
+        <p class="nothing" data-tpl-if="!manifest">No manifest: this repository has no <code>elaine.yaml</code>, so it declares nothing.</p>
+        <info-group data-tpl-if="manifest">
+            <info-item>
+                <span class="label">Type</span>
+                <span class="value">{{ manifest.type ?? 'unspecified' }}</span>
+            </info-item>
+            <info-item>
+                <span class="label">Tier</span>
+                <span class="value">{{ manifest.tier ?? 'unspecified' }}</span>
+            </info-item>
+            <info-item>
+                <span class="label">Lifecycle</span>
+                <span class="value">{{ manifest.lifecycle ?? 'unspecified' }}</span>
+            </info-item>
+            <info-item>
+                <span class="label">Stewards</span>
+                <span class="value">
+                    <span data-tpl-if="stewards.length == 0">unspecified</span>
+                    <steward-links data-tpl-if="stewards.length > 0">
+                        <a data-tpl-each="stewards" data-tpl-var="s" data-tpl-href="s.href">{{ s.name }}</a>
+                    </steward-links>
+                </span>
+            </info-item>
+            <info-item>
+                <span class="label">Commissioner / Channel</span>
+                <span class="value">{{ manifest.commissioner ?? 'unspecified' }} / {{ manifest.channel ?? 'unspecified' }}</span>
+            </info-item>
+            <info-item>
+                <span class="label">Authentication</span>
+                <span class="value">{{ manifest.authentication?.join(', ') ?? 'unspecified' }}</span>
+            </info-item>
+            <info-item>
+                <span class="label">Sensitivity</span>
+                <span class="value">{{ manifest.sensitivity?.join(', ') ?? 'unspecified' }}</span>
+            </info-item>
+        </info-group>
+        <h3 data-tpl-if="manifest">Environments</h3>
+        <p class="nothing" data-tpl-if="manifest && environments.length == 0">No environments declared.</p>
+        <table class="environments" data-tpl-if="environments.length > 0">
+            <thead>
+                <tr>
+                    <th>Environment</th>
+                    <th>Type</th>
+                    <th>Platform</th>
+                    <th>Ingress</th>
+                    <th>Domains</th>
+                    <th>Certificates</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr data-tpl-each="environments" data-tpl-var="env">
+                    <td><strong>{{ env.name }}</strong></td>
+                    <td>{{ env.type }}</td>
+                    <td>{{ env.platform ?? 'unspecified' }}</td>
+                    <td>{{ env.ingress ?? 'unspecified' }}</td>
+                    <td>{{ env.domains?.join(', ') ?? 'none' }}</td>
+                    <td>{{ env.certificates ?? 'unspecified' }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </template>
+
+    <template id="compliance-template">
+        <p class="nothing" data-tpl-if="!manifest">No manifest, so no compliance declared.</p>
+        <p class="nothing" data-tpl-if="manifest && frameworks.length == 0">The manifest has no compliance block.</p>
+        <table class="compliance-status" data-tpl-if="frameworks.length > 0">
+            <thead>
+                <tr>
+                    <th>Framework</th>
+                    <th>Declared</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr data-tpl-each="frameworks" data-tpl-var="f">
+                    <td><strong>{{ f.label }}</strong></td>
+                    <td>{{ f.value }}</td>
+                    <td>
+                        <tag data-tpl-if="f.pending" class="pending">pending</tag>
+                        <tag data-tpl-if="!f.pending" class="assessed">assessed</tag>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </template>
+
+    <template id="vulnerabilities-template">
+        <p class="nothing" data-tpl-if="vulnerabilities == null && failures.length == 0">No data: no scanner checked the dependencies of this repository.</p>
+        <p class="nothing" data-tpl-if="vulnerabilities == null && failures.length > 0">Unknown: the check failed, see the scanner failures below.</p>
+        <p class="nothing" data-tpl-if="vulnerabilities?.length == 0">No known vulnerabilities.</p>
+        <table class="dependency-vulns" data-tpl-if="packages.length > 0">
+            <thead>
+                <tr>
+                    <th>Package</th>
+                    <th>Installed</th>
+                    <th>Advisories</th>
+                    <th>Modules</th>
+                    <th>Scanner</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr data-tpl-each="packages" data-tpl-var="p">
+                    <td><strong>{{ p.artifact }}</strong></td>
+                    <td>{{ p.version }}</td>
+                    <td>
+                        <advisory-links>
+                            <a data-tpl-each="p.advisories" data-tpl-var="id" class="danger" data-tpl-href="`https://osv.dev/vulnerability/{id}`" target="_blank" rel="noopener noreferrer">{{ id }}</a>
+                        </advisory-links>
+                    </td>
+                    <td>
+                        <span data-tpl-if="p.modules.length == 1">{{ p.modules[0] }}</span>
+                        <tooltip data-tpl-if="p.modules.length > 1">
+                            <tag class="dashed" tabindex="0">{{ p.modules.length }} modules</tag>
+                            <pre>{{ p.modules.join('\n') }}</pre>
+                        </tooltip>
+                    </td>
+                    <td>{{ p.scanner }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </template>
+
+    <template id="images-template">
+        <p class="nothing" data-tpl-if="containers == null">No data: no scanner looked for container images in this repository.</p>
+        <p class="nothing" data-tpl-if="containers?.length == 0">This repository runs no container images.</p>
+        <table class="repository-images" data-tpl-if="images.length > 0">
+            <thead>
+                <tr>
+                    <th>Image</th>
+                    <th>Fixable</th>
+                    <th>High and critical</th>
+                    <th>Scan</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr data-tpl-each="images" data-tpl-var="i">
+                    <td><strong>{{ i.image }}</strong></td>
+                    <td>{{ i.fixable }}</td>
+                    <td>{{ i.serious }}</td>
+                    <td>
+                        <tag data-tpl-if="i.status == 'vulnerable'" data-tpl-class-append="`severity {i.highest}`">up to {{ i.highest }}</tag>
+                        <tag data-tpl-if="i.status == 'clean'" class="severity clean">clean</tag>
+                        <tag data-tpl-if="i.status == 'no-sbom'" class="dashed">no SBOM</tag>
+                        <tag data-tpl-if="i.status == 'failed'" class="dashed" data-tpl-title="i.reason">scan failed</tag>
+                        <tag data-tpl-if="i.status == 'unscanned'" class="dashed">not scanned</tag>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+        <image-details data-tpl-if="vulnerable_images.length > 0">
+            <details data-tpl-each="vulnerable_images" data-tpl-var="i" data-tpl-open="i.open">
+                <summary>{{ i.image }}: {{ i.counts }}</summary>
+                <severity-group data-tpl-each="i.severities" data-tpl-var="g">
+                    <h3><tag data-tpl-class-append="`severity {g.severity}`">{{ g.severity }}</tag> {{ g.vulnerabilities.length }}</h3>
+                    <table class="image-severity-vulns">
+                        <thead>
+                            <tr>
+                                <th>Package</th>
+                                <th>Installed</th>
+                                <th>Fixed in</th>
+                                <th>Advisory</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr data-tpl-each="g.vulnerabilities" data-tpl-var="v">
+                                <td><strong>{{ v.package }}</strong></td>
+                                <td>{{ v.version }}</td>
+                                <td>{{ v.fixed_in }}</td>
+                                <td><a class="danger" data-tpl-href="`https://osv.dev/vulnerability/{v.vuln_id}`" target="_blank" rel="noopener noreferrer">{{ v.vuln_id }}</a></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </severity-group>
+            </details>
+        </image-details>
+    </template>
+
+    <template id="outdated-template">
+        <p class="nothing" data-tpl-if="outdated_dependencies == null && failures.length == 0">No data: no scanner checked the dependencies of this repository.</p>
+        <p class="nothing" data-tpl-if="outdated_dependencies == null && failures.length > 0">Unknown: the check failed, see the scanner failures below.</p>
+        <p class="nothing" data-tpl-if="outdated_dependencies?.length == 0">No outdated dependencies.</p>
+        <table class="repository-outdated" data-tpl-if="outdated.length > 0">
+            <thead>
+                <tr>
+                    <th>Package</th>
+                    <th>Current</th>
+                    <th>Latest</th>
+                    <th>Modules</th>
+                    <th>Scanner</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr data-tpl-each="outdated" data-tpl-var="d">
+                    <td><strong>{{ d.artifact }}</strong></td>
+                    <td><tag class="current">{{ d.current }}</tag></td>
+                    <td><tag class="latest">{{ d.latest }}</tag></td>
+                    <td>
+                        <span data-tpl-if="d.modules.length == 1">{{ d.modules[0] }}</span>
+                        <tooltip data-tpl-if="d.modules.length > 1">
+                            <tag class="dashed" tabindex="0">{{ d.modules.length }} modules</tag>
+                            <pre>{{ d.modules.join('\n') }}</pre>
+                        </tooltip>
+                    </td>
+                    <td>{{ d.scanner }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </template>
+
+    <template id="failures-template">
+        <p class="nothing" data-tpl-if="scanners == 0">No scanner applies to this repository.</p>
+        <p class="nothing" data-tpl-if="scanners > 0 && failures.length == 0">Every check passed.</p>
+        <table class="repository-failures" data-tpl-if="failures.length > 0">
+            <thead>
+                <tr>
+                    <th>Scanner</th>
+                    <th>Failed checks</th>
+                    <th>Log</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr data-tpl-each="failures" data-tpl-var="f">
+                    <td><strong>{{ f.scanner }}</strong></td>
+                    <td>{{ f.checks.join(', ') }}</td>
+                    <td><a data-tpl-href="f.log_href" data-tpl-data-scanner="f.scanner" class="log-link">logs</a></td>
+                </tr>
+            </tbody>
+        </table>
+    </template>
+
+    <template id="not-found-template">
+        <error-box>No repository named <strong>{{ name }}</strong>.</error-box>
+    </template>
+
+    <script type="module">
+        import { Templates } from "ftl";
+        import { authenticate, Dialog, setupNavSpy, stewardHref, relativeTime, exactTime } from "/elaine.js";
+
+        const { http } = await authenticate();
+
+        const FRAMEWORK_LABELS = {
+            dora: 'DORA',
+            cra: 'CRA',
+            nis2: 'NIS2',
+            ai_act: 'AI Act',
+            gdpr: 'GDPR',
+            data_residency: 'Data residency',
+            ads: 'ADS',
+        };
+        const SEVERITIES = ['critical', 'high', 'medium', 'low', 'negligible', 'unknown'];
+        const OPEN_IMAGE_VULNERABILITIES = 20;
+        const DETAIL_SECTIONS = ['#manifest', '#compliance', '#vulnerabilities', '#images', '#outdated', '#failures'];
+
+        const moment = iso => ({ relative: relativeTime(iso), exact: exactTime(iso) });
+
+        /// One row per key, with the modules (the `project` of each entry) that share it.
+        function groupedByKey(entries, keyOf, rowOf) {
+            const rows = new Map();
+            for (const entry of entries ?? []) {
+                const key = keyOf(entry);
+                const row = rows.get(key) ?? { ...rowOf(entry), modules: [], advisories: [] };
+                if (!row.modules.includes(entry.project)) row.modules.push(entry.project);
+                if (entry.vuln_id && !row.advisories.includes(entry.vuln_id)) row.advisories.push(entry.vuln_id);
+                rows.set(key, row);
+            }
+            return [...rows.values()];
+        }
+
+        function repositoryView(p) {
+            const compliance = p.manifest?.compliance;
+            const failures = Object.entries(p.health ?? {})
+                .map(([scanner, checks]) => ({
+                    scanner,
+                    checks: Object.entries(checks).filter(([, status]) => status === 'failed').map(([check]) => check),
+                    log_href: `/api/logs?repo=${encodeURIComponent(p.name)}&scanner=${encodeURIComponent(scanner)}`,
+                }))
+                .filter(f => f.checks.length > 0);
+            const packages = groupedByKey(p.vulnerabilities, v => `${v.artifact}@${v.version}`, v => ({ artifact: v.artifact, version: v.version, scanner: v.scanner ?? '' }))
+                .sort((a, b) => b.advisories.length - a.advisories.length || a.artifact.localeCompare(b.artifact));
+            const outdated = groupedByKey(p.outdated_dependencies, d => `${d.artifact}@${d.current}@${d.latest}`, d => ({ artifact: d.artifact, current: d.current, latest: d.latest, scanner: d.scanner ?? '' }))
+                .sort((a, b) => a.artifact.localeCompare(b.artifact));
+            const vulnerable_images = p.images
+                .filter(i => (p.image_vulnerabilities[i.image] ?? []).length > 0)
+                .map(i => {
+                    const vulnerabilities = p.image_vulnerabilities[i.image];
+                    const severities = SEVERITIES
+                        .map(severity => ({ severity, vulnerabilities: vulnerabilities.filter(v => v.severity === severity) }))
+                        .filter(g => g.vulnerabilities.length > 0);
+                    return {
+                        image: i.image,
+                        open: vulnerabilities.length <= OPEN_IMAGE_VULNERABILITIES,
+                        severities,
+                        counts: severities.map(g => `${g.vulnerabilities.length} ${g.severity}`).join(', '),
+                    };
+                });
+            return {
+                ...p,
+                created: moment(p.created_at),
+                pushed: moment(p.pushed_at),
+                updated: moment(p.updated_at),
+                failed_checks: failures.reduce((sum, f) => sum + f.checks.length, 0),
+                stewards: (p.manifest?.stewards ?? []).map(name => ({ name, href: stewardHref(name) })),
+                environments: p.manifest?.environments ?? [],
+                frameworks: compliance
+                    ? Object.entries(FRAMEWORK_LABELS).map(([key, label]) => ({ label, value: compliance[key], pending: p.pending_frameworks.includes(key) }))
+                    : [],
+                packages,
+                outdated,
+                vulnerable_images,
+                failures,
+                scanners: Object.keys(p.health ?? {}).length,
+            };
+        }
+
+        async function showRepository() {
+            const name = decodeURIComponent(window.location.hash.slice(1));
+            document.querySelector('header h1 .page').textContent = `/ ${name || 'Repository'}`;
+            document.title = `Elaine - ${name || 'Repository'}`;
+            let project;
+            try {
+                project = await http.get(`/api/projects/${encodeURIComponent(name)}`).fetchJson();
+            } catch {
+                Templates.fromSelector('#not-found-template').withOverlay({ name }).renderToSelector('repository-summary');
+                DETAIL_SECTIONS.forEach(s => document.querySelector(s).hidden = true);
+                return;
+            }
+            DETAIL_SECTIONS.forEach(s => document.querySelector(s).hidden = false);
+            const view = repositoryView(project);
+            Templates.fromSelector('#summary-template').withOverlay(view).renderToSelector('repository-summary');
+            Templates.fromSelector('#manifest-template').withOverlay(view).renderToSelector('manifest-grid');
+            Templates.fromSelector('#compliance-template').withOverlay(view).renderToSelector('compliance-grid');
+            Templates.fromSelector('#vulnerabilities-template').withOverlay(view).renderToSelector('vulnerabilities-grid');
+            Templates.fromSelector('#images-template').withOverlay(view).renderToSelector('images-grid');
+            Templates.fromSelector('#outdated-template').withOverlay(view).renderToSelector('outdated-grid');
+            Templates.fromSelector('#failures-template').withOverlay(view).renderToSelector('failures-grid');
+        }
+
+        // The hash names the repository, so the section links scroll without changing it.
+        document.querySelector('header > nav:nth-of-type(2)').addEventListener('click', e => {
+            const link = e.target.closest('a');
+            if (!link) return;
+            e.preventDefault();
+            document.querySelector(link.hash)?.scrollIntoView();
+        });
+
+        const logDialog = new Dialog();
+        document.querySelector('failures-grid').addEventListener('click', async e => {
+            const link = e.target.closest('a.log-link');
+            if (!link) return;
+            e.preventDefault();
+            const title = `${decodeURIComponent(window.location.hash.slice(1))} / ${link.dataset.scanner}`;
+            logDialog.open(title, 'Loading...');
+            try {
+                logDialog.open(title, await http.get(link.getAttribute('href')).fetchText());
+            } catch (err) {
+                logDialog.open(title, `Failed to load log: ${err}`);
+            }
+        });
+
+        window.addEventListener('hashchange', () => {
+            window.scrollTo(0, 0);
+            showRepository();
+        });
+        await showRepository();
+        setupNavSpy();
+    </script>
+</body>
+
+</html>

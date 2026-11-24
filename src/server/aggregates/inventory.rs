@@ -1,4 +1,4 @@
-use super::{manifest_meta, pct, tier_weight};
+use super::{StewardNames, manifest_meta, pct, tier_weight};
 use crate::scanners::{RepoStats, ScannerKind};
 use crate::schema::{CertManagement, EnvironmentManifest, EnvironmentType, ExposureType, LifecycleType, ProjectType, ServiceTier};
 use serde::Serialize;
@@ -57,12 +57,12 @@ pub struct TierRow {
 
 impl Inventory {
     pub(super) fn calculate(live: &[&RepoStats]) -> Self {
+        let names = StewardNames::of(live);
         let mut assignments: Vec<AssignmentRow> = live
             .iter()
             .flat_map(|p| {
                 let (project_type, tier, lifecycle) = manifest_meta(p);
-                let stewards = p.manifest.as_ref().and_then(|m| m.stewards.clone()).unwrap_or_default();
-                stewards.into_iter().map(move |steward| AssignmentRow {
+                names.of_repo(p).into_iter().map(move |steward| AssignmentRow {
                     steward,
                     name: p.name.clone(),
                     html_url: p.html_url.clone(),

@@ -143,6 +143,11 @@ The three main phases in detail:
 
 3. **Serve:** Launch the embedded Axum web server to view the aggregated statistics in a browser dashboard. Pass `--dev` to serve frontend assets from `./src/frontend/` instead of the embedded binary.
 
+   Besides the dashboard and the governance, security and inventory pages, each repository has its page, `repository.html#<name>`: what GitHub says of it, what its manifest declares, its compliance per framework, the vulnerabilities of its dependencies and of the images it runs, its outdated dependencies and its scanner failures with their logs. Each steward has theirs, `steward.html#<steward>`: their live repositories and the compliance frameworks still pending on them. A steward written as an email `first.last@domain` is the same person as `First Last`, and case does not count. Both pages read the API, behind the login like the rest:
+
+   - `GET /api/projects/{name}`: the repository as `/api/projects` lists it, plus `pending_frameworks` (the compliance frameworks still to assess) and `image_vulnerabilities` (the fixable vulnerabilities of each scanned image it runs, by image); 404 when there is no such repository.
+   - `GET /api/stewards/{name}`: `steward` (the name as the page shows it), `written_as` (the spellings found in the manifests), `repositories` (the live ones naming the steward: name, type, tier, lifecycle, counts of vulnerabilities and outdated dependencies, `null` when not checked, last push), `pending` (each framework still pending, with its repositories) and `without_compliance` (the repositories whose manifest has no compliance block); 404 when no repository names the steward.
+
 ## Repository Manifests
 
 ### Governance & Compliance (`elaine.yaml`)

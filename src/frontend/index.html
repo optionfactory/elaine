@@ -37,113 +37,110 @@
     <metrics-grid></metrics-grid>
 
     <filter-controls>
-        <filter-group>
+        <filter-group data-param="status">
             <label>Status:</label>
             <state-button>
-                <state title="Any" data-value="any"><svg><use href="icons.svg#icon-any"></use></svg></state>
-                <state title="Live" active data-value="live"><svg><use href="icons.svg#icon-live"></use></svg></state>
-                <state title="Forked" data-value="forked"><svg><use href="icons.svg#icon-forked"></use></svg></state>
-                <state title="Archived" data-value="archived"><svg><use href="icons.svg#icon-archived"></use></svg></state>
-                <state title="Disabled" data-value="disabled"><svg><use href="icons.svg#icon-disabled"></use></svg></state>
+                <state data-value="any"><svg><use href="icons.svg#icon-any"></use></svg><span>Any</span></state>
+                <state active data-default data-value="live"><svg><use href="icons.svg#icon-live"></use></svg><span>Live</span></state>
+                <state data-value="forked"><svg><use href="icons.svg#icon-forked"></use></svg><span>Forked</span></state>
+                <state data-value="archived"><svg><use href="icons.svg#icon-archived"></use></svg><span>Archived</span></state>
+                <state data-value="disabled"><svg><use href="icons.svg#icon-disabled"></use></svg><span>Disabled</span></state>
             </state-button>
         </filter-group>
 
-        <filter-group>
+        <filter-group data-param="visibility">
             <label>Visibility:</label>
             <state-button>
-                <state title="Any" active data-value="any"><svg><use href="icons.svg#icon-any"></use></svg></state>
-                <state title="Public" data-value="public"><svg><use href="icons.svg#icon-public"></use></svg></state>
-                <state title="Private" data-value="private"><svg><use href="icons.svg#icon-private"></use></svg></state>
+                <state active data-default data-value="any"><svg><use href="icons.svg#icon-any"></use></svg><span>Any</span></state>
+                <state data-value="public"><svg><use href="icons.svg#icon-public"></use></svg><span>Public</span></state>
+                <state data-value="private"><svg><use href="icons.svg#icon-private"></use></svg><span>Private</span></state>
             </state-button>
         </filter-group>
 
-
-        <filter-group>
+        <filter-group data-param="manifest">
             <label>Manifest:</label>
             <state-button>
-                <state title="Any" active data-value="any"><svg><use href="icons.svg#icon-any"></use></svg></state>
-                <state title="Elaine manifest present" data-value="manifest"><svg><use href="icons.svg#icon-manifest"></use></svg></state>
-                <state title="Elaine manifest missing" data-value="nomanifest"><svg><use href="icons.svg#icon-nomanifest"></use></svg></state>
+                <state active data-default data-value="any"><svg><use href="icons.svg#icon-any"></use></svg><span>Any</span></state>
+                <state title="Elaine manifest present" data-value="manifest"><svg><use href="icons.svg#icon-manifest"></use></svg><span>Present</span></state>
+                <state title="Elaine manifest missing" data-value="nomanifest"><svg><use href="icons.svg#icon-nomanifest"></use></svg><span>Missing</span></state>
             </state-button>
         </filter-group>
 
-
-
-        <filter-group>
+        <filter-group data-param="vulnerabilities">
             <label>Vulnerabilities:</label>
             <state-button>
-                <state title="Any" active data-value="any"><svg><use href="icons.svg#icon-any"></use></svg></state>
-                <state title="With vulnerabilities" data-value="vulns"><svg><use href="icons.svg#icon-vulns"></use></svg></state>
-                <state title="No vulnerabilities" data-value="no-vulns"><svg><use href="icons.svg#icon-no-vulns"></use></svg></state>
+                <state active data-default data-value="any"><svg><use href="icons.svg#icon-any"></use></svg><span>Any</span></state>
+                <state title="With known vulnerabilities in the dependencies" data-value="vulns"><svg><use href="icons.svg#icon-vulns"></use></svg><span>Some</span></state>
+                <state title="Scanned, no known vulnerabilities in the dependencies" data-value="no-vulns"><svg><use href="icons.svg#icon-no-vulns"></use></svg><span>None</span></state>
             </state-button>
         </filter-group>
 
-        <filter-group>
+        <filter-group data-param="outdated">
             <label>Outdated deps:</label>
             <state-button>
-                <state title="Any" active data-value="any"><svg><use href="icons.svg#icon-any"></use></svg></state>
-                <state title="Outdated" data-value="outdated"><svg><use href="icons.svg#icon-outdated"></use></svg></state>
-                <state title="Up to date" data-value="no-outdated"><svg><use href="icons.svg#icon-no-outdated"></use></svg></state>
+                <state active data-default data-value="any"><svg><use href="icons.svg#icon-any"></use></svg><span>Any</span></state>
+                <state data-value="outdated"><svg><use href="icons.svg#icon-outdated"></use></svg><span>Outdated</span></state>
+                <state data-value="no-outdated"><svg><use href="icons.svg#icon-no-outdated"></use></svg><span>Up to date</span></state>
             </state-button>
         </filter-group>
 
-        <filter-group>
+        <filter-group data-param="tier">
             <label>Tier:</label>
             <state-button>
-                <state title="Any" active data-value="any"><svg><use href="icons.svg#icon-any"></use></svg></state>
-                <state title="Tier1" data-value="tier1"><svg><use href="icons.svg#icon-tier1"></use></svg></state>
-                <state title="Tier2" data-value="tier2"><svg><use href="icons.svg#icon-tier2"></use></svg></state>
-                <state title="Tier3" data-value="tier3"><svg><use href="icons.svg#icon-tier3"></use></svg></state>
-                <state title="Tier4" data-value="tier4"><svg><use href="icons.svg#icon-tier4"></use></svg></state>
+                <state active data-default data-value="any"><svg><use href="icons.svg#icon-any"></use></svg><span>Any</span></state>
+                <state data-value="tier1"><svg><use href="icons.svg#icon-tier1"></use></svg><span>Tier 1</span></state>
+                <state data-value="tier2"><svg><use href="icons.svg#icon-tier2"></use></svg><span>Tier 2</span></state>
+                <state data-value="tier3"><svg><use href="icons.svg#icon-tier3"></use></svg><span>Tier 3</span></state>
+                <state data-value="tier4"><svg><use href="icons.svg#icon-tier4"></use></svg><span>Tier 4</span></state>
             </state-button>
         </filter-group>
 
-        <filter-group>
+        <filter-group data-param="type">
             <label>Project type:</label>
             <state-button>
-                <state title="Any" active data-value="any"><svg><use href="icons.svg#icon-any"></use></svg></state>
-                <state title="Service" data-value="service"><svg><use href="icons.svg#icon-service"></use></svg></state>
-                <state title="Library" data-value="library"><svg><use href="icons.svg#icon-library"></use></svg></state>
-                <state title="Tool" data-value="tool"><svg><use href="icons.svg#icon-tool"></use></svg></state>
-                <state title="Infrastructure" data-value="infrastructure"><svg><use href="icons.svg#icon-infrastructure"></use></svg></state>
-                <state title="Documentation" data-value="documentation"><svg><use href="icons.svg#icon-documentation"></use></svg></state>
-                <state title="Playground" data-value="playground"><svg><use href="icons.svg#icon-playground"></use></svg></state>
+                <state active data-default data-value="any"><svg><use href="icons.svg#icon-any"></use></svg><span>Any</span></state>
+                <state data-value="service"><svg><use href="icons.svg#icon-service"></use></svg><span>Service</span></state>
+                <state data-value="library"><svg><use href="icons.svg#icon-library"></use></svg><span>Library</span></state>
+                <state data-value="tool"><svg><use href="icons.svg#icon-tool"></use></svg><span>Tool</span></state>
+                <state title="Infrastructure" data-value="infrastructure"><svg><use href="icons.svg#icon-infrastructure"></use></svg><span>Infra</span></state>
+                <state title="Documentation" data-value="documentation"><svg><use href="icons.svg#icon-documentation"></use></svg><span>Docs</span></state>
+                <state data-value="playground"><svg><use href="icons.svg#icon-playground"></use></svg><span>Playground</span></state>
             </state-button>
         </filter-group>
 
-        <filter-group>
+        <filter-group data-param="lifecycle">
             <label>Lifecycle:</label>
             <state-button>
-                <state title="Any" active data-value="any"><svg><use href="icons.svg#icon-any"></use></svg></state>
-                <state title="Active" data-value="lifecycle-active"><svg><use href="icons.svg#icon-lifecycle-active"></use></svg></state>
-                <state title="Deprecated" data-value="lifecycle-deprecated"><svg><use href="icons.svg#icon-lifecycle-deprecated"></use></svg></state>
-                <state title="End of life" data-value="lifecycle-end-of-life"><svg><use href="icons.svg#icon-lifecycle-end-of-life"></use></svg></state>
-                <state title="Maintenance" data-value="lifecycle-maintenance"><svg><use href="icons.svg#icon-lifecycle-maintenance"></use></svg></state>
-                <state title="Prototype" data-value="lifecycle-prototype"><svg><use href="icons.svg#icon-lifecycle-prototype"></use></svg></state>
-                <state title="Unmaintained" data-value="lifecycle-unmaintained"><svg><use href="icons.svg#icon-lifecycle-unmaintained"></use></svg></state>
+                <state active data-default data-value="any"><svg><use href="icons.svg#icon-any"></use></svg><span>Any</span></state>
+                <state data-value="lifecycle-active"><svg><use href="icons.svg#icon-lifecycle-active"></use></svg><span>Active</span></state>
+                <state data-value="lifecycle-deprecated"><svg><use href="icons.svg#icon-lifecycle-deprecated"></use></svg><span>Deprecated</span></state>
+                <state data-value="lifecycle-end-of-life"><svg><use href="icons.svg#icon-lifecycle-end-of-life"></use></svg><span>End of life</span></state>
+                <state data-value="lifecycle-maintenance"><svg><use href="icons.svg#icon-lifecycle-maintenance"></use></svg><span>Maintenance</span></state>
+                <state data-value="lifecycle-prototype"><svg><use href="icons.svg#icon-lifecycle-prototype"></use></svg><span>Prototype</span></state>
+                <state data-value="lifecycle-unmaintained"><svg><use href="icons.svg#icon-lifecycle-unmaintained"></use></svg><span>Unmaintained</span></state>
             </state-button>
         </filter-group>
 
-        <filter-group>
+        <filter-group data-param="ingress">
             <label>Ingress:</label>
             <state-button>
-                <state title="Any" active data-value="any"><svg><use href="icons.svg#icon-any"></use></svg></state>
-                <state title="Local" data-value="ingress-local"><svg><use href="icons.svg#icon-ingress-local"></use></svg></state>
-                <state title="Restricted VPN" data-value="ingress-restricted-vpn"><svg><use href="icons.svg#icon-ingress-restricted-vpn"></use></svg></state>
-                <state title="Restricted IP" data-value="ingress-restricted-ip"><svg><use href="icons.svg#icon-ingress-restricted-ip"></use></svg></state>
-                <state title="Restricted Geo IP" data-value="ingress-restricted-geo-ip"><svg><use href="icons.svg#icon-ingress-restricted-geo-ip"></use></svg></state>
-                <state title="Restricted PAM" data-value="ingress-restricted-pam"><svg><use href="icons.svg#icon-ingress-restricted-pam"></use></svg></state>
-                <state title="Internet" data-value="ingress-internet"><svg><use href="icons.svg#icon-ingress-internet"></use></svg></state>
-                <state title="None" data-value="ingress-none"><svg><use href="icons.svg#icon-ingress-none"></use></svg></state>
+                <state active data-default data-value="any"><svg><use href="icons.svg#icon-any"></use></svg><span>Any</span></state>
+                <state data-value="ingress-local"><svg><use href="icons.svg#icon-ingress-local"></use></svg><span>Local</span></state>
+                <state title="Restricted VPN" data-value="ingress-restricted-vpn"><svg><use href="icons.svg#icon-ingress-restricted-vpn"></use></svg><span>VPN</span></state>
+                <state title="Restricted IP" data-value="ingress-restricted-ip"><svg><use href="icons.svg#icon-ingress-restricted-ip"></use></svg><span>IP</span></state>
+                <state title="Restricted Geo IP" data-value="ingress-restricted-geo-ip"><svg><use href="icons.svg#icon-ingress-restricted-geo-ip"></use></svg><span>Geo IP</span></state>
+                <state title="Restricted PAM" data-value="ingress-restricted-pam"><svg><use href="icons.svg#icon-ingress-restricted-pam"></use></svg><span>PAM</span></state>
+                <state data-value="ingress-internet"><svg><use href="icons.svg#icon-ingress-internet"></use></svg><span>Internet</span></state>
+                <state data-value="ingress-none"><svg><use href="icons.svg#icon-ingress-none"></use></svg><span>None</span></state>
             </state-button>
         </filter-group>
 
-        <filter-group>
+        <filter-group data-param="compliance">
             <label>Compliance:</label>
             <state-button>
-                <state title="Any" active data-value="any"><svg><use href="icons.svg#icon-any"></use></svg></state>
-                <state title="Compliant" data-value="compliant"><svg><use href="icons.svg#icon-compliant"></use></svg></state>
-                <state title="Non-compliant" data-value="non-compliant"><svg><use href="icons.svg#icon-non-compliant"></use></svg></state>
+                <state active data-default data-value="any"><svg><use href="icons.svg#icon-any"></use></svg><span>Any</span></state>
+                <state data-value="compliant"><svg><use href="icons.svg#icon-compliant"></use></svg><span>Compliant</span></state>
+                <state data-value="non-compliant"><svg><use href="icons.svg#icon-non-compliant"></use></svg><span>Non-compliant</span></state>
             </state-button>
         </filter-group>
 
@@ -151,13 +148,15 @@
 
     <search-bar>
         <form>
-            <button type="button" class="btn-roulette" data-filter="live,nomanifest,roulette">
+            <button type="button" class="btn-roulette" data-filter="live,nomanifest,roulette" title="A random live repository without a manifest">
                 <svg aria-hidden="true"><use href="icons.svg#icon-roulette"></use></svg>
                 <span>Audit Roulette</span>
             </button>
-            <input type="text" name="search" placeholder="Search by repository, commissioner, steward, or domain..." />
+            <input type="text" name="search" placeholder="Search by repository, description, steward, commissioner or domain..." />
         </form>
     </search-bar>
+
+    <match-count aria-live="polite"></match-count>
 
     <loading-spinner id="spinner">
         <div class="spinner"></div>
@@ -190,8 +189,11 @@
         <error-box data-tpl-if="self.length == 0">No matching repositories found.</error-box>
         <project-card data-tpl-each="self">
             <project-header>
-                <h2><a data-tpl-href="html_url" target="_blank" rel="noopener noreferrer">{{ name }}</a></h2>
-                <p>{{ description ?? 'no description' }}</p>
+                <h2>
+                    <a data-tpl-href="href">{{ name }}</a>
+                    <a class="github" data-tpl-href="html_url" target="_blank" rel="noopener noreferrer" title="Open on GitHub" aria-label="Open on GitHub"></a>
+                </h2>
+                <p data-tpl-if="description">{{ description }}</p>
                 <badges>
                     <badge data-tpl-if="private" class="private">Private</badge>
                     <badge data-tpl-if="!private" class="public">Public</badge>
@@ -203,49 +205,23 @@
                     <badge data-tpl-if="manifest?.lifecycle" class="lifecycle">{{ manifest.lifecycle }}</badge>
                     <badge data-tpl-if="failed_checks > 0" class="failed-checks">{{ failed_checks }} check{{ failed_checks > 1 ? 's' : '' }} failed</badge>
                 </badges>
-                <time>
-                    <div>Created: {{ created_at }}</div>
-                    <div>Pushed: {{ pushed_at }}</div>
-                    <div>Updated: {{ updated_at }}</div>
-                </time>
+                <project-times>
+                    <span data-tpl-each="times" data-tpl-var="t">{{ t.label }} <time data-tpl-datetime="t.iso" data-tpl-title="t.exact">{{ t.relative }}</time></span>
+                </project-times>
             </project-header>
 
-            <info-group data-tpl-if="manifest" data-tpl-with="manifest">
-                <info-item>
-                    <span class="label">Project type</span>
-                    <span class="value">{{ type}}</span>
-                </info-item>
-                <info-item>
-                    <span class="label">Commissioner / Channel</span>
-                    <span class="value">{{ commissioner ?? 'unspecified' }} / {{ channel ?? 'unspecified' }}</span>
-                </info-item>
-                <info-item>
-                    <span class="label">Stewards</span>
-                    <span class="value">{{ stewards?.join(', ') ?? 'unspecified' }}</span>
-                </info-item>
-                <info-item>
-                    <span class="label">Authentication</span>
-                    <span class="value">{{authentication?.join(', ') ?? 'unspecified' }}</span>
-                </info-item>
-                <info-item>
-                    <span class="label">Sensitivity</span>
-                    <span class="value">{{sensitivity?.join(', ') ?? 'unspecified' }}</span>
+            <info-group data-tpl-if="facts.length > 0">
+                <info-item data-tpl-each="facts" data-tpl-var="fact">
+                    <span class="label">{{ fact.label }}</span>
+                    <span class="value" data-tpl-if="fact.text">{{ fact.text }}</span>
+                    <span class="value links" data-tpl-if="fact.links"><a data-tpl-each="fact.links" data-tpl-var="link" data-tpl-href="link.href">{{ link.text }}</a></span>
                 </info-item>
             </info-group>
 
-            <section>
-                <h3>Compliance Frameworks</h3>
-                <tag-list data-tpl-if="!manifest?.compliance">
-                    <tag>No data</tag>
-                </tag-list>
-                <tag-list data-tpl-if="manifest?.compliance">
-                    <tag>DORA: {{ manifest.compliance.dora }}</tag>
-                    <tag>CRA: {{manifest.compliance.cra }}</tag>
-                    <tag>NIS2: {{manifest.compliance.nis2}}</tag>
-                    <tag>AI Act: {{manifest.compliance.ai_act}}</tag>
-                    <tag>GDPR: {{ manifest.compliance.gdpr }}</tag>
-                    <tag>Data Residency: {{manifest.compliance.data_residency}}</tag>
-                    <tag>Ads: {{manifest.compliance.ads}}</tag>
+            <section data-tpl-if="compliance.length > 0">
+                <h3>Compliance</h3>
+                <tag-list>
+                    <tag data-tpl-each="compliance" data-tpl-var="c">{{ c.label }}: {{ c.value }}</tag>
                 </tag-list>
             </section>
 
@@ -282,51 +258,12 @@
                 </details>
             </section>
 
-            <section>
-                <details>
-                    <summary>
-                        <h3>Outdated Dependencies</h3>
-                        <tag-list>
-                            <tag data-tpl-if="outdated_dependencies == null">No data</tag>
-                            <tag data-tpl-if="outdated_dependencies?.length == 0">No outdated dependencies found in this project</tag>
-                            <tag data-tpl-if="outdated_dependencies?.length > 0">{{ outdated_dependencies.length }}</tag>
-                        </tag-list>
-                    </summary>
-                    <table class="outdated-dependencies" data-tpl-if="outdated_dependencies?.length > 0">
-                        <thead>
-                            <tr>
-                                <th>Project</th>
-                                <th>Scanner</th>
-                                <th>Artifact</th>
-                                <th>Current</th>
-                                <th>Latest</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr data-tpl-each="outdated_dependencies" data-tpl-var="dep">
-                                <td><strong>{{ dep.project }}</strong></td>
-                                <td><tag data-tpl-if="dep.scanner">{{ dep.scanner }}</tag></td>
-                                <td>{{dep.artifact}}</td>
-                                <td>
-                                    <tag class="current">{{dep.current}}</tag>
-                                </td>
-                                <td>
-                                    <tag class="latest">{{dep.latest}}</tag>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </details>
-            </section>
-
-            <section>
+            <section data-tpl-if="vulnerabilityChips.length > 0">
                 <details>
                     <summary>
                         <h3>Known vulnerabilities</h3>
                         <tag-list>
-                            <tag data-tpl-if="vulnerabilities == null">No data</tag>
-                            <tag data-tpl-if="vulnerabilities?.length == 0">No known vulnerabilities found in this project</tag>
-                            <tag data-tpl-if="vulnerabilities?.length > 0">{{ vulnerabilities.length }}</tag>
+                            <tag data-tpl-each="vulnerabilityChips" data-tpl-var="chip" data-tpl-class="chip.kind" data-tpl-title="chip.hint">{{ chip.text }}</tag>
                         </tag-list>
                     </summary>
                     <table class="vulnerabilities" data-tpl-if="vulnerabilities?.length > 0">
@@ -363,17 +300,44 @@
                 </details>
             </section>
 
-            <section>
+            <section data-tpl-if="outdated_dependencies?.length > 0">
+                <details>
+                    <summary>
+                        <h3>Outdated dependencies</h3>
+                        <tag-list>
+                            <tag class="current">{{ outdated_dependencies.length }} outdated</tag>
+                        </tag-list>
+                    </summary>
+                    <table class="outdated-dependencies">
+                        <thead>
+                            <tr>
+                                <th>Project</th>
+                                <th>Scanner</th>
+                                <th>Artifact</th>
+                                <th>Current</th>
+                                <th>Latest</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr data-tpl-each="outdated_dependencies" data-tpl-var="dep">
+                                <td><strong>{{ dep.project }}</strong></td>
+                                <td><tag data-tpl-if="dep.scanner">{{ dep.scanner }}</tag></td>
+                                <td>{{dep.artifact}}</td>
+                                <td>
+                                    <tag class="current">{{dep.current}}</tag>
+                                </td>
+                                <td>
+                                    <tag class="latest">{{dep.latest}}</tag>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </details>
+            </section>
+
+            <section data-tpl-if="images.length > 0">
                 <h3>Used containers</h3>
-                <tag-list>
-                    <tag data-tpl-if="!containers">
-                        No data
-                    </tag>
-                    <tag data-tpl-if="containers?.length == 0">
-                        No containers referenced in this project
-                    </tag>
-                </tag-list>
-                <image-list data-tpl-if="images?.length > 0">
+                <image-list>
                     <image-row data-tpl-each="images" data-tpl-var="img">
                         <tag class="container">{{ img.image }}</tag>
                         <tag data-tpl-if="img.status == 'vulnerable'" data-tpl-class-append="`severity {img.highest}`">
@@ -381,125 +345,276 @@
                         </tag>
                         <tag data-tpl-if="img.status == 'clean'" class="severity clean">no fixable vulnerabilities</tag>
                         <tag data-tpl-if="img.status == 'no-sbom'" class="dashed">no SBOM</tag>
-                        <tag data-tpl-if="img.status == 'failed'" class="dashed">scan failed</tag>
+                        <tag data-tpl-if="img.status == 'failed'" class="dashed" data-tpl-title="img.reason">scan failed</tag>
                         <tag data-tpl-if="img.status == 'unscanned'" class="dashed">not scanned</tag>
                     </image-row>
                 </image-list>
             </section>
 
-            <section>
+            <section data-tpl-if="docker_files.length > 0">
                 <h3>Docker files</h3>
                 <tag-list>
-                    <tag data-tpl-if="!docker_files.length">No docker files found in this project</tag>
                     <tag data-tpl-each="docker_files" class="dockerfile">{{ self }}</tag>
                 </tag-list>
             </section>
 
-            <section>
+            <section data-tpl-if="ansible_confs.length > 0">
                 <h3>Ansible</h3>
                 <tag-list>
-                    <tag data-tpl-if="!ansible_confs.length">No ansible configurations found in this project</tag>
                     <tag data-tpl-each="ansible_confs" class="ansible">{{ self }}</tag>
                 </tag-list>
             </section>
 
-            <section>
+            <section data-tpl-if="legopfa_confs.length > 0">
                 <h3>Legopfa</h3>
                 <tag-list>
-                    <tag data-tpl-if="!legopfa_confs.length">No legopfa configurations found in this project</tag>
                     <tag data-tpl-each="legopfa_confs" class="legopfa">{{ self }}</tag>
                 </tag-list>
             </section>
 
+            <p class="nothing-found" data-tpl-if="nothingFound">{{ nothingFound }}</p>
         </project-card>
     </template>
 
     <script type="module">
         import { Templates } from "ftl";
-        import { Spinner, InfiniteScroller, authenticate, projects } from "/elaine.js";
+        import { Spinner, InfiniteScroller, authenticate, projects, repositoryHref, stewardHref, relativeTime, exactTime } from "/elaine.js";
 
-        const { config, http } = await authenticate();
+        const { http } = await authenticate();
         const spinner = new Spinner();
         const scroller = new InfiniteScroller('projects-grid', 'scroll-sentinel', '#projects-template', spinner, 5);
+        const groups = [...document.querySelectorAll('filter-controls filter-group')];
+        const searchInput = document.querySelector('search-bar input[name="search"]');
+        const matchCount = document.querySelector('match-count');
+
+        /// "a, b or c"
+        function joinedWith(words, conjunction) {
+            return words.length > 1 ? `${words.slice(0, -1).join(', ')} ${conjunction} ${words.at(-1)}` : words.join('');
+        }
+
+        /// What a scan of the dependencies says, in plain words: never ran, failed, found nothing, or found something.
+        function scanState(found, check, health) {
+            if (found == null) {
+                return Object.values(health ?? {}).some(checks => checks[check] === 'failed') ? 'failed' : 'unscanned';
+            }
+            return found.length > 0 ? 'found' : 'none';
+        }
+
+        function dependencyNotes(vulns, outdated) {
+            if (vulns === outdated) {
+                const both = {
+                    unscanned: 'dependencies not scanned',
+                    failed: 'dependency scan failed',
+                    none: 'dependencies scanned: no known vulnerabilities, none outdated',
+                };
+                return both[vulns] ? [both[vulns]] : [];
+            }
+            const vulnNotes = {
+                unscanned: 'dependency vulnerabilities not scanned',
+                failed: 'dependency vulnerability scan failed',
+                none: 'no known vulnerabilities in the dependencies',
+            };
+            const outdatedNotes = {
+                unscanned: 'outdated dependencies not checked',
+                failed: 'outdated dependency check failed',
+                none: 'no outdated dependencies',
+            };
+            return [vulnNotes[vulns], outdatedNotes[outdated]].filter(Boolean);
+        }
+
+        /// The repository as a card shows it: links, readable times, counts, and one line for what is missing or empty.
+        function cardOf(p) {
+            const m = p.manifest;
+            const facts = [
+                { label: 'Project type', text: m?.type },
+                { label: 'Stewards', links: m?.stewards?.length ? m.stewards.map(s => ({ text: s, href: stewardHref(s) })) : null },
+                { label: 'Commissioner', text: m?.commissioner },
+                { label: 'Channel', text: m?.channel },
+                { label: 'Authentication', text: m?.authentication?.join(', ') },
+                { label: 'Sensitivity', text: m?.sensitivity?.join(', ') },
+            ].filter(f => f.text || f.links);
+            const frameworks = [['dora', 'DORA'], ['cra', 'CRA'], ['nis2', 'NIS2'], ['ai_act', 'AI Act'], ['gdpr', 'GDPR'], ['data_residency', 'Data Residency'], ['ads', 'Ads']];
+            const compliance = frameworks
+                .filter(([key]) => m?.compliance?.[key])
+                .map(([key, label]) => ({ label, value: m.compliance[key] }));
+
+            const serious = p.images.reduce((sum, i) => sum + i.serious, 0);
+            const lower = p.images.reduce((sum, i) => sum + i.fixable - i.serious, 0);
+            const vulnerabilityChips = [
+                p.vulnerabilities?.length > 0 && {
+                    text: `${p.vulnerabilities.length} in dependencies`,
+                    kind: 'dependency-vulns',
+                    hint: `${new Set(p.vulnerabilities.map(v => v.vuln_id)).size} distinct advisories from OSV, which the scan does not rate by severity`,
+                },
+                serious > 0 && { text: `${serious} high or critical in images`, kind: 'severity high', hint: 'fixable, in the container images the repository runs' },
+                lower > 0 && { text: `${lower} other in images`, kind: 'severity low', hint: 'fixable, medium or lower, in the container images the repository runs' },
+            ].filter(Boolean);
+
+            const notes = dependencyNotes(
+                scanState(p.vulnerabilities, 'vulns', p.health),
+                scanState(p.outdated_dependencies, 'outdated', p.health),
+            );
+            if (p.containers == null) {
+                notes.push('containers not scanned');
+            }
+            const absent = [
+                p.containers?.length === 0 && 'containers',
+                p.docker_files.length === 0 && 'Docker files',
+                p.ansible_confs.length === 0 && 'Ansible',
+                p.legopfa_confs.length === 0 && 'legopfa',
+            ].filter(Boolean);
+            if (absent.length > 0) {
+                notes.push(`no ${joinedWith(absent, 'or')}`);
+            }
+            if (m) {
+                const unstated = [
+                    !m.stewards?.length && 'stewards',
+                    !m.commissioner && 'commissioner',
+                    !m.compliance && 'compliance',
+                ].filter(Boolean);
+                if (unstated.length > 0) {
+                    notes.push(`manifest names no ${joinedWith(unstated, 'or')}`);
+                }
+            }
+
+            const times = [['Created', p.created_at], ['Pushed', p.pushed_at], ['Updated', p.updated_at]]
+                .map(([label, iso]) => ({ label, iso, relative: relativeTime(iso), exact: exactTime(iso) }));
+
+            return {
+                ...p,
+                href: repositoryHref(p.name),
+                times,
+                facts,
+                compliance,
+                vulnerabilityChips,
+                nothingFound: notes.join(' · '),
+            };
+        }
+
+        async function* projectCards(items) {
+            for await (const p of items) {
+                yield cardOf(p);
+            }
+        }
+
+        const defaultOf = group => group.querySelector('state[data-default]').dataset.value;
+        const valuesOf = group => [...group.querySelectorAll('state')].map(s => s.dataset.value);
+
+        /// A group missing from the query string keeps its default; an unknown value falls back to it too.
+        function viewFromUrl() {
+            const params = new URLSearchParams(location.search);
+            const filters = groups
+                .map(group => {
+                    const value = params.get(group.dataset.param);
+                    return valuesOf(group).includes(value) ? value : defaultOf(group);
+                })
+                .filter(value => value !== 'any');
+            if (params.has('roulette')) {
+                filters.push('roulette');
+            }
+            return { filters, search: params.get('search') ?? '' };
+        }
+
+        function urlOf({ filters, search }) {
+            const params = new URLSearchParams();
+            for (const group of groups) {
+                const chosen = valuesOf(group).find(value => filters.includes(value)) ?? 'any';
+                if (chosen !== defaultOf(group)) {
+                    params.set(group.dataset.param, chosen);
+                }
+            }
+            if (filters.includes('roulette')) {
+                params.set('roulette', '');
+            }
+            if (search) {
+                params.set('search', search);
+            }
+            const query = params.toString();
+            return query ? `${location.pathname}?${query}` : location.pathname;
+        }
 
         function filtersFromControls() {
-            const activeTags = [];
-            document.querySelectorAll('filter-controls filter-group').forEach(group => {
-                const activeBtn = group.querySelector('state[active]');
-                if (activeBtn && activeBtn.dataset.value && activeBtn.dataset.value !== 'any') {
-                    activeTags.push(activeBtn.dataset.value);
-                }
-            });
-            return activeTags;
+            return groups
+                .map(group => group.querySelector('state[active]')?.dataset.value)
+                .filter(value => value && value !== 'any');
         }
 
-        function updateFilterControls(filters) {
-            document.querySelectorAll('filter-controls filter-group').forEach(group => {
-                const buttons = group.querySelectorAll('state');
-                let hasMatch = false;
-                buttons.forEach(btn => {
-                    if (filters.includes(btn.dataset.value)) {
-                        btn.setAttribute('active', '');
-                        hasMatch = true;
-                    } else {
-                        btn.removeAttribute('active');
-                    }
-                });
-                if (!hasMatch) {
-                    const defaultBtn = group.querySelector('state[data-value="any"]');
-                    if (defaultBtn) defaultBtn.setAttribute('active', '');
-                }
+        function showFilters({ filters, search }) {
+            for (const group of groups) {
+                const chosen = valuesOf(group).find(value => filters.includes(value)) ?? 'any';
+                group.querySelectorAll('state').forEach(s => s.toggleAttribute('active', s.dataset.value === chosen));
+            }
+            const shown = filters.filter(f => f !== 'roulette');
+            document.querySelectorAll('.metric-card').forEach(card => {
+                const cardFilters = (card.dataset.filter || '').split(',').filter(Boolean);
+                card.classList.toggle('active', cardFilters.length === shown.length && cardFilters.every(f => shown.includes(f)));
             });
+            searchInput.value = search;
         }
 
+        let latestView = 0;
 
-        function updateActiveMetricCard(filters) {
-            document.querySelectorAll('.metric-card').forEach(b => {
-                b.classList.remove('active');
-                const cardFilter = (b.dataset.filter || '').split(',').filter(Boolean);
-                if (cardFilter.length === filters.length && cardFilter.every(f => filters.includes(f))) {
-                    b.classList.add('active');
+        async function countMatches({ filters, search }, viewNumber) {
+            matchCount.textContent = '';
+            try {
+                const response = await http.get('/api/projects')
+                    .param('filter', ...filters)
+                    .param('search', search || null)
+                    .param('limit', 0)
+                    .fetch();
+                if (viewNumber !== latestView) {
+                    return;
                 }
-            });
+                const total = Number(response.headers.get('X-Total-Count'));
+                const counted = {
+                    0: 'No repositories match',
+                    1: '1 repository matches',
+                };
+                matchCount.textContent = counted[total] ?? `${total} repositories match`;
+            } catch {
+                // the cards below show the failure
+            }
+        }
+
+        async function show(view) {
+            const viewNumber = ++latestView;
+            showFilters(view);
+            countMatches(view, viewNumber);
+            await scroller.load(projectCards(projects(http, view.filters, view.search || null)));
+        }
+
+        async function navigate(view) {
+            const url = urlOf(view);
+            if (url !== `${location.pathname}${location.search}`) {
+                history.pushState(null, '', url);
+            }
+            await show(view);
         }
 
         document.querySelector('filter-controls').addEventListener('click', async e => {
             const button = e.target.closest('state');
             if (!button) return;
-
-            const group = button.closest('filter-group');
-            group.querySelectorAll('state').forEach(b => b.removeAttribute('active'));
-            button.setAttribute('active', '');
-
-            const activeFilters = filtersFromControls();
-            updateActiveMetricCard(activeFilters);
-            await scroller.load(projects(http, activeFilters, null));
+            button.closest('filter-group').querySelectorAll('state').forEach(s => s.toggleAttribute('active', s === button));
+            await navigate({ filters: filtersFromControls(), search: searchInput.value.trim() });
         });
 
-        document.querySelector('form').addEventListener('submit', async (e) => {
+        document.querySelector('search-bar form').addEventListener('submit', async e => {
             e.preventDefault();
-            const search = new FormData(e.target).get('search');
-            const activeFilters = filtersFromControls();
-            await scroller.load(projects(http, activeFilters, search));
+            await navigate({ filters: filtersFromControls(), search: searchInput.value.trim() });
         });
 
         document.querySelector('body').addEventListener('click', async e => {
             const button = e.target.closest('[data-filter]');
             if (!button || button.closest('filter-controls')) return;
-
             const filters = (button.dataset.filter || '').split(',').filter(Boolean);
-            if (button.classList.contains('metric-card')) {
-                document.querySelectorAll('.metric-card').forEach(b => b.classList.remove('active'));
-                button.classList.add('active');
-            }
-
-            updateFilterControls(filters);
-            await scroller.load(projects(http, filters, null));
+            await navigate({ filters, search: searchInput.value.trim() });
         });
+
+        window.addEventListener('popstate', () => show(viewFromUrl()));
 
         const stats = await http.get('/api/stats').fetchJson();
         Templates.fromSelector('#metrics-template').withOverlay(stats).renderToSelector('metrics-grid');
-        await scroller.load(projects(http, ['live'], null));
+        await show(viewFromUrl());
     </script>
 </body>
 
