@@ -184,4 +184,24 @@ function setupNavSpy() {
     sections.forEach(s => s && spy.observe(s));
 }
 
-export { Spinner, InfiniteScroller, authenticate, projects, Dialog, setupNavSpy }
+/// The page of a repository, and of a steward as their manifests write them.
+const repositoryHref = name => `repository.html#${encodeURIComponent(name)}`;
+const stewardHref = steward => `steward.html#${encodeURIComponent(steward)}`;
+
+/// "3 months ago", "just now": for tables; `exactTime` goes in the title, for the hover.
+function relativeTime(iso) {
+    if (!iso) return 'never';
+    const seconds = (Date.now() - new Date(iso).getTime()) / 1000;
+    const units = [['year', 31557600], ['month', 2629800], ['day', 86400], ['hour', 3600], ['minute', 60]];
+    for (const [unit, size] of units) {
+        const count = Math.floor(seconds / size);
+        if (count >= 1) return `${count} ${unit}${count > 1 ? 's' : ''} ago`;
+    }
+    return 'just now';
+}
+
+function exactTime(iso) {
+    return iso ? new Date(iso).toISOString().slice(0, 16).replace('T', ' ') + ' UTC' : '';
+}
+
+export { Spinner, InfiniteScroller, authenticate, projects, Dialog, setupNavSpy, repositoryHref, stewardHref, relativeTime, exactTime }
