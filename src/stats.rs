@@ -31,11 +31,11 @@ impl StatsStore {
     pub fn new<P: AsRef<Path>>(data_dir: P) -> Result<Self> {
         let base_dir = data_dir.as_ref().to_path_buf();
         let stats_dir = base_dir.join("stats");
-        fs::create_dir_all(&stats_dir)?;
+        create_private_dirs(&stats_dir)?;
         let logs_dir = base_dir.join("stats").join("logs");
-        fs::create_dir_all(&logs_dir)?;
+        create_private_dirs(&logs_dir)?;
         let dependencies_dir = base_dir.join("stats").join("dependencies");
-        fs::create_dir_all(&dependencies_dir)?;
+        create_private_dirs(&dependencies_dir)?;
         Ok(Self {
             base_dir,
             stats_dir,
@@ -79,9 +79,7 @@ impl StatsStore {
     /// Written through a renamed temporary file, like the aggregate.
     pub fn save_images(&self, images: &BTreeMap<String, ImageScan>) -> Result<()> {
         let path = self.images_file_path();
-        let mut file = tempfile::Builder::new()
-            .permissions(std::os::unix::fs::PermissionsExt::from_mode(0o644))
-            .tempfile_in(&self.base_dir)?;
+        let mut file = tempfile::Builder::new().tempfile_in(&self.base_dir)?;
         serde_json::to_writer_pretty(&mut file, images)?;
         file.persist(&path).with_context(|| format!("Failed to update {:?}", path))?;
         Ok(())
@@ -105,7 +103,7 @@ impl StatsStore {
     pub fn save_project_scan(&self, stat: &RepoStats) -> Result<PathBuf> {
         let file_path = self.project_file_path(&stat.name);
         let json_data = serde_json::to_string_pretty(stat)?;
-        fs::write(&file_path, &json_data).with_context(|| format!("Failed to write scan data to {:?}", file_path))?;
+        write_private(&file_path, json_data.as_bytes()).with_context(|| format!("Failed to write scan data to {:?}", file_path))?;
         Ok(file_path)
     }
 
@@ -122,7 +120,7 @@ impl StatsStore {
                 _ => Ok(()),
             };
         }
-        fs::write(&path, serde_json::to_string(dependencies)?).with_context(|| format!("Failed to write {:?}", path))
+        write_private(&path, serde_json::to_string(dependencies)?.as_bytes()).with_context(|| format!("Failed to write {:?}", path))
     }
 
     /// Empty when the last full scan checked nothing, or ran with a release that did not keep it.
@@ -202,9 +200,7 @@ impl StatsStore {
     /// Writes through a renamed temporary file, so `serve` never reloads a half-written file.
     fn write_aggregate(&self, projects: &[RepoStats]) -> Result<PathBuf> {
         let aggregate_path = self.aggregate_file_path();
-        let mut file = tempfile::Builder::new()
-            .permissions(std::os::unix::fs::PermissionsExt::from_mode(0o644))
-            .tempfile_in(&self.base_dir)?;
+        let mut file = tempfile::Builder::new().tempfile_in(&self.base_dir)?;
         serde_json::to_writer_pretty(&mut file, projects)?;
         file.persist(&aggregate_path)
             .with_context(|| format!("Failed to update aggregate scan data at {:?}", aggregate_path))?;
@@ -244,9 +240,9 @@ impl StatsStore {
         let incoming = tempfile::Builder::new().prefix("logs.incoming").tempdir_in(&self.stats_dir)?;
         for (repo, scanners) in &snapshot.logs {
             let repo_dir = incoming.path().join(repo);
-            fs::create_dir_all(&repo_dir)?;
+            create_private_dirs(&repo_dir)?;
             for (scanner, content) in scanners {
-                fs::write(repo_dir.join(format!("{}.log", scanner)), content)?;
+                write_private(&repo_dir.join(format!("{}.log", scanner)), content.as_bytes())?;
             }
         }
         let previous = self.stats_dir.join("logs.previous");
@@ -276,6 +272,19 @@ impl StatsStore {
         }
         Ok(())
     }
+}
+
+/// What the login protects stays readable only by the user of elaine: directories 0700 and files 0600 when they are
+/// created, whatever the umask. The data directory itself is left to the deployment.
+fn create_private_dirs(path: &Path) -> std::io::Result<()> {
+    std::os::unix::fs::DirBuilderExt::mode(fs::DirBuilder::new().recursive(true), 0o700).create(path)
+}
+
+fn write_private(path: &Path, contents: &[u8]) -> std::io::Result<()> {
+    use std::io::Write;
+    std::os::unix::fs::OpenOptionsExt::mode(fs::OpenOptions::new().write(true).create(true).truncate(true), 0o600)
+        .open(path)?
+        .write_all(contents)
 }
 
 #[cfg(test)]

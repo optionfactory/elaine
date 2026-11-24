@@ -13,6 +13,14 @@ async fn main() -> Result<()> {
         return Elaine::init();
     }
 
+    // it holds the push token, the login secret and the GitHub token: the group may read it, nobody else
+    let mode = std::os::unix::fs::PermissionsExt::mode(&fs::metadata("elaine.conf.json").context("Failed to read 'elaine.conf.json'")?.permissions());
+    if mode & 0o007 != 0 {
+        anyhow::bail!(
+            "'elaine.conf.json' can be read by every user of this machine (mode {:o}): chmod o-rwx elaine.conf.json",
+            mode & 0o777
+        );
+    }
     let config: Config = fs::read("elaine.conf.json")
         .context("Failed to read 'elaine.conf.json'")
         .and_then(|bytes| serde_json::from_slice(&bytes).map_err(Into::into))
