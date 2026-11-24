@@ -42,6 +42,8 @@ Create an `elaine.conf.json` file in the directory where you run the tool:
 
 All fields except `organization` are optional: `data_dir` defaults to `data`, the server binds to `127.0.0.1:8000`, `github_token` can be set here or resolved from the environment, and omitting `login` serves the dashboard without authentication. Within `login` every field is required, `domain` included: without it any Google account would sign in. The file holds the tokens and the login secret: elaine refuses to start when every user of the machine can read it (its group may). What it writes in `data_dir` (the scan data, the images, the logs) is readable only by its own user: files 0600, directories 0700; `data_dir` itself is left as the deployment sets it. Unknown fields are refused.
 
+The pages load nothing from elsewhere: `ftl` and `httpc` (from [fml](https://github.com/optionfactory/fml), version 9.0.0) are in `src/frontend/vendor/`, built into the binary and pinned by their hash in each page; updating fml means copying its two `dist` files there and updating the hashes. Every page carries a Content-Security-Policy that runs only the site's own scripts and, by their hash, the inline scripts of that page; every response says `nosniff` and sends no referrer, and the API is never cached.
+
 With `login`, the whole dashboard (pages, assets and API) requires a Google login of `domain`: the authorization code flow with PKCE, then a session cookie valid for 12 hours, signed with a key generated at every start (a restart signs everyone out). Only `/favicon.svg` and the pushes to `/api/snapshot` stay public. The OAuth client needs one authorized redirect URI, `<public_url>/oidc/callback`; `/logout` signs out.
 
 ### Scanning on a different machine

@@ -281,7 +281,62 @@ pub fn create_router(app_state: Arc<AppState>, dev: bool) -> Router {
             .route("/oidc/callback", get(login::callback))
             .route("/logout", get(login::sign_out));
     }
-    public.merge(behind_login).with_state(app_state)
+    public
+        .merge(behind_login)
+        .layer(middleware::from_fn(add_security_headers))
+        .with_state(app_state)
+}
+
+/// On every response: no sniffing of the content type and no referrer; on the API, no caching. On a page, a
+/// Content-Security-Policy that runs only the site's own scripts and, by their hash, the inline scripts of that very
+/// page (its import map and its module): a value that ever reached the page as markup could not run.
+async fn add_security_headers(request: axum::extract::Request, next: middleware::Next) -> axum::response::Response {
+    use axum::http::{HeaderValue, header};
+    let api = request.uri().path().starts_with("/api/");
+    let (mut parts, body) = next.run(request).await.into_parts();
+    parts.headers.insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
+    parts.headers.insert(header::REFERRER_POLICY, HeaderValue::from_static("no-referrer"));
+    if api {
+        parts.headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    }
+    let page = parts
+        .headers
+        .get(header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| value.starts_with("text/html"));
+    if !page {
+        return axum::response::Response::from_parts(parts, body);
+    }
+    // the pages are a few tens of KB, built into the binary or read from src/frontend
+    let Ok(bytes) = axum::body::to_bytes(body, 4 * 1024 * 1024).await else {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    };
+    let hashes: String = inline_scripts(&String::from_utf8_lossy(&bytes))
+        .map(|script| {
+            let digest = ring::digest::digest(&ring::digest::SHA256, script.as_bytes());
+            format!(" 'sha256-{}'", base64::Engine::encode(&base64::engine::general_purpose::STANDARD, digest))
+        })
+        .collect();
+    let policy = format!(
+        "default-src 'self'; script-src 'self'{hashes}; style-src 'self' 'unsafe-inline'; img-src 'self' data:; \
+         object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+    );
+    if let Ok(policy) = HeaderValue::from_str(&policy) {
+        parts.headers.insert(header::CONTENT_SECURITY_POLICY, policy);
+    }
+    parts.headers.remove(header::CONTENT_LENGTH);
+    axum::response::Response::from_parts(parts, axum::body::Body::from(bytes))
+}
+
+/// The text of the `<script>` elements without a `src`, exactly as the browser hashes it.
+fn inline_scripts(page: &str) -> impl Iterator<Item = &str> {
+    page.split("<script").skip(1).filter_map(|rest| {
+        let (tag, after) = rest.split_once('>')?;
+        if tag.contains("src=") {
+            return None;
+        }
+        after.split_once("</script>").map(|(script, _)| script)
+    })
 }
 
 fn matches_filters(p: &RepoStats, filters: &[&str]) -> bool {
@@ -428,6 +483,12 @@ fn matches_filters(p: &RepoStats, filters: &[&str]) -> bool {
 mod tests {
     use super::*;
     use crate::github::GithubRepository;
+
+    #[test]
+    fn only_the_inline_scripts_are_hashed_with_their_exact_text() {
+        let page = "<script type=\"importmap\">{\"a\":1}</script><script src=\"x.js\"></script>\n<script type=\"module\">\n  run();\n</script>";
+        assert_eq!(inline_scripts(page).collect::<Vec<_>>(), ["{\"a\":1}", "\n  run();\n"]);
+    }
 
     fn repo(audit_json: Option<&str>) -> RepoStats {
         let mut r = RepoStats::new_from_github(&GithubRepository {
