@@ -14,8 +14,10 @@ use std::sync::Arc;
 use std::time::Duration;
 
 const SESSION_SECONDS: i64 = 12 * 3600;
-const SESSION_COOKIE: &str = "elaine_session";
-const LOGIN_COOKIE: &str = "elaine_login";
+/// `__Host-`: only this host, over HTTPS, at `/`, so that no sibling subdomain can plant it.
+const SESSION_COOKIE: &str = "__Host-elaine_session";
+/// `__Secure-`: over HTTPS only; it stays under `/oidc`, which `__Host-` would not allow.
+const LOGIN_COOKIE: &str = "__Secure-elaine_login";
 
 /// The email of the signed-in user, for the handlers behind the login.
 #[derive(Clone)]
@@ -106,7 +108,10 @@ pub async fn callback(State(state): State<Arc<AppState>>, headers: HeaderMap, Qu
         return message(StatusCode::BAD_REQUEST, "The login was refused or did not start here: sign in again.");
     };
     let email = match google_email(&state.http_client, login, &code, verifier).await {
-        Ok(email) => email,
+        Ok(email) => {
+            eprintln!("[Login] {email} signed in.");
+            email
+        }
         Err(e) => {
             eprintln!("[Login] Refused: {e:#}");
             return message(StatusCode::BAD_GATEWAY, "Google did not confirm the login: sign in again.");
@@ -138,7 +143,8 @@ fn local_path(encoded: &str) -> String {
         .decode(encoded)
         .ok()
         .and_then(|bytes| String::from_utf8(bytes).ok())
-        .filter(|path| path.starts_with('/') && !path.starts_with("//") && !path.contains('\\'))
+        // browsers drop tabs and newlines from a URL: "/\t/host" would become "//host"
+        .filter(|path| path.starts_with('/') && !path.starts_with("//") && !path.contains('\\') && !path.contains(char::is_control))
         .unwrap_or_else(|| "/".to_string())
 }
 
@@ -315,10 +321,16 @@ mod tests {
 
     #[test]
     fn the_login_returns_only_to_paths_of_this_site() {
-        let returned =
-            ["/security.html?x=1", "//evil.example/x", "/\\evil.example", "https://evil.example/"].map(|path| local_path(&URL_SAFE_NO_PAD.encode(path)));
+        let returned = [
+            "/security.html?x=1",
+            "//evil.example/x",
+            "/\\evil.example",
+            "/\t/evil.example",
+            "https://evil.example/",
+        ]
+        .map(|path| local_path(&URL_SAFE_NO_PAD.encode(path)));
 
-        assert_eq!(returned, ["/security.html?x=1", "/", "/", "/"]);
+        assert_eq!(returned, ["/security.html?x=1", "/", "/", "/", "/"]);
         assert_eq!(local_path("not base64!"), "/");
     }
 
