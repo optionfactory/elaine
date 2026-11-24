@@ -273,7 +273,7 @@ pub fn create_router(app_state: Arc<AppState>, dev: bool) -> Router {
 
     let mut public = Router::new().route("/favicon.svg", get(embedded_assets_handler)).route(
         "/api/snapshot",
-        put(crate::push::receive_snapshot_handler).layer(DefaultBodyLimit::max(64 * 1024 * 1024)),
+        put(crate::push::receive_snapshot_handler).layer(DefaultBodyLimit::max(crate::push::MOST_PUSH_BYTES)),
     );
     if app_state.config.login.is_some() {
         public = public

@@ -5,14 +5,19 @@ use crate::server::AppState;
 use crate::stats::Snapshot;
 use anyhow::Context;
 use axum::{
-    body::Bytes,
-    extract::State,
-    http::{HeaderMap, StatusCode, header},
+    extract::{Request, State},
+    http::{StatusCode, header},
     response::{IntoResponse, Response},
 };
 use flate2::{Compression, read::GzDecoder, write::GzEncoder};
 use std::collections::BTreeMap;
+use std::io::Read;
 use std::sync::Arc;
+
+/// A real snapshot of a few hundred repositories is about 1 MB gzipped and 10 MB of JSON: the bounds leave room for
+/// growth and keep a push from filling the memory of the server.
+pub const MOST_PUSH_BYTES: usize = 16 * 1024 * 1024;
+const MOST_SNAPSHOT_BYTES: u64 = 256 * 1024 * 1024;
 
 /// Sends `snapshot` as gzipped JSON to the `elaine serve` instance at `remote`, replacing what it shows.
 pub async fn send_snapshot(remote: &RemoteConfig, snapshot: &Snapshot) -> anyhow::Result<()> {
@@ -36,11 +41,14 @@ pub async fn send_snapshot(remote: &RemoteConfig, snapshot: &Snapshot) -> anyhow
     Ok(())
 }
 
-pub async fn receive_snapshot_handler(State(state): State<Arc<AppState>>, headers: HeaderMap, body: Bytes) -> Response {
+/// The token is checked before the body is read, so that a request without it costs the server nothing; the body is
+/// bounded gzipped and unzipped, and unzipped and parsed away from the threads that answer the other requests.
+pub async fn receive_snapshot_handler(State(state): State<Arc<AppState>>, request: Request) -> Response {
     let Some(expected) = state.config.push_token.as_deref().filter(|t| !t.is_empty()) else {
         return (StatusCode::FORBIDDEN, "Pushing is not enabled on this server").into_response();
     };
-    let presented = headers
+    let presented = request
+        .headers()
         .get(header::AUTHORIZATION)
         .and_then(|h| h.to_str().ok())
         .and_then(|h| h.strip_prefix("Bearer "))
@@ -48,11 +56,39 @@ pub async fn receive_snapshot_handler(State(state): State<Arc<AppState>>, header
     // Compares every byte, so the response time does not reveal how much of the token matched.
     let token_matches = presented.len() == expected.len() && presented.bytes().zip(expected.bytes()).fold(0u8, |acc, (a, b)| acc | (a ^ b)) == 0;
     if !token_matches {
+        eprintln!("[Push] Refused a push with an invalid token.");
         return (StatusCode::UNAUTHORIZED, "Invalid push token").into_response();
     }
-    let snapshot: Snapshot = match serde_json::from_reader(GzDecoder::new(&body[..])) {
-        Ok(snapshot) => snapshot,
-        Err(e) => return (StatusCode::BAD_REQUEST, format!("Invalid snapshot: {}", e)).into_response(),
+    let body = match axum::body::to_bytes(request.into_body(), MOST_PUSH_BYTES).await {
+        Ok(body) => body,
+        Err(_) => return (StatusCode::PAYLOAD_TOO_LARGE, "The push is larger than the server takes").into_response(),
+    };
+    let organization = state.config.organization.clone();
+    let parsed = tokio::task::spawn_blocking(move || {
+        let mut json = Vec::new();
+        GzDecoder::new(&body[..])
+            .take(MOST_SNAPSHOT_BYTES + 1)
+            .read_to_end(&mut json)
+            .map_err(|e| (StatusCode::BAD_REQUEST, format!("Invalid snapshot: {}", e)))?;
+        if json.len() as u64 > MOST_SNAPSHOT_BYTES {
+            return Err((StatusCode::PAYLOAD_TOO_LARGE, "The snapshot is larger than the server takes".to_string()));
+        }
+        let snapshot: Snapshot = serde_json::from_slice(&json).map_err(|e| (StatusCode::BAD_REQUEST, format!("Invalid snapshot: {}", e)))?;
+        // the pages and the mails link each repository to it: only GitHub, under the organization
+        let prefix = format!("https://github.com/{}/", organization);
+        if let Some(stray) = snapshot.projects.iter().find(|p| !p.html_url.is_empty() && !p.html_url.starts_with(&prefix)) {
+            return Err((StatusCode::BAD_REQUEST, format!("Invalid snapshot: {} links outside {}", stray.name, prefix)));
+        }
+        Ok(snapshot)
+    })
+    .await;
+    let snapshot = match parsed {
+        Ok(Ok(snapshot)) => snapshot,
+        Ok(Err((status, reason))) => {
+            eprintln!("[Push] Refused a push: {}", reason);
+            return (status, reason).into_response();
+        }
+        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to read the snapshot: {}", e)).into_response(),
     };
     let stats = Arc::clone(&state.stats);
     let stored = tokio::task::spawn_blocking(move || {
@@ -146,6 +182,16 @@ mod tests {
         assert!(!stats.aggregate_file_path().exists());
 
         let right = RemoteConfig { url, token: "s3cret".into() };
+        let mut stray = RepoStats::new_from_github(&repo);
+        stray.html_url = "https://evil.example/acme-api".into();
+        let elsewhere = Snapshot {
+            projects: vec![stray],
+            logs: BTreeMap::new(),
+            images: BTreeMap::new(),
+        };
+        assert!(send_snapshot(&right, &elsewhere).await.is_err());
+        assert!(!stats.aggregate_file_path().exists());
+
         send_snapshot(&right, &snapshot).await.unwrap();
         let stored = stats.load_snapshot().unwrap();
         assert_eq!(stored.projects[0].name, "acme-api");

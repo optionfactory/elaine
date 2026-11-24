@@ -69,7 +69,7 @@ On the scanning machine, point `remote` at the server:
 }
 ```
 
-With `remote` configured, `scan` pushes its results at the end, even when some repositories failed; `elaine push` sends the last results again without rescanning. Each push replaces everything the server shows. The token travels in an HTTP header, so put the server behind a reverse proxy that terminates TLS. Without `push_token`, the server refuses every push.
+With `remote` configured, `scan` pushes its results at the end, even when some repositories failed; `elaine push` sends the last results again without rescanning. Each push replaces everything the server shows. The token travels in an HTTP header, so put the server behind a reverse proxy that terminates TLS. Without `push_token`, the server refuses every push. The token is checked before the body is read; a push may be at most 16 MB gzipped and 256 MB unzipped (a real one of a few hundred repositories is about 1 MB and 10 MB), and each repository's `html_url` must be under `https://github.com/<organization>/`, since the pages and the mails link to it. Refused pushes are logged, without the token.
 
 ### Mail on new vulnerabilities
 
