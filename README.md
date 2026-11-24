@@ -2,6 +2,8 @@
 
 A CLI tool for aggregating and inspecting governance manifests and dependency vulnerabilities across an organization's GitHub repositories.
 
+What `serve` holds, who can do what with it and the known limits: [SECURITY.md](SECURITY.md).
+
 > *"That's the second biggest attack surface I've ever seen!"*
 >
 > — Elaine, sizing up your dependency tree.
