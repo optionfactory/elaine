@@ -80,7 +80,7 @@
                 <span class="value">{{ critical }}</span>
             </info-item>
             <info-item>
-                <span class="label">Known vulnerabilities</span>
+                <span class="label">Known vulnerabilities shipped</span>
                 <span class="value">{{ vulnerabilities }}</span>
             </info-item>
             <info-item>
@@ -98,7 +98,8 @@
                     <th>Repository</th>
                     <th>Tier</th>
                     <th>Lifecycle</th>
-                    <th>Vulnerabilities</th>
+                    <th title="Known vulnerabilities in what the repository ships">Vulnerabilities</th>
+                    <th title="Known vulnerabilities in test, dev or build dependencies, which do not ship">Build and test only</th>
                     <th>Outdated</th>
                     <th>Last push</th>
                 </tr>
@@ -109,6 +110,7 @@
                     <td>{{ r.tier ?? 'unspecified' }}</td>
                     <td>{{ r.lifecycle ?? 'unspecified' }}</td>
                     <td data-tpl-class-append="r.vulnerabilities == null ? 'unknown' : ''">{{ r.vulnerabilities ?? 'no data' }}</td>
+                    <td class="build-only" data-tpl-class-append="r.build_only_vulnerabilities == null ? 'unknown' : ''">{{ r.build_only_vulnerabilities ?? 'no data' }}</td>
                     <td data-tpl-class-append="r.outdated == null ? 'unknown' : ''">{{ r.outdated ?? 'no data' }}</td>
                     <td data-tpl-title="r.pushed.exact">{{ r.pushed.relative }}</td>
                 </tr>

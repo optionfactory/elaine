@@ -14,8 +14,9 @@ pub struct Scan<'a> {
     pub images: &'a BTreeMap<String, ImageScan>,
 }
 
-/// The vulnerabilities in `current` that `previous` did not have, once per repository, artifact and advisory: a new
-/// version of a dependency still vulnerable to the same advisory is not new.
+/// The vulnerabilities of what the repositories ship in `current` that `previous` did not have, once per repository,
+/// artifact and advisory: a new version of a dependency still vulnerable to the same advisory is not new, one that
+/// moves from a test dependency into what ships is.
 ///
 /// Without a previous push (the first one, or the first after a restore) nothing is new. A repository counts only when
 /// both pushes scanned it for vulnerabilities, so one failed scan does not make all its vulnerabilities look new at the
@@ -27,10 +28,13 @@ pub fn new_vulnerabilities<'a>(previous: Option<&[RepoStats]>, current: &'a [Rep
     let known: HashMap<&str, Option<HashSet<(&str, &str)>>> = previous
         .iter()
         .map(|repo| {
-            let vulns = repo
-                .vulnerabilities
-                .as_ref()
-                .map(|vulns| vulns.iter().map(|v| (v.artifact.as_str(), v.vuln_id.as_str())).collect());
+            let vulns = repo.vulnerabilities.as_ref().map(|vulns| {
+                vulns
+                    .iter()
+                    .filter(|v| !v.build_only)
+                    .map(|v| (v.artifact.as_str(), v.vuln_id.as_str()))
+                    .collect()
+            });
             (repo.name.as_str(), vulns)
         })
         .collect();
@@ -45,7 +49,7 @@ pub fn new_vulnerabilities<'a>(previous: Option<&[RepoStats]>, current: &'a [Rep
             None => None,
         };
         let mut seen = HashSet::new();
-        for vuln in vulns {
+        for vuln in vulns.iter().filter(|v| !v.build_only) {
             let key = (vuln.artifact.as_str(), vuln.vuln_id.as_str());
             if before.is_none_or(|before| !before.contains(&key)) && seen.insert(key) {
                 found.push((repo, vuln));
@@ -492,6 +496,17 @@ mod tests {
             images: &images,
         };
         assert!(new_image_vulnerabilities(Some(&previous), &current).is_empty());
+    }
+
+    #[test]
+    fn vulnerabilities_only_in_what_builds_or_tests_are_not_mailed() {
+        // junit's advisory was in a test dependency, and now ships; mockito's is in a test dependency
+        let mut previous = [repo("core", Some(&[("junit", "GHSA-1")]))];
+        previous[0].vulnerabilities.as_mut().unwrap()[0].build_only = true;
+        let mut current = [repo("core", Some(&[("junit", "GHSA-1"), ("mockito", "GHSA-2"), ("netty", "GHSA-3")]))];
+        current[0].vulnerabilities.as_mut().unwrap()[1].build_only = true;
+        let found = new_vulnerabilities(Some(&previous), &current);
+        assert_eq!(ids(&found), ["core GHSA-1", "core GHSA-3"]);
     }
 
     #[test]

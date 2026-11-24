@@ -9,7 +9,7 @@ use std::collections::{BTreeMap, BTreeSet};
 pub struct Security {
     /// One row per (repository, scanner) pair with failed checks.
     pub failures: Vec<FailureRow>,
-    /// Live repositories with known vulnerabilities, sorted by count.
+    /// Live repositories with known vulnerabilities, sorted by those in what they ship.
     pub vulns: Vec<VulnsRow>,
     /// Live repositories with outdated dependencies, sorted by count.
     pub outdated: Vec<OutdatedRow>,
@@ -44,7 +44,10 @@ pub struct FailureRow {
 pub struct VulnsRow {
     pub name: String,
     pub html_url: String,
+    /// In what the repository ships.
     pub vulns: usize,
+    /// Only in what builds or tests it.
+    pub build_only: usize,
     pub manifest: bool,
     #[serde(rename = "type")]
     pub project_type: Option<ProjectType>,
@@ -89,6 +92,7 @@ pub struct RiskMatrixRow {
 #[derive(Debug, Clone, Serialize)]
 pub struct RiskCell {
     pub repos: usize,
+    /// In what the repositories ship.
     pub vulns: usize,
     pub score: u32,
     pub level: &'static str,
@@ -105,6 +109,7 @@ pub struct WorstRow {
     #[serde(rename = "type")]
     pub project_type: Option<ProjectType>,
     pub lifecycle: Option<LifecycleType>,
+    /// In what the repository ships.
     pub vulns: usize,
     pub outdated: usize,
     /// Fixable high and critical vulnerabilities of the images it runs: shown, not part of the ranking.
@@ -246,12 +251,13 @@ impl Security {
         let mut vulns: Vec<VulnsRow> = live
             .iter()
             .filter_map(|p| {
-                let count = p.vulnerabilities.as_ref().map(|v| v.len()).unwrap_or(0);
+                let (shipped, build_only) = p.vulnerability_counts().unwrap_or_default();
                 let (project_type, tier, lifecycle) = manifest_meta(p);
-                (count > 0).then(|| VulnsRow {
+                (shipped + build_only > 0).then(|| VulnsRow {
                     name: p.name.clone(),
                     html_url: p.html_url.clone(),
-                    vulns: count,
+                    vulns: shipped,
+                    build_only,
                     manifest: p.manifest.is_some(),
                     project_type,
                     tier,
@@ -259,7 +265,7 @@ impl Security {
                 })
             })
             .collect();
-        vulns.sort_by_key(|r| std::cmp::Reverse(r.vulns));
+        vulns.sort_by_key(|r| std::cmp::Reverse((r.vulns, r.build_only)));
 
         let mut outdated: Vec<OutdatedRow> = live
             .iter()
@@ -348,7 +354,7 @@ impl Risk {
             .map(|p| {
                 let tier = p.manifest.as_ref().and_then(|m| m.tier).unwrap_or(ServiceTier::Tier4);
                 let exposure = p.manifest.as_ref().map(Exposure::from_manifest).unwrap_or(Exposure::Unknown);
-                let vulns = p.vulnerabilities.as_ref().map(|v| v.len()).unwrap_or(0);
+                let vulns = p.vulnerability_counts().map(|(shipped, _)| shipped).unwrap_or(0);
                 let outdated = p.outdated_dependencies.as_ref().map(|v| v.len()).unwrap_or(0);
                 (*p, tier, exposure, vulns, outdated)
             })
@@ -491,6 +497,30 @@ mod tests {
         let worst: Vec<_> = agg.security.risk.worst.iter().map(|w| (w.name.as_str(), w.vulns, w.image_vulns)).collect();
         assert_eq!(worst, [("fresh", 1, 0), ("stale", 0, 1)]);
         assert!(agg.security.vulns.iter().all(|r| r.name == "fresh"));
+    }
+
+    #[test]
+    fn vulnerabilities_only_in_what_builds_or_tests_are_listed_but_do_not_rank() {
+        let manifest = |name: &str, tier: &str| {
+            format!(
+                r#"{{ "schema_version": 1, "name": "{name}", "tier": "{tier}", "environments": [ {{ "name": "prod", "type": "production", "ingress": "internet" }} ] }}"#
+            )
+        };
+        let vuln = |build_only| crate::scanners::Vulnerability {
+            build_only,
+            ..Default::default()
+        };
+        let mut tooling = with_manifest(repo("tooling", false), &manifest("tooling", "tier1"));
+        tooling.vulnerabilities = Some(vec![vuln(true), vuln(true), vuln(true)]);
+        let mut shop = with_manifest(repo("shop", false), &manifest("shop", "tier1"));
+        shop.vulnerabilities = Some(vec![vuln(false), vuln(true)]);
+        let agg = Aggregates::calculate(&[tooling, shop], &Default::default());
+        let listed: Vec<_> = agg.security.vulns.iter().map(|r| (r.name.as_str(), r.vulns, r.build_only)).collect();
+        assert_eq!(listed, [("shop", 1, 1), ("tooling", 0, 3)]);
+        let ranked: Vec<_> = agg.security.risk.worst.iter().map(|w| (w.name.as_str(), w.vulns)).collect();
+        assert_eq!(ranked, [("shop", 1), ("tooling", 0)]);
+        let cell_vulns: usize = agg.security.risk.rows.iter().flat_map(|r| &r.cells).map(|c| c.vulns).sum();
+        assert_eq!(cell_vulns, 1);
     }
 
     #[test]

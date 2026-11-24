@@ -70,8 +70,8 @@
             <label>Vulnerabilities:</label>
             <state-button>
                 <state active data-default data-value="any"><svg><use href="icons.svg#icon-any"></use></svg><span>Any</span></state>
-                <state title="With known vulnerabilities in the dependencies" data-value="vulns"><svg><use href="icons.svg#icon-vulns"></use></svg><span>Some</span></state>
-                <state title="Scanned, no known vulnerabilities in the dependencies" data-value="no-vulns"><svg><use href="icons.svg#icon-no-vulns"></use></svg><span>None</span></state>
+                <state title="With known vulnerabilities in what it ships" data-value="vulns"><svg><use href="icons.svg#icon-vulns"></use></svg><span>Some</span></state>
+                <state title="Scanned, no known vulnerabilities in what it ships" data-value="no-vulns"><svg><use href="icons.svg#icon-no-vulns"></use></svg><span>None</span></state>
             </state-button>
         </filter-group>
 
@@ -281,7 +281,7 @@
                             <tr data-tpl-each="vulnerabilities" data-tpl-var="vuln">
                                 <td><strong>{{ vuln.project }}</strong></td>
                                 <td><tag data-tpl-if="vuln.scanner">{{ vuln.scanner }}</tag></td>
-                                <td>{{vuln.artifact}}</td>
+                                <td>{{vuln.artifact}} <tag class="build-only" data-tpl-if="vuln.build_only" title="in a test, dev or build dependency: it does not ship">build and test</tag></td>
                                 <td>{{vuln.version}}</td>
                                 <td>
                                     <a class="danger" data-tpl-href="`https://osv.dev/vulnerability/{vuln.vuln_id}`" target="_blank" rel="noopener noreferrer">
@@ -440,12 +440,15 @@
 
             const serious = p.images.reduce((sum, i) => sum + i.serious, 0);
             const lower = p.images.reduce((sum, i) => sum + i.fixable - i.serious, 0);
+            const shipped = (p.vulnerabilities ?? []).filter(v => !v.build_only);
+            const buildOnly = (p.vulnerabilities ?? []).filter(v => v.build_only);
             const vulnerabilityChips = [
-                p.vulnerabilities?.length > 0 && {
-                    text: `${p.vulnerabilities.length} in dependencies`,
+                shipped.length > 0 && {
+                    text: `${shipped.length} in dependencies`,
                     kind: 'dependency-vulns',
-                    hint: `${new Set(p.vulnerabilities.map(v => v.vuln_id)).size} distinct advisories from OSV, which the scan does not rate by severity`,
+                    hint: `${new Set(shipped.map(v => v.vuln_id)).size} distinct advisories from OSV, which the scan does not rate by severity`,
                 },
+                buildOnly.length > 0 && { text: `${buildOnly.length} only in build and test`, kind: 'build-only', hint: 'in test, dev or build dependencies: they do not ship' },
                 serious > 0 && { text: `${serious} high or critical in images`, kind: 'severity high', hint: 'fixable, in the container images the repository runs' },
                 lower > 0 && { text: `${lower} other in images`, kind: 'severity low', hint: 'fixable, medium or lower, in the container images the repository runs' },
             ].filter(Boolean);
@@ -486,6 +489,7 @@
                 times,
                 facts,
                 compliance,
+                vulnerabilities: [...shipped, ...buildOnly],
                 vulnerabilityChips,
                 nothingFound: notes.join(' · '),
             };

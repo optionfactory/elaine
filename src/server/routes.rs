@@ -343,7 +343,7 @@ fn matches_filters(p: &RepoStats, filters: &[&str]) -> bool {
     let live = !p.archived;
     let manifest = p.manifest.is_some();
     let public = !p.private;
-    let has_vulns = p.vulnerabilities.as_ref().map(|v| !v.is_empty()).unwrap_or(false);
+    let has_vulns = p.vulnerability_counts().is_some_and(|(shipped, _)| shipped > 0);
     let has_outdated = p.outdated_dependencies.as_ref().map(|v| !v.is_empty()).unwrap_or(false);
 
     if filters.contains(&"live") && !live {

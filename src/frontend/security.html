@@ -65,7 +65,8 @@
 
         <h2 id="highest-risk">Highest risk repositories</h2>
         <p class="section-intro">
-            Ranked by tier &times; exposure score, then by known vulnerabilities and outdated dependencies as tie-breakers.
+            Ranked by tier &times; exposure score, then by known vulnerabilities in what the repository ships and by
+            outdated dependencies as tie-breakers.
             Image vulns are the fixable high and critical vulnerabilities of the container images the repository runs:
             shown next to the ranking, not part of it.
         </p>
@@ -103,8 +104,11 @@
     <section id="vulns">
         <h2>Known vulnerabilities</h2>
         <p class="section-intro">
-            Live repositories with known vulnerabilities, sorted by count. The same advisory often hits many
-            repositories at once, so fixing a shared dependency once can clear multiple rows.
+            Live repositories with known vulnerabilities, sorted by those in what they ship. The same advisory often
+            hits many repositories at once, so fixing a shared dependency once can clear multiple rows.
+            Build and test only are the vulnerabilities of dependencies that never ship: Maven test scope, npm dev
+            packages, Cargo dev and build dependencies and proc macros, Go modules only tests compile. They count
+            neither in the matrix nor in the ranking above.
         </p>
 
         <vulns-grid>
@@ -200,7 +204,8 @@
             <thead>
                 <tr>
                     <th>Repository</th>
-                    <th>Vulnerabilities</th>
+                    <th>Shipped</th>
+                    <th>Build and test only</th>
                     <th>Type</th>
                     <th>Tier</th>
                     <th>Lifecycle</th>
@@ -210,6 +215,7 @@
                 <tr data-tpl-each="self" data-tpl-var="r">
                     <td><span class="repo-link"><a data-tpl-href="#elaine:repositoryHref(r.name)">{{ r.name }}</a><a class="github" data-tpl-href="r.html_url" target="_blank" rel="noopener noreferrer" title="Open on GitHub" aria-label="Open on GitHub"></a></span></td>
                     <td>{{ r.vulns }}</td>
+                    <td class="build-only">{{ r.build_only }}</td>
                     <td class="no-manifest" data-tpl-if="!r.manifest"><badges><badge class="nomanifest">no manifest</badge></badges></td>
                     <td data-tpl-if="r.manifest">{{ r.type ?? 'unspecified' }}</td>
                     <td data-tpl-if="r.manifest">{{ r.tier ?? 'unspecified' }}</td>
@@ -360,7 +366,7 @@
                     <th>Exposure</th>
                     <th>Type</th>
                     <th>Lifecycle</th>
-                    <th>Vulns</th>
+                    <th title="Known vulnerabilities in what the repository ships">Vulns</th>
                     <th>Image vulns</th>
                     <th>Outdated</th>
                 </tr>

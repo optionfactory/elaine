@@ -706,7 +706,7 @@ table {
     }
 
     &.vulns-board {
-        grid-template-columns: 1fr auto auto auto auto;
+        grid-template-columns: 1fr auto auto auto auto auto;
     }
 
     &.outdated-board {
@@ -1801,7 +1801,7 @@ table {
     }
 
     &.steward-repositories {
-        grid-template-columns: 1fr auto auto auto auto auto;
+        grid-template-columns: 1fr auto auto auto auto auto auto;
 
         td.unknown {
             color: var(--text-muted);
@@ -1823,6 +1823,17 @@ tag {
         background: color-mix(in srgb, var(--success) 15%, var(--card-bg));
         color: var(--success);
     }
+
+    &.build-only {
+        background: color-mix(in srgb, var(--text-muted) 15%, var(--card-bg));
+        color: var(--text-muted);
+        cursor: help;
+        white-space: nowrap;
+    }
+}
+
+td.build-only {
+    color: var(--text-muted);
 }
 
 severity-group {

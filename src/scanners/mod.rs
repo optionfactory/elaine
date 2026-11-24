@@ -158,6 +158,15 @@ impl RepoStats {
         self.health.entry(kind).or_default().insert(check.to_string(), status);
     }
 
+    /// The known vulnerabilities of what the repository ships, and of what only builds or tests it; `None` when no
+    /// scanner checked it.
+    pub fn vulnerability_counts(&self) -> Option<(usize, usize)> {
+        self.vulnerabilities.as_ref().map(|vulns| {
+            let build_only = vulns.iter().filter(|v| v.build_only).count();
+            (vulns.len() - build_only, build_only)
+        })
+    }
+
     pub fn checked_for_vulnerabilities(&mut self) {
         if self.vulnerabilities.is_none() {
             self.vulnerabilities = Some(Vec::new());

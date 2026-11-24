@@ -69,7 +69,8 @@
         <h2>Known vulnerabilities</h2>
         <p class="section-intro">
             Vulnerabilities of the dependencies, as OSV reports them, one row per package and installed version.
-            The scanners do not record a severity or a fixed version for these: the advisory has both.
+            The scanners do not record a severity or a fixed version for these: the advisory has both. Packages tagged
+            build and test are only in test, dev or build dependencies, which do not ship; they come last.
         </p>
         <vulnerabilities-grid>
             <skeleton-row></skeleton-row>
@@ -242,7 +243,7 @@
             </thead>
             <tbody>
                 <tr data-tpl-each="packages" data-tpl-var="p">
-                    <td><strong>{{ p.artifact }}</strong></td>
+                    <td><strong>{{ p.artifact }}</strong> <tag class="build-only" data-tpl-if="p.build_only" title="in a test, dev or build dependency: it does not ship">build and test</tag></td>
                     <td>{{ p.version }}</td>
                     <td>
                         <advisory-links>
@@ -417,8 +418,8 @@
                     log_href: `/api/logs?repo=${encodeURIComponent(p.name)}&scanner=${encodeURIComponent(scanner)}`,
                 }))
                 .filter(f => f.checks.length > 0);
-            const packages = groupedByKey(p.vulnerabilities, v => `${v.artifact}@${v.version}`, v => ({ artifact: v.artifact, version: v.version, scanner: v.scanner ?? '' }))
-                .sort((a, b) => b.advisories.length - a.advisories.length || a.artifact.localeCompare(b.artifact));
+            const packages = groupedByKey(p.vulnerabilities, v => `${v.artifact}@${v.version}@${v.build_only}`, v => ({ artifact: v.artifact, version: v.version, scanner: v.scanner ?? '', build_only: v.build_only }))
+                .sort((a, b) => a.build_only - b.build_only || b.advisories.length - a.advisories.length || a.artifact.localeCompare(b.artifact));
             const outdated = groupedByKey(p.outdated_dependencies, d => `${d.artifact}@${d.current}@${d.latest}`, d => ({ artifact: d.artifact, current: d.current, latest: d.latest, scanner: d.scanner ?? '' }))
                 .sort((a, b) => a.artifact.localeCompare(b.artifact));
             const vulnerable_images = p.images

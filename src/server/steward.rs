@@ -38,8 +38,10 @@ struct StewardRepository<'a> {
     project_type: Option<ProjectType>,
     tier: Option<ServiceTier>,
     lifecycle: Option<LifecycleType>,
-    /// `None` when no scanner checked the repository.
+    /// In what the repository ships; `None` when no scanner checked it.
     vulnerabilities: Option<usize>,
+    /// Only in what builds or tests it.
+    build_only_vulnerabilities: Option<usize>,
     outdated: Option<usize>,
     pushed_at: &'a str,
 }
@@ -94,7 +96,8 @@ fn find_steward<'a>(projects: &'a [RepoStats], steward: &str) -> Option<StewardP
                     project_type,
                     tier,
                     lifecycle,
-                    vulnerabilities: p.vulnerabilities.as_ref().map(Vec::len),
+                    vulnerabilities: p.vulnerability_counts().map(|(shipped, _)| shipped),
+                    build_only_vulnerabilities: p.vulnerability_counts().map(|(_, build_only)| build_only),
                     outdated: p.outdated_dependencies.as_ref().map(Vec::len),
                     pushed_at: &p.pushed_at,
                 }
