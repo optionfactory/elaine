@@ -122,6 +122,10 @@ pub fn new_image_vulnerabilities<'a>(previous: Option<&BTreeMap<String, ImageSca
 }
 
 /// Mails the vulnerabilities `current` brings over `previous`, if any.
+/// The entries one mail lists: a push holds whatever its sender wrote, and a mail of thousands helps nobody; the rest
+/// is on the dashboard.
+const MOST_LISTED: usize = 200;
+
 pub async fn notify(alerts: &AlertsConfig, previous: Option<Scan<'_>>, current: Scan<'_>, dashboard: Option<&str>) -> anyhow::Result<()> {
     let found = new_vulnerabilities(previous.as_ref().map(|p| p.projects), current.projects);
     let found_in_images = new_image_vulnerabilities(previous.as_ref().map(|p| p.images), &current);
@@ -133,13 +137,16 @@ pub async fn notify(alerts: &AlertsConfig, previous: Option<Scan<'_>>, current: 
         1 => "Elaine: 1 new vulnerability".to_string(),
         n => format!("Elaine: {n} new vulnerabilities"),
     };
+    let listed = &found[..found.len().min(MOST_LISTED)];
+    let listed_in_images = &found_in_images[..found_in_images.len().min(MOST_LISTED - listed.len())];
+    let left = total - listed.len() - listed_in_images.len();
     let message = Message::builder()
         .from(Mailbox::new(Some("Elaine".into()), alerts.from.email.clone()))
         .to(alerts.to.clone())
         .subject(subject)
         .multipart(MultiPart::alternative_plain_html(
-            text(&found, &found_in_images, dashboard),
-            html(&found, &found_in_images, dashboard),
+            text(listed, listed_in_images, left, dashboard),
+            html(listed, listed_in_images, left, dashboard),
         ))?;
     let loopback = alerts.smtp_host == "localhost" || alerts.smtp_host.parse::<IpAddr>().is_ok_and(|ip| ip.is_loopback());
     let builder = if loopback {
@@ -180,7 +187,7 @@ fn label<T: serde::Serialize>(value: &T) -> String {
         .unwrap_or_default()
 }
 
-fn text(found: &[(&RepoStats, &Vulnerability)], found_in_images: &[NewImageVulnerability], dashboard: Option<&str>) -> String {
+fn text(found: &[(&RepoStats, &Vulnerability)], found_in_images: &[NewImageVulnerability], left: usize, dashboard: Option<&str>) -> String {
     let mut text = String::new();
     for (id, hits) in by_advisory(found) {
         let _ = writeln!(text, "{id}  https://osv.dev/vulnerability/{id}");
@@ -208,6 +215,9 @@ fn text(found: &[(&RepoStats, &Vulnerability)], found_in_images: &[NewImageVulne
             );
         }
         text.push('\n');
+    }
+    if left > 0 {
+        let _ = writeln!(text, "And {left} more, on the dashboard.\n");
     }
     if let Some(dashboard) = dashboard {
         let _ = writeln!(text, "{dashboard}");
@@ -245,7 +255,7 @@ fn section_title(html: &mut String, title: &str) {
 }
 
 /// Tables and inline styles in the light slate palette: mail clients drop stylesheets and most of CSS.
-fn html(found: &[(&RepoStats, &Vulnerability)], found_in_images: &[NewImageVulnerability], dashboard: Option<&str>) -> String {
+fn html(found: &[(&RepoStats, &Vulnerability)], found_in_images: &[NewImageVulnerability], left: usize, dashboard: Option<&str>) -> String {
     let mut parts = Vec::new();
     if !found.is_empty() {
         let repos: HashSet<&str> = found.iter().map(|(repo, _)| repo.name.as_str()).collect();
@@ -325,6 +335,12 @@ fn html(found: &[(&RepoStats, &Vulnerability)], found_in_images: &[NewImageVulne
             );
         }
         html.push_str(CARD_END);
+    }
+    if left > 0 {
+        let _ = writeln!(
+            html,
+            "<tr><td style=\"padding:8px 4px 0;font-size:14px;color:{MUTED};\">And {left} more, on the dashboard.</td></tr>"
+        );
     }
     if let Some(dashboard) = dashboard {
         let _ = writeln!(
@@ -482,7 +498,7 @@ mod tests {
     fn the_mail_escapes_what_the_repositories_declare() {
         let current = [repo("core", Some(&[("<img src=x>", "GHSA-1")]))];
         let found = new_vulnerabilities(Some(&[]), &current);
-        let html = html(&found, &[], Some("https://elaine.example.com"));
+        let html = html(&found, &[], 0, Some("https://elaine.example.com"));
         assert!(!html.contains("<img"));
         assert!(html.contains("&lt;img src=x&gt;"));
     }

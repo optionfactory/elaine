@@ -75,7 +75,7 @@ With `remote` configured, `scan` pushes its results at the end, even when some r
 
 ### Mail on new vulnerabilities
 
-With `alerts`, the server mails the vulnerabilities each push brings that the previous one did not have:
+With `alerts`, the server mails the vulnerabilities each push brings that the previous one did not have (at most 200 listed in one mail, the subject counting them all, the rest on the dashboard):
 
 ```json
 {
