@@ -41,6 +41,10 @@ pub struct Vulnerability {
     /// Missing in the results of earlier releases and in the JSON anarchitect writes for Maven.
     #[serde(default)]
     pub scanner: Option<ScannerKind>,
+    /// Only in what builds or tests the repository (a test or dev dependency, a build script's, a proc macro's), never
+    /// in what it ships. False in the results of releases before 1.9, which did not tell.
+    #[serde(default)]
+    pub build_only: bool,
 }
 
 /// A dependency a scanner checked against OSV. Kept on the scanning machine only, so that a repository that did not
@@ -54,6 +58,8 @@ pub struct Dependency {
     pub version: String,
     #[serde(default)]
     pub trail: Vec<String>,
+    #[serde(default)]
+    pub build_only: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]

@@ -1,6 +1,6 @@
-use crate::scanners::osv::fetch_vulnerabilities;
+use crate::scanners::osv::{Locked, check_locked, lock};
 use crate::scanners::pathcollector::Pattern;
-use crate::scanners::{CheckStatus, Dependency, OutdatedDependency, RepoStats, ScanContext, Scanner, ScannerKind, Vulnerability};
+use crate::scanners::{CheckStatus, OutdatedDependency, RepoStats, ScanContext, Scanner, ScannerKind};
 use serde::Deserialize;
 use std::collections::BTreeSet;
 
@@ -36,7 +36,7 @@ struct GoListPackageModule {
     version: Option<String>,
 }
 
-/// The modules some package of the repository, its tests included, compiles code from. The module graph of
+/// The modules some listed package compiles code from. The module graph of
 /// `go list -m all` also holds modules only required by a dependency's `go.mod`, which never reach the binary.
 fn compiled_modules(go_list: &[u8]) -> serde_json::Result<BTreeSet<(String, String)>> {
     let mut modules = BTreeSet::new();
@@ -113,50 +113,34 @@ impl Scanner for GoScanner {
                 .collect();
             stats.add_outdated_dependencies(ScannerKind::Go, updates);
 
-            let compiled = match ctx.run_logged("go", "go", &["list", "-e", "-deps", "-test", "-json=Module", "./..."], &run_dir) {
-                Ok(out) if out.success => compiled_modules(&out.stdout).map_err(anyhow::Error::from),
-                Ok(out) => Err(anyhow::anyhow!("{}", String::from_utf8_lossy(&out.stderr).trim())),
-                Err(e) => Err(e),
-            };
-            let compiled = match compiled {
-                Ok(compiled) => compiled,
-                Err(e) => {
-                    ctx.report_failure("go", format!("Failed to list the compiled packages of {}: {}", mod_path.display(), e));
-                    vulns_ok = false;
-                    continue;
-                }
-            };
-            let osv_deps: Vec<(&str, &str, &str)> = compiled.iter().map(|(path, version)| ("Go", path.as_str(), version.as_str())).collect();
-
-            match fetch_vulnerabilities(ctx.client, &osv_deps) {
-                Ok(vulns) => {
-                    stats.add_checked_dependencies(
-                        ScannerKind::Go,
-                        osv_deps.iter().map(|(ecosystem, name, version)| Dependency {
-                            ecosystem: ecosystem.to_string(),
-                            project: ctx.repo.name.clone(),
-                            artifact: name.to_string(),
-                            version: version.to_string(),
-                            trail: vec![],
-                        }),
-                    );
-                    let vulnerabilities = vulns
-                        .into_iter()
-                        .map(|(pkg, ver, id)| Vulnerability {
-                            project: ctx.repo.name.clone(),
-                            artifact: pkg,
-                            version: ver,
-                            vuln_id: id,
-                            ..Default::default()
-                        })
-                        .collect();
-                    stats.add_vulnerabilities(ScannerKind::Go, vulnerabilities);
-                }
-                Err(e) => {
-                    ctx.report_failure("go", format!("OSV check failed for {}: {}", mod_path.display(), e));
-                    vulns_ok = false;
+            // what the binaries compile, then what their tests add
+            let mut listed = Vec::new();
+            for args in [
+                &["list", "-e", "-deps", "-json=Module", "./..."][..],
+                &["list", "-e", "-deps", "-test", "-json=Module", "./..."],
+            ] {
+                let modules = match ctx.run_logged("go", "go", args, &run_dir) {
+                    Ok(out) if out.success => compiled_modules(&out.stdout).map_err(anyhow::Error::from),
+                    Ok(out) => Err(anyhow::anyhow!("{}", String::from_utf8_lossy(&out.stderr).trim())),
+                    Err(e) => Err(e),
+                };
+                match modules {
+                    Ok(modules) => listed.push(modules),
+                    Err(e) => {
+                        ctx.report_failure("go", format!("Failed to list the compiled packages of {}: {}", mod_path.display(), e));
+                        break;
+                    }
                 }
             }
+            let [shipped, tested] = &listed[..] else {
+                vulns_ok = false;
+                continue;
+            };
+            let mut locked = Locked::new();
+            for (path, version) in tested {
+                lock(&mut locked, path, version, !shipped.contains(&(path.clone(), version.clone())));
+            }
+            vulns_ok &= check_locked(ctx, stats, (ScannerKind::Go, "go"), "Go", mod_path, &locked);
         }
 
         stats.record_check(ScannerKind::Go, "vulns", if vulns_ok { CheckStatus::Ok } else { CheckStatus::Failed });

@@ -60,8 +60,22 @@ impl Scanner for MavenScanner {
 
                     let vulns_path = run_dir.join("target").join("anarchitect-vulnerabilities.json");
                     match fs::read_to_string(&vulns_path) {
-                        Ok(payload) => match serde_json::from_str::<Vec<Vulnerability>>(&payload) {
-                            Ok(parsed_vulns) => stats.add_vulnerabilities(ScannerKind::Maven, parsed_vulns),
+                        Ok(payload) => match serde_json::from_str::<Vec<AuditedVulnerability>>(&payload) {
+                            Ok(parsed_vulns) => stats.add_vulnerabilities(
+                                ScannerKind::Maven,
+                                parsed_vulns
+                                    .into_iter()
+                                    .map(|v| Vulnerability {
+                                        build_only: v.scope.as_deref() == Some("test"),
+                                        project: v.project,
+                                        artifact: v.artifact,
+                                        version: v.version,
+                                        vuln_id: v.vuln_id,
+                                        trail: v.trail,
+                                        scanner: None,
+                                    })
+                                    .collect(),
+                            ),
                             Err(e) => {
                                 ctx.report_failure("maven", format!("Failed to parse {}: {}", vulns_path.display(), e));
                                 vulns_ok = false;
@@ -85,6 +99,7 @@ impl Scanner for MavenScanner {
                             artifact: d.artifact,
                             version: d.version,
                             trail: d.trail,
+                            build_only: d.scope.as_deref() == Some("test"),
                         })),
                         _ => audited = None,
                     }
@@ -136,6 +151,21 @@ impl Scanner for MavenScanner {
     }
 }
 
+/// An entry of `anarchitect-vulnerabilities.json`.
+#[derive(serde::Deserialize)]
+struct AuditedVulnerability {
+    project: String,
+    artifact: String,
+    version: String,
+    vuln_id: String,
+    #[serde(default)]
+    trail: Vec<String>,
+    /// The Maven scope, written by anarchitect since 1.19: `test` only builds and tests; `provided` counts as shipped,
+    /// since the container that provides it runs it.
+    #[serde(default)]
+    scope: Option<String>,
+}
+
 /// An entry of `anarchitect-dependencies.json`.
 #[derive(serde::Deserialize)]
 struct AuditedDependency {
@@ -144,4 +174,6 @@ struct AuditedDependency {
     version: String,
     #[serde(default)]
     trail: Vec<String>,
+    #[serde(default)]
+    scope: Option<String>,
 }

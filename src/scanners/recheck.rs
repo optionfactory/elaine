@@ -43,6 +43,7 @@ fn replace_vulnerabilities(repo: &mut RepoStats, recorded: &BTreeMap<ScannerKind
                     vuln_id: id.clone(),
                     trail: dep.trail.clone(),
                     scanner: Some(*scanner),
+                    build_only: dep.build_only,
                 });
             }
         }
@@ -73,6 +74,7 @@ mod tests {
             artifact: "lodash".into(),
             version: "4.17.20".into(),
             trail: vec![],
+            build_only: false,
         };
         let recorded = BTreeMap::from([(ScannerKind::Npm, vec![lodash])]);
         let advisories = Advisories::from([(("npm".into(), "lodash".into(), "4.17.20".into()), vec!["GHSA-new".into()])]);

@@ -1,4 +1,7 @@
+use crate::scanners::{Dependency, RepoStats, ScanContext, ScannerKind, Vulnerability};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
+use std::path::Path;
 
 #[derive(Serialize)]
 struct OsvBatchQuery<'a> {
@@ -87,4 +90,57 @@ pub fn fetch_vulnerabilities(client: &reqwest::Client, dependencies: &[(&str, &s
     })?;
 
     Ok(found_vulns)
+}
+
+/// Each `(artifact, version)` of a lockfile, with whether it only builds or tests the repository: a version the
+/// lockfile holds several times is shipped when any of them is.
+pub type Locked = BTreeMap<(String, String), bool>;
+
+pub fn lock(locked: &mut Locked, artifact: &str, version: &str, build_only: bool) {
+    locked
+        .entry((artifact.to_string(), version.to_string()))
+        .and_modify(|known| *known &= build_only)
+        .or_insert(build_only);
+}
+
+/// Checks the locked dependencies against OSV and records them with the vulnerabilities found; false, with the
+/// failure in the scanner's log, when OSV fails.
+pub fn check_locked(ctx: &ScanContext, stats: &mut RepoStats, scanner: (ScannerKind, &str), ecosystem: &str, manifest: &Path, locked: &Locked) -> bool {
+    let (scanner, log) = scanner;
+    let queries: Vec<(&str, &str, &str)> = locked
+        .keys()
+        .map(|(artifact, version)| (ecosystem, artifact.as_str(), version.as_str()))
+        .collect();
+    match fetch_vulnerabilities(ctx.client, &queries) {
+        Ok(found) => {
+            stats.add_checked_dependencies(
+                scanner,
+                locked.iter().map(|((artifact, version), build_only)| Dependency {
+                    ecosystem: ecosystem.to_string(),
+                    project: ctx.repo.name.clone(),
+                    artifact: artifact.clone(),
+                    version: version.clone(),
+                    trail: vec![],
+                    build_only: *build_only,
+                }),
+            );
+            let vulnerabilities = found
+                .into_iter()
+                .map(|(artifact, version, vuln_id)| Vulnerability {
+                    project: ctx.repo.name.clone(),
+                    build_only: locked.get(&(artifact.clone(), version.clone())).copied().unwrap_or(false),
+                    artifact,
+                    version,
+                    vuln_id,
+                    ..Default::default()
+                })
+                .collect();
+            stats.add_vulnerabilities(scanner, vulnerabilities);
+            true
+        }
+        Err(e) => {
+            ctx.report_failure(log, format!("OSV check failed for {}: {}", manifest.display(), e));
+            false
+        }
+    }
 }

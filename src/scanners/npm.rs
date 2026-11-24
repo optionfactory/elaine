@@ -1,6 +1,6 @@
-use crate::scanners::osv::fetch_vulnerabilities;
+use crate::scanners::osv::{Locked, check_locked, lock};
 use crate::scanners::pathcollector::Pattern;
-use crate::scanners::{CheckStatus, Dependency, OutdatedDependency, RepoStats, ScanContext, Scanner, ScannerKind, Vulnerability};
+use crate::scanners::{CheckStatus, OutdatedDependency, RepoStats, ScanContext, Scanner, ScannerKind};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
@@ -13,6 +13,26 @@ struct PackageLock {
 #[derive(Deserialize)]
 struct NpmPackage {
     version: Option<String>,
+    /// Only reached through dev dependencies.
+    #[serde(default)]
+    dev: bool,
+    #[serde(default)]
+    os: Vec<String>,
+    #[serde(default)]
+    cpu: Vec<String>,
+}
+
+impl NpmPackage {
+    /// npm leaves out of the install a package whose `os` or `cpu` excludes the machine: the platform builds of esbuild
+    /// or swc, say. Repositories are built and run on Linux amd64.
+    fn installs_on_linux_amd64(&self) -> bool {
+        let allows = |allowed: &[String], platform: &str| {
+            allowed.is_empty()
+                || allowed.iter().any(|a| a == platform)
+                || allowed.iter().all(|a| a.starts_with('!')) && !allowed.iter().any(|a| a.strip_prefix('!') == Some(platform))
+        };
+        allows(&self.os, "linux") && allows(&self.cpu, "x64")
+    }
 }
 
 #[derive(Deserialize)]
@@ -69,52 +89,19 @@ impl Scanner for NpmScanner {
                 }
             };
 
-            let per_vulns_ok = (|| -> Option<()> {
-                let packages = packages.as_ref()?;
-                let mut deps = Vec::new();
+            let per_vulns_ok = packages.as_ref().is_some_and(|packages| {
+                let mut locked = Locked::new();
                 for (path, pkg) in packages {
-                    if path.is_empty() {
-                        continue;
-                    }
-                    let name = path.split("node_modules/").last().unwrap_or(path);
-                    if let Some(version) = &pkg.version {
-                        deps.push(("npm", name, version.as_str()));
-                    }
-                }
-                match fetch_vulnerabilities(ctx.client, &deps) {
-                    Ok(vulns) => {
-                        stats.add_checked_dependencies(
-                            ScannerKind::Npm,
-                            deps.iter().map(|(ecosystem, name, version)| Dependency {
-                                ecosystem: ecosystem.to_string(),
-                                project: ctx.repo.name.clone(),
-                                artifact: name.to_string(),
-                                version: version.to_string(),
-                                trail: vec![],
-                            }),
-                        );
-                        stats.add_vulnerabilities(
-                            ScannerKind::Npm,
-                            vulns
-                                .into_iter()
-                                .map(|(pkg, ver, id)| Vulnerability {
-                                    project: ctx.repo.name.clone(),
-                                    artifact: pkg,
-                                    version: ver,
-                                    vuln_id: id,
-                                    ..Default::default()
-                                })
-                                .collect(),
-                        );
-                        Some(())
-                    }
-                    Err(e) => {
-                        ctx.report_failure("npm", format!("OSV check failed for {}: {}", lock_path.display(), e));
-                        None
+                    let name = path.rsplit("node_modules/").next().unwrap_or(path);
+                    if let Some(version) = &pkg.version
+                        && !path.is_empty()
+                        && pkg.installs_on_linux_amd64()
+                    {
+                        lock(&mut locked, name, version, pkg.dev);
                     }
                 }
-            })()
-            .is_some();
+                check_locked(ctx, stats, (ScannerKind::Npm, "npm"), "npm", lock_path, &locked)
+            });
             vulns_ok &= per_vulns_ok;
 
             let per_outdated_ok = match ctx.run_logged("npm", "npm", &["outdated", "--json"], &run_dir) {
@@ -189,5 +176,27 @@ mod tests {
 
         let found: Vec<(&str, &str, &str)> = deps.iter().map(|d| (d.artifact.as_str(), d.current.as_str(), d.latest.as_str())).collect();
         assert_eq!(found, vec![("left-pad", "1.0.0", "1.3.0")]);
+    }
+
+    #[test]
+    fn platform_builds_for_other_machines_are_not_installed() {
+        let lock: PackageLock = serde_json::from_str(
+            r#"{ "packages": {
+                "node_modules/@esbuild/linux-x64": { "version": "0.25.0", "os": ["linux"], "cpu": ["x64"] },
+                "node_modules/@esbuild/darwin-arm64": { "version": "0.25.0", "os": ["darwin"], "cpu": ["arm64"] },
+                "node_modules/fsevents": { "version": "2.3.3", "os": ["!linux", "!win32"] },
+                "node_modules/left-pad": { "version": "1.0.0" }
+            } }"#,
+        )
+        .unwrap();
+        let mut installed: Vec<_> = lock
+            .packages
+            .unwrap()
+            .into_iter()
+            .filter(|(_, pkg)| pkg.installs_on_linux_amd64())
+            .map(|(path, _)| path)
+            .collect();
+        installed.sort();
+        assert_eq!(installed, ["node_modules/@esbuild/linux-x64", "node_modules/left-pad"]);
     }
 }
