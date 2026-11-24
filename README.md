@@ -40,7 +40,7 @@ Create an `elaine.conf.json` file in the directory where you run the tool:
 }
 ```
 
-All fields except `organization` are optional: `data_dir` defaults to `data`, the server binds to `127.0.0.1:8000`, `github_token` can be set here or resolved from the environment, and omitting `login` serves the dashboard without authentication. Unknown fields are refused.
+All fields except `organization` are optional: `data_dir` defaults to `data`, the server binds to `127.0.0.1:8000`, `github_token` can be set here or resolved from the environment, and omitting `login` serves the dashboard without authentication. Within `login` every field is required, `domain` included: without it any Google account would sign in. Unknown fields are refused.
 
 With `login`, the whole dashboard (pages, assets and API) requires a Google login of `domain`: the authorization code flow with PKCE, then a session cookie valid for 12 hours, signed with a key generated at every start (a restart signs everyone out). Only `/favicon.svg` and the pushes to `/api/snapshot` stay public. The OAuth client needs one authorized redirect URI, `<public_url>/oidc/callback`; `/logout` signs out.
 

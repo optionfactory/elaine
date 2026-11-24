@@ -67,9 +67,7 @@ fn start_login(login: &LoginConfig, return_to: &str) -> Response {
         ("code_challenge_method", "S256"),
         ("prompt", "select_account"),
     ];
-    if let Some(domain) = &login.domain {
-        params.push(("hd", domain));
-    }
+    params.push(("hd", &login.domain));
     let Ok(url) = reqwest::Url::parse_with_params("https://accounts.google.com/o/oauth2/v2/auth", &params) else {
         return message(StatusCode::INTERNAL_SERVER_ERROR, "The login address cannot be built.");
     };
@@ -197,10 +195,8 @@ fn id_token_email(login: &LoginConfig, id_token: &str) -> anyhow::Result<String>
     if !claims.email_verified {
         anyhow::bail!("{} is not verified", claims.email);
     }
-    if let Some(domain) = &login.domain
-        && claims.hd.as_ref() != Some(domain)
-    {
-        anyhow::bail!("{} is not an account of {}", claims.email, domain);
+    if claims.hd.as_ref() != Some(&login.domain) {
+        anyhow::bail!("{} is not an account of {}", claims.email, login.domain);
     }
     Ok(claims.email.to_ascii_lowercase())
 }
@@ -266,7 +262,7 @@ mod tests {
             client_id: "elaine.apps.googleusercontent.com".into(),
             client_secret: String::new(),
             public_url: "https://elaine.example.com".into(),
-            domain: Some("example.com".into()),
+            domain: "example.com".into(),
         }
     }
 

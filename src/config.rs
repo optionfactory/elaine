@@ -8,8 +8,9 @@ pub struct LoginConfig {
     pub client_secret: String,
     /// `https://<host>`, where Google sends the browser back after the login.
     pub public_url: String,
-    /// Google Workspace domain: Google offers only its accounts (`hd`), and only its ID tokens are accepted.
-    pub domain: Option<String>,
+    /// Google Workspace domain: Google offers only its accounts (`hd`), and only its ID tokens are accepted. Required:
+    /// without it any Google account would sign in.
+    pub domain: String,
 }
 
 /// Where `elaine push` sends the scan results.
