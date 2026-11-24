@@ -1,5 +1,5 @@
 use crate::images::ImageScan;
-use crate::scanners::{CheckStatus, Dependency, RepoStats, ScannerKind};
+use crate::scanners::{CheckStatus, Dependency, RepoStats, SCAN_FORMAT, ScannerKind};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -97,7 +97,7 @@ impl StatsStore {
             .values()
             .flat_map(|checks| checks.values())
             .any(|status| *status == CheckStatus::Failed);
-        prev.pushed_at == pushed_at && prev.updated_at == updated_at && !has_failed_checks
+        prev.pushed_at == pushed_at && prev.updated_at == updated_at && !has_failed_checks && prev.scan_format == SCAN_FORMAT
     }
 
     pub fn save_project_scan(&self, stat: &RepoStats) -> Result<PathBuf> {
@@ -343,6 +343,21 @@ mod tests {
         };
         let mut stats = RepoStats::new_from_github(&repo);
         stats.record_check(ScannerKind::Npm, "vulns", CheckStatus::Failed);
+        store.save_project_scan(&stats).unwrap();
+        assert!(!store.is_scan_fresh("acme", "2024-01-01T00:00:00Z", "2024-01-02T00:00:00Z"));
+    }
+
+    #[test]
+    fn stale_when_scanned_with_an_older_format() {
+        let (_dir, store) = fresh_store();
+        let repo = GithubRepository {
+            name: "acme".to_string(),
+            updated_at: "2024-01-01T00:00:00Z".to_string(),
+            pushed_at: "2024-01-02T00:00:00Z".to_string(),
+            ..Default::default()
+        };
+        let mut stats = RepoStats::new_from_github(&repo);
+        stats.scan_format = SCAN_FORMAT - 1;
         store.save_project_scan(&stats).unwrap();
         assert!(!store.is_scan_fresh("acme", "2024-01-01T00:00:00Z", "2024-01-02T00:00:00Z"));
     }

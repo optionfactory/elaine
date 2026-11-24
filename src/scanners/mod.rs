@@ -74,8 +74,15 @@ pub struct OutdatedDependency {
     pub scanner: Option<ScannerKind>,
 }
 
+/// Raised when the scanners change what they find: a repository scanned with an older format is scanned again even
+/// when it did not change. 2: shipped or build only, Go modules compiled only.
+pub const SCAN_FORMAT: u32 = 2;
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RepoStats {
+    /// Missing, so 0, in the scans of releases before 1.9.
+    #[serde(default)]
+    pub scan_format: u32,
     pub name: String,
     pub html_url: String,
     pub created_at: String,
@@ -125,6 +132,7 @@ impl RepoStats {
     /// Initializes a baseline RepoStats object from GitHub metadata
     pub fn new_from_github(repo: &GithubRepository) -> Self {
         Self {
+            scan_format: SCAN_FORMAT,
             name: repo.name.clone(),
             html_url: repo.html_url.clone(),
             created_at: repo.created_at.clone(),
