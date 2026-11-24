@@ -103,6 +103,29 @@ pub fn without_tag(image: &str) -> &str {
 
 const WORKERS: usize = 4;
 
+fn update_grype_db() -> Result<(), String> {
+    match Command::new("grype").args(["db", "update"]).output() {
+        Ok(out) if out.status.success() => Ok(()),
+        Ok(out) => Err(format!("grype db update: {}", String::from_utf8_lossy(&out.stderr).trim())),
+        Err(e) => Err(format!("grype: {e}")),
+    }
+}
+
+/// `grype db status` checks the database against its checksum and says `Status: valid` when it holds.
+fn grype_db_valid() -> bool {
+    Command::new("grype")
+        .args(["db", "status"])
+        .output()
+        .is_ok_and(|out| status_says_valid(&String::from_utf8_lossy(&out.stdout)))
+}
+
+fn status_says_valid(status: &str) -> bool {
+    status
+        .lines()
+        .filter_map(|line| line.strip_prefix("Status:"))
+        .any(|value| value.trim() == "valid")
+}
+
 /// Registry, repository and tag (or digest) of an image as docker reads its name: no registry means Docker Hub, and a
 /// single name there is an official image under `library/`.
 fn reference(image: &str) -> (String, String, String) {
@@ -216,11 +239,17 @@ pub fn scan_images(images: &BTreeSet<String>, digests: &BTreeMap<String, String>
         return BTreeMap::new();
     }
     // once here, so that the parallel runs below do not each try to update the same database
-    let updated = Command::new("grype").args(["db", "update"]).output();
-    let failure = match updated {
-        Ok(out) if out.status.success() => None,
-        Ok(out) => Some(format!("grype db update: {}", String::from_utf8_lossy(&out.stderr).trim())),
-        Err(e) => Some(format!("grype: {e}")),
+    let failure = match update_grype_db() {
+        // a download cut short leaves a database whose checksum fails, and that `db update` thinks current
+        Ok(()) if !grype_db_valid() => Command::new("grype")
+            .args(["db", "delete"])
+            .output()
+            .map_err(|e| format!("grype: {e}"))
+            .and_then(|_| update_grype_db())
+            .err()
+            .or_else(|| (!grype_db_valid()).then(|| "grype: the vulnerability database is still invalid after a new download".to_string())),
+        Ok(()) => None,
+        Err(reason) => Some(reason),
     };
     if let Some(reason) = failure {
         return images
@@ -365,6 +394,14 @@ fn fixable(report: GrypeReport) -> Vec<ImageVulnerability> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_a_valid_status_counts() {
+        let status = |value: &str| format!("Path:      /x/vulnerability.db\nSchema:    v6.1.10\nStatus:    {value}\n");
+        assert!(status_says_valid(&status("valid")));
+        assert!(!status_says_valid(&status("invalid")));
+        assert!(!status_says_valid(""));
+    }
 
     #[test]
     fn image_names_read_as_docker_reads_them() {

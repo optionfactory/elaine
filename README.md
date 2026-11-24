@@ -13,7 +13,7 @@ What `serve` holds, who can do what with it and the known limits: [SECURITY.md](
 * A GitHub personal access token with read permissions for the target organization. This can be provided via the `GITHUB_TOKEN` or `GH_TOKEN` environment variables, or by having an active `gh auth token` session.
 * An `elaine.conf.json` configuration file in the working directory.
 * The ecosystem tools the scanners invoke: `mvn`, `npm`, `go`, and `cargo` with [`cargo-outdated`](https://github.com/kbknapp/cargo-outdated) (only needed for repositories using that ecosystem).
-* For the container images: `docker` with `buildx`, and [`grype`](https://github.com/anchore/grype), which keeps its own vulnerability database (a few hundred MB, updated at every scan). Without them every image shows as failed, and the rest of the scan goes on.
+* For the container images: `docker` with `buildx`, and [`grype`](https://github.com/anchore/grype), which keeps its own vulnerability database (a few GB, updated at every scan; one whose checksum fails, after a download cut short, is deleted and downloaded again). Without them every image shows as failed, and the rest of the scan goes on.
 
 ## Installation
 
