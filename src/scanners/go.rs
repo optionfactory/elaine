@@ -2,6 +2,7 @@ use crate::scanners::osv::fetch_vulnerabilities;
 use crate::scanners::pathcollector::Pattern;
 use crate::scanners::{CheckStatus, Dependency, OutdatedDependency, RepoStats, ScanContext, Scanner, ScannerKind, Vulnerability};
 use serde::Deserialize;
+use std::collections::BTreeSet;
 
 #[derive(Deserialize)]
 struct GoListModule {
@@ -17,6 +18,34 @@ struct GoListModule {
 struct GoListUpdate {
     #[serde(rename = "Version")]
     version: String,
+}
+
+/// A package of `go list -deps -json=Module`: no module for the standard library.
+#[derive(Deserialize)]
+struct GoListPackage {
+    #[serde(rename = "Module")]
+    module: Option<GoListPackageModule>,
+}
+
+#[derive(Deserialize)]
+struct GoListPackageModule {
+    #[serde(rename = "Path")]
+    path: String,
+    /// Missing for the main module and the other modules of a workspace.
+    #[serde(rename = "Version")]
+    version: Option<String>,
+}
+
+/// The modules some package of the repository, its tests included, compiles code from. The module graph of
+/// `go list -m all` also holds modules only required by a dependency's `go.mod`, which never reach the binary.
+fn compiled_modules(go_list: &[u8]) -> serde_json::Result<BTreeSet<(String, String)>> {
+    let mut modules = BTreeSet::new();
+    for package in serde_json::Deserializer::from_slice(go_list).into_iter::<GoListPackage>() {
+        if let Some(GoListPackageModule { path, version: Some(version) }) = package?.module {
+            modules.insert((path, version));
+        }
+    }
+    Ok(modules)
 }
 
 pub struct GoScanner;
@@ -84,12 +113,20 @@ impl Scanner for GoScanner {
                 .collect();
             stats.add_outdated_dependencies(ScannerKind::Go, updates);
 
-            let mut osv_deps = Vec::new();
-            for m in &parsed {
-                if let Some(ref version) = m.version {
-                    osv_deps.push(("Go", m.path.as_str(), version.as_str()));
+            let compiled = match ctx.run_logged("go", "go", &["list", "-e", "-deps", "-test", "-json=Module", "./..."], &run_dir) {
+                Ok(out) if out.success => compiled_modules(&out.stdout).map_err(anyhow::Error::from),
+                Ok(out) => Err(anyhow::anyhow!("{}", String::from_utf8_lossy(&out.stderr).trim())),
+                Err(e) => Err(e),
+            };
+            let compiled = match compiled {
+                Ok(compiled) => compiled,
+                Err(e) => {
+                    ctx.report_failure("go", format!("Failed to list the compiled packages of {}: {}", mod_path.display(), e));
+                    vulns_ok = false;
+                    continue;
                 }
-            }
+            };
+            let osv_deps: Vec<(&str, &str, &str)> = compiled.iter().map(|(path, version)| ("Go", path.as_str(), version.as_str())).collect();
 
             match fetch_vulnerabilities(ctx.client, &osv_deps) {
                 Ok(vulns) => {
@@ -125,5 +162,22 @@ impl Scanner for GoScanner {
         stats.record_check(ScannerKind::Go, "vulns", if vulns_ok { CheckStatus::Ok } else { CheckStatus::Failed });
         stats.record_check(ScannerKind::Go, "outdated", if outdated_ok { CheckStatus::Ok } else { CheckStatus::Failed });
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn only_modules_with_compiled_packages_are_checked() {
+        let go_list = br#"{}
+{"Module": {"Path": "github.com/acme/service", "Main": true}}
+{"Module": {"Path": "github.com/valyala/fasthttp", "Version": "v1.80.0"}}
+{"Module": {"Path": "github.com/valyala/fasthttp", "Version": "v1.80.0"}}
+{"Module": {"Path": "golang.org/x/net", "Version": "v0.63.0"}}
+"#;
+        let modules: Vec<_> = compiled_modules(go_list).unwrap().into_iter().map(|(path, _)| path).collect();
+        assert_eq!(modules, ["github.com/valyala/fasthttp", "golang.org/x/net"]);
     }
 }
